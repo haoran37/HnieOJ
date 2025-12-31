@@ -1,0 +1,16 @@
+{
+  "locale": "English",
+  "oj": "Hunan Institute of Engineering Algorithm Design Online Judge System",
+  "header": {
+    "home": "Home",
+    "bank": "Problem Bank",
+    "set": "Problem Set",
+    "contest": "Contest",
+    "status": "Status",
+    "wiki": "WIKI",
+    "blog": "Blog",
+    "explore": "Explore",
+    "login": "Login",
+    "register": "Register"
+  }
+}

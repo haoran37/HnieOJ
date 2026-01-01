@@ -45,14 +45,14 @@ import FriendLinks from './components/FriendLinks.vue'
 }
 
 .layout-left {
-  flex: 7 0 0;
-  width: calc(70% - 10px);
+  flex: 6.5 0 0;
+  width: calc(65% - 10px);
   min-width: 0;
 }
 
 .layout-right {
-  flex: 3 0 0;
-  width: calc(30% - 10px);
+  flex: 3.5 0 0;
+  width: calc(35% - 10px);
   min-width: 0;
 }
 

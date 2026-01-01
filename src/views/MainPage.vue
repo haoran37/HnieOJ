@@ -1,7 +1,7 @@
 <template>
   <n-space vertical size="large">
      <n-layout>
-      <n-layout-header>
+      <n-layout-header class="header-container">
         <TopNavi />
       </n-layout-header>
        <n-layout-content class="content-limit-container">
@@ -24,12 +24,22 @@
 </script>
 
 <style scoped lang="less">
+.header-container {
+  z-index: 100;
+  position: relative;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
 .content-limit-container {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
-  height: 100%;
-  padding: 0 5%; // 左右自动留空
+  min-height: calc(100vh - var(--header-height) - var(--footer-height));
+  padding: 20px 5% 0;
   box-sizing: border-box;
+  background-color: #EFEFEF;
+  position: relative;
+  z-index: 1;
 }
 </style>

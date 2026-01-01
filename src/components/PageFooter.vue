@@ -29,10 +29,14 @@ import { SITE_CONFIG } from '@/configs';
 .page-footer {
   width: 100%;
   padding: 10px 0;
-  background-color: #f9f9f9;
+  background-color: white;
   border-top: 1px solid #eeeeee;
   display: flex;
   justify-content: center;
+  box-shadow: 0 -2px 2px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 100;
+  overflow: visible;
 }
 
 .content-limit-container {

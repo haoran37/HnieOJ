@@ -100,6 +100,9 @@ function handleMenuChange(key: string) {
   background-color: rgba(216, 216, 216, 0.13);
   height: var(--header-height);
   width: 100%;
+  position: relative;
+  overflow: visible;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.15);
 }
 
 .content-limit-container {

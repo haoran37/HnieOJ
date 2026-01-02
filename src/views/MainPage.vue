@@ -36,7 +36,7 @@
   align-items: flex-start;
   width: 100%;
   min-height: calc(100vh - var(--header-height) - var(--footer-height));
-  padding: 20px 5% 0;
+  padding: 20px 5% 20px;
   box-sizing: border-box;
   background-color: #EFEFEF;
   position: relative;

@@ -36,7 +36,7 @@
         v-model:page-size="pagination.pageSize"
         :item-count="pagination.total"
         show-size-picker
-        :page-sizes="[5, 7, 10, 15]"
+        :page-sizes="[10, 15, 20, 25]"
         @update:page="fetchData"
         @update:page-size="handleSizeChange"
       >
@@ -58,8 +58,8 @@ const loading = ref(false);
 const listData = ref<any[]>([]);
 const pagination = reactive({
   page: 1,
-  pageSize: 7,
-  total: 0
+  pageSize: 10,
+  total: 0,
 });
 
 // TODO: 异步数据请求

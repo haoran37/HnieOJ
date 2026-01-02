@@ -53,10 +53,10 @@ const tableData = ref([])
 
 const pagination = reactive({
   page: 1,
-  pageSize: 10,
+  pageSize: 20,
   itemCount: 0,
   showSizePicker: true,
-  pageSizes: [10, 20, 50],
+  pageSizes: [20, 50, 100, 200],
   prefix: (info: any) => `共 ${info.itemCount} 条数据`
 })
 

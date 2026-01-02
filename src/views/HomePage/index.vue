@@ -10,6 +10,7 @@
         <RecentContests />
         <UserSidePanel />
         <TopRatingList />
+        <TopContributorList />
         <UserSearchBox />
         <FriendLinks />
       </div>
@@ -26,6 +27,7 @@ import UserSidePanel from './components/UserSidePanel.vue'
 import TopRatingList from './components/TopRatingList.vue'
 import UserSearchBox from './components/UserSearchBox.vue'
 import FriendLinks from './components/FriendLinks.vue'
+import TopContributorList from './components/TopContributorList.vue'
 </script>
 
 <style scoped lang="less">

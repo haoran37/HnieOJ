@@ -1,7 +1,7 @@
 <template>
-  <BoardCard title="Top 评分" class="top-rating-card">
+  <BoardCard title="Top 贡献" class="top-contribution-card">
     <template #icon>
-      <n-icon size="22"><BarChartIcon /></n-icon>
+      <n-icon size="22"><RibbonIcon /></n-icon>
     </template>
 
     <n-spin :show="loading">
@@ -10,38 +10,32 @@
           :bordered="false" 
           :single-line="false" 
           size="small" 
-          class="rating-table"
+          class="contribution-table"
         >
           <thead>
             <tr>
               <th style="width: 50px; font-size: 18px;">#</th>
               <th style="font-size: 18px;">专业</th>
               <th style="font-size: 18px;">姓名</th>
-              <th style="width: 80px; font-size: 18px;">评分</th>
+              <th style="width: 80px; font-size: 18px;">贡献值</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(user, index) in ratingList" :key="index">
+            <tr v-for="(user, index) in contributionList" :key="index">
               <td class="index-col">{{ index + 1 }}</td>
               <td>{{ user.major }}</td>
               <td class="name-col">{{ user.name }}</td>
-              <td class="score-col">{{ user.score }}</td>
+              <td class="score-col">{{ user.contribution }}</td>
             </tr>
           </tbody>
         </n-table>
         
-        <n-empty v-if="!loading && ratingList.length === 0" description="暂无数据" />
+        <n-empty v-if="!loading && contributionList.length === 0" description="暂无数据" />
       </div>
     </n-spin>
 
     <div class="card-footer">
-      <div class="footer-left">
-        <n-button text class="blue-link" @click="handleFilter('major')">根据专业</n-button>
-        <span class="divider">|</span>
-        <n-button text class="blue-link" @click="handleFilter('grade')">根据年级</n-button>
-        <span class="divider">|</span>
-        <n-button text class="blue-link" @click="handleFilter('class')">根据班级</n-button>
-      </div>
+      <div></div>
       <n-button text class="blue-link" @click="handleViewAll">
         View all ->
       </n-button>
@@ -51,28 +45,28 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { BarChartOutline as BarChartIcon } from '@vicons/ionicons5';
+import { RibbonOutline as RibbonIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 
-interface RatingUser {
+interface ContributionUser {
   major: string;
   name: string;
-  score: number;
+  contribution: number;
 }
 
 const loading = ref(false);
-const ratingList = ref<RatingUser[]>([]);
+const contributionList = ref<ContributionUser[]>([]);
 
-// TODO: 替换为真实数据请求
-const fetchTopRatings = async () => {
+// 异步请求占位
+const fetchTopContributions = async () => {
   loading.value = true;
   try {
-    // 模拟异步请求占位
+    // 模拟异步请求
     setTimeout(() => {
-      ratingList.value = Array.from({ length: 10 }, () => ({
-        major: '计算机XXXX',
+      contributionList.value = Array.from({ length: 10 }, () => ({
+        major: '软件工程XXXX',
         name: 'XXX',
-        score: 4009
+        contribution: 256
       }));
       loading.value = false;
     }, 400);
@@ -81,14 +75,13 @@ const fetchTopRatings = async () => {
   }
 };
 
-const handleFilter = (type: string) => console.log('Filter:', type);
-const handleViewAll = () => console.log('View All');
+const handleViewAll = () => console.log('View all contributions');
 
-onMounted(fetchTopRatings);
+onMounted(fetchTopContributions);
 </script>
 
 <style scoped lang="less">
-.top-rating-card {
+.top-contribution-card {
   :deep(.n-card__content) {
     padding: 0;
   }
@@ -98,7 +91,7 @@ onMounted(fetchTopRatings);
   width: 100%;
 }
 
-.rating-table {
+.contribution-table {
   width: 100%;
   border-collapse: collapse;
 
@@ -114,6 +107,7 @@ onMounted(fetchTopRatings);
   }
 
   tbody tr {
+    // 灰白间隔逻辑
     &:nth-child(even) td {
       background-color: #f7f7f7; 
     }
@@ -148,13 +142,6 @@ onMounted(fetchTopRatings);
   align-items: center;
   padding: 8px 12px;
   background-color: #fff;
-
-  .footer-left {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    .divider { color: #d9d9d9; font-size: 14px; margin: 0 1px; }
-  }
 
   .blue-link {
     color: #2080f0;

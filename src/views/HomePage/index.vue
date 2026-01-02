@@ -47,22 +47,22 @@ import TopContributorList from './components/TopContributorList.vue'
 }
 
 .layout-left {
-  flex: 6.5 0 0;
-  width: calc(65% - 10px);
+  flex: 65;
+  // width: calc(65% - 10px);
   min-width: 0;
 }
 
 .layout-right {
-  flex: 3.5 0 0;
-  width: calc(35% - 10px);
+  flex: 35;
+  // width: calc(35% - 10px);
   min-width: 0;
 }
 
 .page-container * {
-  word-wrap: break-word !important;
-  word-break: break-all !important;
-  white-space: normal !important;
-  overflow-wrap: break-word !important;
+  word-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: break-word;
   box-sizing: border-box;
   max-width: 100%;
 }

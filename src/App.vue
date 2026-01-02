@@ -12,7 +12,6 @@
 
 <style>
   body {
-    /* overflow: hidden; */
     --header-height: 60px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

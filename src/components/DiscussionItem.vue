@@ -119,7 +119,6 @@ defineEmits([
   display: block;
   width: 100%;
   overflow: hidden;
-
   font-size: 15px;
   font-weight: 500;
   color: #007bff;

@@ -12,15 +12,15 @@
         :show-feedback="false" 
         class="search-form"
       >
-        <n-form-item label="姓名：">
+        <n-form-item label="姓名:">
           <n-input v-model:value="searchForm.name" placeholder="请输入" clearable />
         </n-form-item>
-        
-        <n-form-item label="学号：">
+
+        <n-form-item label="学号:">
           <n-input v-model:value="searchForm.studentId" placeholder="请输入" clearable />
         </n-form-item>
-        
-        <n-form-item label="班级：">
+
+        <n-form-item label="班级:">
           <n-input v-model:value="searchForm.className" placeholder="请输入" clearable />
         </n-form-item>
 

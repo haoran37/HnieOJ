@@ -8,12 +8,12 @@
       <div class="left-info">
         <div class="stat-line">
           <n-icon size="26" class="stat-icon blue-icon"><BarChartIcon /></n-icon>
-          <span class="stat-label">评分：</span>
+          <span class="stat-label">评分:</span>
           <span class="stat-value">{{ userInfo.rating }}</span>
         </div>
         <div class="stat-line">
           <n-icon size="26" class="stat-icon red-icon"><RibbonIcon /></n-icon>
-          <span class="stat-label">贡献：</span>
+          <span class="stat-label">贡献:</span>
           <span class="stat-value">{{ userInfo.contribution }}</span>
         </div>
 
@@ -38,9 +38,8 @@
           :style="{
             backgroundColor: '#2080f0',
             fontSize: '48px',
-            // borderRadius: '8px' // 圆角
           }"
-          src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg",
+          src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg"
          />          
         <div class="display-username">{{ userInfo.username }}</div>
       </div>

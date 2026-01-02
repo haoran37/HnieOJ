@@ -1,10 +1,10 @@
 <template>
   <n-space vertical size="large">
-     <n-layout>
+    <n-layout>
       <n-layout-header class="header-container">
         <TopNavi />
       </n-layout-header>
-       <n-layout-content class="content-limit-container">
+      <n-layout-content class="content-limit-container">
          <RouterView />
       </n-layout-content>
       <n-layout-footer>
@@ -27,8 +27,8 @@
 .header-container {
   z-index: 100;
   position: relative;
-  overflow: visible !important;
-  padding: 0 !important;
+  overflow: visible;
+  padding: 0;
 }
 
 .content-limit-container {

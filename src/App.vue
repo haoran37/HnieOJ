@@ -1,7 +1,9 @@
 <template>
-  <NConfigProvider>
-    <MainPage />
-  </NConfigProvider>
+  <n-config-provider>
+    <n-modal-provider>
+      <MainPage />
+    </n-modal-provider>
+  </n-config-provider>
 </template>
 
 <script setup lang="ts">

@@ -160,8 +160,7 @@ onMounted(() => {
   padding: 16px 24px;
   background: #fff;
   border-top: 1px solid #efeff5;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
+  box-sizing: border-box;
 }
 
 .pagination-prefix {

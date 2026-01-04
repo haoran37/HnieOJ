@@ -131,6 +131,7 @@ import { ChevronDownOutline as ChevronDown, SearchOutline as SearchIcon } from '
 const tagStore = useTagStore();
 const problemStore = useProblemStore();
 const { tagData, loading: tagLoading } = storeToRefs(tagStore);
+const { total: totalCount } = storeToRefs(problemStore);
 
 const selectedSource = ref('HNIE');
 const selectedDifficultyLabel = ref('');
@@ -138,7 +139,6 @@ const searchKeyword = ref('');
 const searchInContent = ref(false);
 const showTagModal = ref(false);
 const selectedTags = ref<string[]>([]);
-const totalCount = ref(0);
 
 // 静态选项
 const sourceOptions = [
@@ -150,11 +150,6 @@ const difficultyOptions = [
   { label: '入门', key: '1' }, { label: '简单', key: '2' },
   { label: '中等', key: '3' }, { label: '困难', key: '4' }
 ];
-
-onMounted(() => {
-  // 页面挂载时对比 Hash 并加载数据
-  tagStore.fetchTags();
-});
 
 const handleDifficultySelect = (key: string, option: any) => {
   selectedDifficultyLabel.value = option.label;
@@ -176,26 +171,28 @@ const clearAll = () => {
 };
 
 const handleSearch = () => {
-  console.log('Filter参数:', {
-    source: selectedSource.value,
-    keyword: searchKeyword.value,
-    tags: selectedTags.value
-  });
-  // 将 Filter 中的数据同步到 problemStore
   problemStore.updateSearch({
     source: selectedSource.value,
     keyword: searchKeyword.value,
     tags: selectedTags.value,
-    difficulty: selectedDifficultyLabel.value // 需要把中文转成 ID 或直接传给后端处理
+    difficulty: selectedDifficultyLabel.value,
+    searchInContent: searchInContent.value,
   });
+  
+  problemStore.handlePageChange(1);
 };
+
+onMounted(() => {
+  // 页面挂载时对比 Hash 并加载数据
+  tagStore.fetchTags();
+});
 </script>
 
 <style scoped lang="less">
 .problem-filter-card {
   background: #fff;
   border-radius: 4px;
-  width: 100%;
+  // width: 100%;
 
   .filter-row {
     display: flex;

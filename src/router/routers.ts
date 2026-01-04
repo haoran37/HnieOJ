@@ -14,10 +14,10 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ProblemsPage/ProblemList.vue')
   },
   {
-    name: 'List',
-    path: '/lists',
+    name: 'Training',
+    path: '/training',
     meta: { title: '题单' },
-    component: () => import('@/views/ListsPage.vue')
+    component: () => import('@/views/TrainingPage.vue')
   },
   {
     name: 'Contests',

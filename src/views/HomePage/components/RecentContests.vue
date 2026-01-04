@@ -9,15 +9,15 @@
         <ContestItem 
           v-if="contest" 
           v-bind="contest" 
-          @click="handleJump"
+          :compact="true" @click="handleJump"
         />
         <n-empty v-else description="暂无近期比赛" />
       </div>
     </n-spin>
 
     <div class="view-all-wrapper">
-      <n-button text type="info" size="small" @click="handleViewAll">
-        View all ->
+      <n-button text size="tiny" type="primary" color="#007bff" @click="handleViewAll">
+        View all »
       </n-button>
     </div>
   </BoardCard>
@@ -25,40 +25,64 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { TrophyOutline as TrophyIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 import ContestItem from '@/components/ContestItem.vue';
 
+const router = useRouter();
 const loading = ref(false);
 const contest = ref<any>(null);
 
-  // TODO: 从后端获取真实比赛数据
 const fetchContest = async () => {
   loading.value = true;
-  // 模拟 API 返回的原始数据
+  
+  // TODO: 从后端获取最新的一场比赛数据
   setTimeout(() => {
     contest.value = {
+      id: '1024',
       title: '第二十届湖南省大学生程序设计竞赛',
-      tagName: 'P1000',
-      tagType: 'success',
+      tags: ['省赛', 'ICPC', '团队赛'], // 字符串数组
       source: 'HNCPC 组委会',
-      beginTime: '2026-01-01T20:00:00',
-      endTime: '2026-01-01T22:00:00'
+      beginTime: '2026-01-05T09:00:00',
+      endTime: '2026-01-05T14:00:00',
+      participantCount: 1250 // 报名人数
     };
     loading.value = false;
   }, 500);
 };
 
-const handleViewAll = () => console.log('View All');
-const handleJump = () => console.log('Jump');
+const handleJump = () => {
+  if (contest.value) {
+    router.push(`/contest/${contest.value.id}`);
+  }
+};
 
-onMounted(fetchContest);
+const handleViewAll = () => {
+  router.push('/contests');
+};
+
+onMounted(() => {
+  fetchContest();
+});
 </script>
 
 <style scoped lang="less">
-.contests-content { min-height: 120px; }
+.contests-content {
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  
+  :deep(.contest-item) {
+    margin: 4px 0;
+  }
+}
+
 .view-all-wrapper {
-  display: flex; justify-content: flex-end; margin-top: 10px;
-  :deep(.n-button) { font-size: 13px; font-weight: 500; color: #2080f0; }
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  padding-right: 4px;
 }
 </style>

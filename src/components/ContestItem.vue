@@ -1,150 +1,352 @@
 <template>
-  <div class="contest-item" @click="$emit('click')">
-    <div class="header-row" :style="statusStyle.header">
-      <n-ellipsis :line-clamp="1" class="contest-title">{{ title }}</n-ellipsis>
-      <n-tag :type="tagType" size="small" :bordered="false">{{ tagName }}</n-tag>
-    </div>
-
-    <div class="body-row">
-      <div class="info-left">
-        <div class="info-line">
-          <n-tag type="info" size="small" :bordered="false" class="label-tag">状态</n-tag>
-          <span class="info-text" :style="{ color: statusStyle.descColor }">
-            {{ statusInfo.desc }}
-          </span>
+  <div 
+    class="contest-item" 
+    :class="{ 'is-compact': compact }"
+    :style="{ borderColor: statusStyle.borderColor }" 
+    @click="$emit('click')"
+  >
+    
+    <div class="header-section" :style="statusStyle.header">
+      <div class="title-row">
+        <div class="title-wrapper">
+          <n-tag :bordered="false" size="small" :type="statusConfig.type" class="status-badge">
+            {{ statusConfig.text }}
+          </n-tag>
+          <h3 class="title" :style="{ color: statusStyle.header.color }">
+            <n-ellipsis :line-clamp="compact ? 1 : 2" :tooltip="false">
+              {{ title }}
+            </n-ellipsis>
+          </h3>
         </div>
-        <div class="info-line">
-          <n-tag type="info" size="small" :bordered="false" class="label-tag">来源</n-tag>
-          <span class="info-text source-link">{{ source }}</span>
+        
+        <div v-if="!compact" class="time-display desktop-time" :style="{ color: statusStyle.header.color }">
+          <n-icon :component="TimeIcon" />
+          <span class="time-text">{{ timeText }}</span>
         </div>
       </div>
 
-      <div class="time-right">
-        <div class="time-str">始：{{ formatTime(beginTime) }}</div>
-        <div class="time-str">终：{{ formatTime(endTime) }}</div>
+      <div v-if="compact" class="time-display mobile-time" :style="{ color: statusStyle.header.color }">
+        <n-icon :component="TimeIcon" />
+        <span class="time-text">{{ timeText }}</span>
+      </div>
+    </div>
+
+    <div class="tags-section">
+      <n-space :size="[6, 6]" :wrap="true">
+        <n-tag 
+          v-for="tag in tags" 
+          :key="tag" 
+          :bordered="false" 
+          size="small" 
+          round
+          :style="getTagStyle(tag)"
+        >
+          {{ tag }}
+        </n-tag>
+      </n-space>
+    </div>
+
+    <div class="footer-section">
+      <div class="source-info">
+        <span class="label">来源：</span>
+        <span class="source-text">
+          <n-ellipsis style="max-width: 120px">{{ source }}</n-ellipsis>
+        </span>
+      </div>
+
+      <div class="meta-actions">
+        <div class="participant-info" :style="{ color: statusStyle.descColor }">
+          <n-icon :component="PeopleIcon" />
+          <span>{{ participantCount }}</span>
+        </div>
+
+        <n-tooltip trigger="hover">
+          <template #trigger>
+            <div class="star-btn" @click.stop="handleToggleFollow">
+               <n-icon 
+                 size="18" 
+                 :component="isFollowed ? StarFilled : StarOutline" 
+                 :color="isFollowed ? '#f0a020' : '#999'" 
+               />
+            </div>
+          </template>
+          {{ isFollowed ? '点击取消关注' : '关注后会邮件通知您' }}
+        </n-tooltip>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useContestTimer, formatTime, formatDuration } from '@/composables/useContestTime';
+import { computed, ref } from 'vue';
+import { 
+  TimeOutline as TimeIcon, 
+  PeopleOutline as PeopleIcon,
+  StarOutline,
+  Star as StarFilled
+} from '@vicons/ionicons5';
+import { useNotification } from 'naive-ui'; // 引入 Notification
+import { useContestTimer, formatDuration } from '@/composables/useContestTime';
+import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
+import { useUserStore } from '@/stores/userStore'; // 引入 UserStore
 
-interface StyleConfig {
-  header: { backgroundColor: string; color: string; };
-  descColor: string;
-}
-
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   title: string;
-  tagName: string;
-  tagType: 'success' | 'error' | 'warning' | 'info' | 'primary';
+  tags: string[];
   source: string;
   beginTime: string;
   endTime: string;
-}>();
+  participantCount: number;
+  compact?: boolean; // 是否开启紧凑模式
+}>(), {
+  compact: false
+});
 
+const emit = defineEmits(['click']);
 const { now } = useContestTimer();
+const notification = useNotification();
+const userStore = useUserStore();
 
-// 计算状态信息
-const statusInfo = computed<{ type: 0 | 1 | 2; desc: string }>(() => {
-  const start = new Date(props.beginTime).getTime();
-  const end = new Date(props.endTime).getTime();
-  const current = now.value.getTime();
+const isFollowed = ref(false);
 
-  if (current < start) {
-    return { type: 0, desc: `距开始 ${formatDuration(start - current)}` };
-  } else if (current <= end) {
-    return { type: 1, desc: `距结束 ${formatDuration(end - current)}` };
+const handleToggleFollow = () => {
+  if (!userStore.isEmailBound) {
+    notification.error({
+      content: '关注失败',
+      meta: '您尚未绑定邮箱，无法接收比赛通知。请前往个人中心设置。',
+      duration: 3000,
+      keepAliveOnHover: true
+    });
+    return;
+  }
+
+  isFollowed.value = !isFollowed.value;
+
+  if (isFollowed.value) {
+    console.log('Event: Follow Contest Success');
+    notification.success({
+      content: '关注成功',
+      meta: '比赛开始前将通过邮件通知您',
+      duration: 2500
+    });
   } else {
-    return { type: 2, desc: '已结束' };
+    console.log('Event: Unfollow Contest');
+    notification.info({
+      content: '已取消关注',
+      duration: 2000
+    });
+  }
+};
+
+const startTimeMs = computed(() => new Date(props.beginTime).getTime());
+const endTimeMs = computed(() => new Date(props.endTime).getTime());
+const diffToStart = computed(() => startTimeMs.value - now.value.getTime());
+const diffToEnd = computed(() => endTimeMs.value - now.value.getTime());
+
+const contestStatus = computed(() => {
+  if (diffToStart.value > 0) return 0; // 未开始
+  if (diffToEnd.value > 0) return 1;   // 进行中
+  return 2;                           // 已结束
+});
+
+const timeText = computed(() => {
+  if (contestStatus.value === 2) return '已结束';
+  if (contestStatus.value === 1) return `距结束：${formatDuration(diffToEnd.value)}`;
+  
+  if (diffToStart.value < 86400000) {
+    return `距开始：${formatDuration(diffToStart.value)}`;
+  } else {
+    const date = new Date(props.beginTime);
+    const M = date.getMonth() + 1;
+    const D = date.getDate();
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    return `${M}月${D}日 ${h}:${m}`;
   }
 });
 
-// 计算样式
-const statusStyle = computed<StyleConfig>(() => {
-  const configs: Record<0 | 1 | 2, StyleConfig> = {
-    0: { header: { backgroundColor: '#f0f9f4', color: '#18a058' }, descColor: '#999' }, // 未开始
-    1: { header: { backgroundColor: '#fdf6ec', color: '#D5A000' }, descColor: '#D5A000' }, // 进行中
-    2: { header: { backgroundColor: '#fef0f0', color: '#f56c6c' }, descColor: '#f56c6c' }  // 已结束
+const statusStyle = computed(() => {
+  const configs = {
+    0: { 
+      header: { backgroundColor: '#f0f9f4', color: '#18a058' }, 
+      descColor: '#999',
+      borderColor: '#18a05880' 
+    },
+    1: { 
+      header: { backgroundColor: '#fdf6ec', color: '#D5A000' }, 
+      descColor: '#D5A000',
+      borderColor: '#D5A00090'
+    },
+    2: { 
+      header: { backgroundColor: '#fef0f0', color: '#f56c6c' }, 
+      descColor: '#f56c6c',
+      borderColor: '#f56c6c90'
+    }
   };
-  return configs[statusInfo.value.type];
+  return configs[contestStatus.value];
 });
 
-defineEmits(['click']);
+const statusConfig = computed(() => {
+  const map = {
+    0: { text: '未开始', type: 'success' as const },
+    1: { text: '进行中', type: 'warning' as const },
+    2: { text: '已结束', type: 'error' as const }
+  };
+  return map[contestStatus.value];
+});
+
+const getTagStyle = (tag: string) => ({
+  backgroundColor: stringToColor(tag),
+  color: stringToTextColor(tag)
+});
 </script>
 
 <style scoped lang="less">
 .contest-item {
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
+  background: #fff;
+  border: 2px solid #efeff5;
+  border-radius: 8px;
+  transition: all 0.2s ease;
   cursor: pointer;
-  background-color: #fff;
-  transition: all 0.2s ease-in-out;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 
   &:hover {
-    border-color: #007bff;
+    transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   }
 
-  .header-row {
-    padding: 10px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  // Header 区域
+  .header-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0,0,0,0.03);
 
-    .status-tag {
-      margin-left: 10px;
-      font-weight: bold;
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
     }
-  }
 
-  .body-row {
-    padding: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    .title-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
 
-    .info-left {
-      .info-line {
-        display: flex;
-        align-items: center;
-        margin-bottom: 8px;
-        &:last-child { margin-bottom: 0; }
-
-        .label-tag {
-          width: 44px;
-          justify-content: center;
-          margin-right: 12px;
-          font-weight: bold;
-        }
-        .info-text {
-          font-size: 14px;
-          font-weight: 500;
-        }
-        .source-link {
-          color: #007bff;
-        }
+      .status-badge { 
+        flex-shrink: 0; 
+        font-weight: bold; 
+      }
+      
+      .title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: bold;
+        line-height: 1.4;
       }
     }
 
-    .time-right {
-      text-align: right;
-      .time-str {
-        font-size: 13px;
-        color: #888;
-        line-height: 1.6;
+    .time-display {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      font-family: 'Monaco', monospace;
+      font-weight: 500;
+      white-space: nowrap;
+      
+      &.desktop-time {
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+      
+      &.mobile-time {
+        margin-top: 6px;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+    }
+  }
+
+  // Tags 区域
+  .tags-section {
+    padding: 10px 16px 6px;
+  }
+
+  // Footer 区域
+  .footer-section {
+    padding: 6px 16px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .source-info {
+      font-size: 12px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      
+      .label { white-space: nowrap; }
+      .source-text { 
+        color: #2080f0; 
+        font-weight: 500; 
+      }
+    }
+
+    .meta-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .participant-info {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      
+      .star-btn {
+        display: flex;
+        align-items: center;
+        padding: 4px;
+        border-radius: 50%;
+        transition: background-color 0.2s;
+        cursor: pointer;
+        &:hover { background-color: rgba(0,0,0,0.05); }
       }
     }
   }
 }
 
-:deep(.contest-title) {
-  font-size: 18px;
-  font-weight: bold;
-  flex: 1;
+// 紧凑模式下的样式微调
+.contest-item.is-compact {
+  border-width: 1px;
+  
+  .header-section {
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    
+    .title-row {
+      width: 100%;
+    }
+    
+    .title-wrapper {
+      .title { font-size: 17px; }
+    }
+  }
+
+  .tags-section {
+    padding: 8px 12px 4px;
+  }
+
+  .footer-section {
+    padding: 4px 12px 10px;
+  }
 }
 </style>

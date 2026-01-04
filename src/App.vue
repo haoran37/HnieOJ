@@ -1,7 +1,9 @@
 <template>
   <n-config-provider>
     <n-modal-provider>
-      <MainPage />
+      <n-notification-provider>
+        <MainPage />
+      </n-notification-provider>
     </n-modal-provider>
   </n-config-provider>
 </template>

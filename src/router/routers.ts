@@ -11,7 +11,7 @@ export const routes: RouteRecordRaw[] = [
     name: 'Problems',
     path: '/problems',
     meta: { title: '题库' },
-    component: () => import('@/views/ProblemsPage/index.vue')
+    component: () => import('@/views/ProblemsPage/ProblemList.vue')
   },
   {
     name: 'List',

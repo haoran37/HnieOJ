@@ -29,7 +29,7 @@ export const routes: RouteRecordRaw[] = [
     name: 'Homework',
     path: '/homework',
     meta: { title: '作业' },
-    component: () => import('@/views/HomeworkPage.vue')
+    component: () => import('@/views/HomeworkPage/HomeworkList.vue')
   },
   {
     name: 'Status',

@@ -56,7 +56,10 @@
 
       <div class="meta-actions">
         <div class="participant-info" :style="{ color: statusStyle.descColor }">
-          <n-icon :component="PeopleIcon" />
+          <n-icon 
+            :component="PeopleIcon"
+            size="18"
+          />
           <span>{{ participantCount }}</span>
         </div>
 
@@ -286,7 +289,7 @@ const getTagStyle = (tag: string) => ({
     align-items: center;
 
     .source-info {
-      font-size: 12px;
+      font-size: 13px;
       color: #888;
       display: flex;
       align-items: center;
@@ -308,7 +311,7 @@ const getTagStyle = (tag: string) => ({
         display: flex;
         align-items: center;
         gap: 4px;
-        font-size: 12px;
+        font-size: 14px;
         white-space: nowrap;
       }
       

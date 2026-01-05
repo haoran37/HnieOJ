@@ -50,7 +50,7 @@
       <div class="source-info">
         <span class="label">来源：</span>
         <span class="source-text">
-          <n-ellipsis style="max-width: 120px">{{ source }}</n-ellipsis>
+          <n-ellipsis style="max-width: 500px">{{ source }}</n-ellipsis>
         </span>
       </div>
 
@@ -60,7 +60,7 @@
           <span>{{ participantCount }}</span>
         </div>
 
-        <n-tooltip trigger="hover">
+        <n-tooltip trigger="hover" v-if="showFollow">
           <template #trigger>
             <div class="star-btn" @click.stop="handleToggleFollow">
                <n-icon 
@@ -85,10 +85,10 @@ import {
   StarOutline,
   Star as StarFilled
 } from '@vicons/ionicons5';
-import { useNotification } from 'naive-ui'; // 引入 Notification
+import { useNotification } from 'naive-ui';
 import { useContestTimer, formatDuration } from '@/composables/useContestTime';
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
-import { useUserStore } from '@/stores/userStore'; // 引入 UserStore
+import { useUserStore } from '@/stores/userStore';
 
 const props = withDefaults(defineProps<{
   title: string;
@@ -98,8 +98,10 @@ const props = withDefaults(defineProps<{
   endTime: string;
   participantCount: number;
   compact?: boolean; // 是否开启紧凑模式
+  showFollow?: boolean; // 是否开启关注按钮
 }>(), {
-  compact: false
+  compact: false,
+  showFollow: true,
 });
 
 const emit = defineEmits(['click']);

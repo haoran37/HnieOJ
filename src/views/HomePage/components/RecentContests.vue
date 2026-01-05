@@ -9,7 +9,8 @@
         <ContestItem 
           v-if="contest" 
           v-bind="contest" 
-          :compact="true" @click="handleJump"
+          :compact="true"
+          @click="handleJump"
         />
         <n-empty v-else description="暂无近期比赛" />
       </div>

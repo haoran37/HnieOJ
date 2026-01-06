@@ -36,7 +36,7 @@
             placeholder="状态" 
             size="small" 
             clearable 
-            style="width: 160px"
+            style="width: 200px"
           />
         </div>
 

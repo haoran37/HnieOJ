@@ -1,6 +1,21 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 
 /**
+ * 格式化日期显示 (年-月-日 时:分:秒)
+ */
+export const formatAllTime = () => {
+  const date = new Date();
+  if (isNaN(date.getTime())) return '无效时间';
+  const Y = date.getFullYear();
+  const M = date.getMonth() + 1;
+  const D = date.getDate();
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const s = String(date.getSeconds()).padStart(2, '0');
+  return `${Y}-${M}-${D} ${h}:${m}:${s}`;
+}
+
+/**
  * 格式化日期显示 (月-日 时:分)
  */
 export const formatTime = (timeStr: string) => {

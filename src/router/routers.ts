@@ -58,7 +58,7 @@ export const routes: RouteRecordRaw[] = [
   {
     name: 'Explore',
     path: '/explore',
-    meta: { title: '搜索' },
+    meta: { title: '探索' },
     component: () => import('@/views/ExplorePage.vue')
   }
 ];

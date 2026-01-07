@@ -3,12 +3,10 @@
 // src/v-md-editor.d.ts
 declare module '@kangc/v-md-editor/lib/preview' {
   import type { DefineComponent } from 'vue';
-
   const VMdPreview: DefineComponent<{}, {}, any> & {
     use(theme: any, config?: any): void;
     install(app: any): void;
   };
-
   export default VMdPreview;
 }
 
@@ -17,7 +15,7 @@ declare module '@kangc/v-md-editor/lib/theme/github.js' {
   export default theme;
 }
 
-declare module '@kangc/v-md-editor/lib/plugins/katex/cdn' {
+declare module '@kangc/v-md-editor/lib/plugins/katex/npm' {
   const createKatexPlugin: () => any;
   export default createKatexPlugin;
 }

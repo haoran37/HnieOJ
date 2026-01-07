@@ -54,15 +54,17 @@ const router = useRouter();
 const activeKey = computed(() => route.path);
 
 const menuOptions = computed<MenuOption[]>(() =>
-  routes.map((r) => ({
-    key: r.path!,
-    label: () =>
-      h(
-        RouterLink,
-        { to: r.path! },
-        { default: () => r.meta?.title as string }
-      )
-  }))
+  routes
+    .filter(r => !r.meta?.hideInMenu) 
+    .map((r) => ({
+      key: r.path!,
+      label: () =>
+        h(
+          RouterLink,
+          { to: r.path! },
+          { default: () => r.meta?.title as string }
+        )
+    }))
 );
 
 /**

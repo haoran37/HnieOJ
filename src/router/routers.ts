@@ -8,10 +8,16 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/HomePage/index.vue')
   },
   {
-    name: 'Problems',
-    path: '/problems',
+    name: 'Problem',
+    path: '/problem',
     meta: { title: '题库' },
     component: () => import('@/views/ProblemsPage/ProblemList.vue')
+  },
+  {
+    name: 'ProblemDetail',
+    path: '/problem/:id',
+    meta: { title: '题目详情', hideInMenu: true},
+    component: () => import('@/views/ProblemsPage/ProblemDetail.vue')
   },
   {
     name: 'Training',

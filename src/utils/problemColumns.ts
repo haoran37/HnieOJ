@@ -2,6 +2,7 @@ import { h } from 'vue';
 import { NTag, NRate, NProgress, NIcon, NSpace } from 'naive-ui';
 import { CheckmarkCircle as CheckIcon, CloseCircle as CloseIcon, Remove as TodoIcon } from '@vicons/ionicons5';
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
+import { renderStatusIcon } from '@/utils/statusUtils'
 
 // 难度颜色映射
 const difficultyColors: Record<string, string> = {
@@ -9,7 +10,6 @@ const difficultyColors: Record<string, string> = {
   '普及/提高-': '#52C41A', '困难': '#3498DB',
 };
 
-// 传入 userStore (或者一个获取状态的函数) 来判断 AC/WA
 export const createColumns = (getProblemStatus: (id: string) => string) => [
   {
     title: '状态',
@@ -18,9 +18,7 @@ export const createColumns = (getProblemStatus: (id: string) => string) => [
     align: 'center' as const,
     render(row: any) {
       const status = getProblemStatus(row.id);
-      if (status === 'AC') return h(NIcon, { size: 20, color: '#18a058' }, { default: () => h(CheckIcon) });
-      if (status === 'WA') return h(NIcon, { size: 20, color: '#d03050' }, { default: () => h(CloseIcon) });
-      return h(NIcon, { size: 20, color: '#ccc' }, { default: () => h(TodoIcon) });
+      return renderStatusIcon(status);
     }
   },
   {

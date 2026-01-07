@@ -526,16 +526,19 @@ onMounted(() => {
 
 .rec-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   cursor: pointer;
   padding: 4px 0;
+  flex-wrap: wrap;
   
   .status-icon {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
   }
   
   .rec-id {
@@ -543,15 +546,17 @@ onMounted(() => {
     font-weight: bold;
     color: #333;
     min-width: 40px;
+    flex-shrink: 0;
   }
   
   .rec-title {
     color: #2080f0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
     flex: 1;
     font-size: 13px;
+    min-width: 80px;
     
     &:hover {
       text-decoration: underline;

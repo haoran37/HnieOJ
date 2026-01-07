@@ -23,7 +23,28 @@ export const routes: RouteRecordRaw[] = [
     name: 'Training',
     path: '/training',
     meta: { title: '题单' },
-    component: () => import('@/views/TrainingPage.vue')
+    component: () => import('@/views/TrainingPage/TrainingList.vue')
+  },
+  {
+    path: '/training/:trainingId',
+    meta: {hideInMenu: true},
+    component: () => import('@/views/TrainingPage/TrainingDetail.vue'),
+    // 重定向到简介
+    redirect: to => `/training/${to.params.trainingId}/information`,
+    children: [
+      {
+        name: 'TrainingInfo',
+        path: 'information',
+        meta: { title: '题单简介', hideInMenu: true },
+        component: () => import('@/views/TrainingPage/components/TrainingInfo.vue')
+      },
+      {
+        name: 'TrainingProblems',
+        path: 'problems',
+        meta: { title: '题目列表', hideInMenu: true },
+        component: () => import('@/views/TrainingPage/components/TrainingProblems.vue')
+      }
+    ]
   },
   {
     name: 'Contests',

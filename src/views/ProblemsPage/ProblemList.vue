@@ -112,6 +112,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue';
+import { useRouter } from 'vue-router';
 import { ChevronDownOutline as ChevronDown, SearchOutline as SearchIcon } from '@vicons/ionicons5';
 import type { DropdownOption } from 'naive-ui';
 import { useUserStore } from '@/stores/userStore';
@@ -119,6 +120,7 @@ import { useProblemsList } from '@/composables/useProblemsList';
 import { useTags } from '@/composables/useTags';
 import { createColumns } from '@/utils/problemColumns';
 
+const router = useRouter();
 const userStore = useUserStore();
 const {
   tableData, loading, total, page, pageSize,
@@ -127,9 +129,16 @@ const {
 
 const { tagData, loading: tagLoading, fetchTags } = useTags();
 
+const handleProblemClick = (id: string) => {
+  router.push(`/problem/${id}`);
+};
+
 // 本地 UI 状态
 const showTagModal = ref(false);
-const columns = createColumns((id) => userStore.getProblemStatus(id)); // 根据用户做题情况构建Columns
+const columns = createColumns(
+  (id) => userStore.getProblemStatus(id),
+  handleProblemClick
+); // 根据用户做题情况构建Columns
 
 // 本地筛选表单
 const localSearch = reactive({

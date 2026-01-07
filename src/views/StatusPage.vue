@@ -77,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
 import { onMounted } from 'vue';
 import { 
   RefreshOutline as RefreshIcon, 
@@ -90,7 +91,8 @@ const {
   fetchStatus, handlePageChange, handleSearch, handleRefresh 
 } = useStatusList();
 
-const columns = createStatusColumns();
+const router = useRouter();
+const columns = createStatusColumns(router);
 
 // 静态选项
 const langOptions = [

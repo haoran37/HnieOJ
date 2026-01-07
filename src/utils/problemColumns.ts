@@ -1,6 +1,5 @@
 import { h } from 'vue';
 import { NTag, NRate, NProgress, NIcon, NSpace } from 'naive-ui';
-import { CheckmarkCircle as CheckIcon, CloseCircle as CloseIcon, Remove as TodoIcon } from '@vicons/ionicons5';
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
 import { renderStatusIcon } from '@/utils/statusUtils'
 
@@ -10,7 +9,10 @@ const difficultyColors: Record<string, string> = {
   '普及/提高-': '#52C41A', '困难': '#3498DB',
 };
 
-export const createColumns = (getProblemStatus: (id: string) => string) => [
+export const createColumns = (
+  getProblemStatus: (id: string) => string,
+  onTitleClick?: (id: string) => void
+) => [
   {
     title: '状态',
     key: 'status',
@@ -34,7 +36,12 @@ export const createColumns = (getProblemStatus: (id: string) => string) => [
       return h('a', {
         href: `/problem/${row.id}`,
         style: { textDecoration: 'none', color: '#2080f0', fontWeight: 'bold' },
-        onClick: (e: MouseEvent) => e.preventDefault()
+        onClick: (e: MouseEvent) => {
+          e.preventDefault();
+          if (onTitleClick) {
+            onTitleClick(row.id);
+          }
+        }
       }, row.title);
     }
   },

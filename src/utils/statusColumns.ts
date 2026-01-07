@@ -1,5 +1,6 @@
 import { h } from 'vue';
 import { NTag } from 'naive-ui';
+import type { Router } from 'vue-router';
 import type { Submission } from '@/composables/useStatusList';
 
 // 状态枚举与颜色配置
@@ -24,7 +25,7 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   'Cancelled': { color: '#909399', label: 'Cancelled' }
 };
 
-export const createStatusColumns = () => [
+export const createStatusColumns = (router: Router) => [
   {
     title: 'Run ID',
     key: 'id',
@@ -54,7 +55,13 @@ export const createStatusColumns = () => [
     align: 'center' as const,
     render: (row: Submission) => h(
       'a',
-      { style: { color: '#2080f0', cursor: 'pointer' } },
+      { 
+        style: { color: '#2080f0', cursor: 'pointer', textDecoration: 'none' },
+        onClick: (e: MouseEvent) => {
+          e.preventDefault();
+          router.push(`/problem/${row.problemId}`);
+        }
+      },
       row.problemId
     )
   },
@@ -63,7 +70,13 @@ export const createStatusColumns = () => [
     key: 'problemTitle',
     render: (row: Submission) => h(
       'a',
-      { style: { color: '#2080f0', cursor: 'pointer', fontWeight: 500 } },
+      { 
+        style: { color: '#2080f0', cursor: 'pointer', fontWeight: 500, textDecoration: 'none' },
+        onClick: (e: MouseEvent) => {
+          e.preventDefault();
+          router.push(`/problem/${row.problemId}`);
+        }
+      },
       row.problemTitle
     )
   },

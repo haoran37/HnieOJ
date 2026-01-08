@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, unref, type Ref } from 'vue';
 
 /**
  * 格式化日期显示 (年-月-日 时:分:秒)
@@ -64,19 +64,29 @@ export function useContestTimer() {
 /**
  * 比赛状态和时间逻辑
  */
-export function useContestStatusTime(beginTime: string, endTime: string) {
+type MaybeRefOrGetter<T> = Ref<T> | (() => T) | T;
+
+export function useContestStatusTime(
+  beginTimeSource: MaybeRefOrGetter<string>, 
+  endTimeSource: MaybeRefOrGetter<string>
+) {
   const { now } = useContestTimer();
 
-  const startTimeMs = computed(() => new Date(beginTime).getTime());
-  const endTimeMs = computed(() => new Date(endTime).getTime());
+  const resolve = (val: MaybeRefOrGetter<string>) => {
+    return typeof val === 'function' ? val() : unref(val);
+  };
+
+  const startTimeMs = computed(() => new Date(resolve(beginTimeSource)).getTime());
+  const endTimeMs = computed(() => new Date(resolve(endTimeSource)).getTime());
 
   const diffToStart = computed(() => startTimeMs.value - now.value.getTime());
   const diffToEnd = computed(() => endTimeMs.value - now.value.getTime());
 
   const contestStatus = computed(() => {
-    if (diffToStart.value > 0) return 0; // 未开始
-    if (diffToEnd.value > 0) return 1;   // 进行中
-    return 2;                            // 已结束
+    if (isNaN(startTimeMs.value)) return 0; // 时间无效或为空，视作未开始
+    if (diffToStart.value > 0) return 0;    // 未开始
+    if (diffToEnd.value > 0) return 1;      // 进行中
+    return 2;                               // 已结束
   });
 
   const timeText = computed(() => {
@@ -84,11 +94,10 @@ export function useContestStatusTime(beginTime: string, endTime: string) {
     if (contestStatus.value === 1) {
       return `距结束：${formatDuration(diffToEnd.value)}`;
     }
-
-    if (diffToStart.value < 86400000) { // 开始时间在24h内
+    if (diffToStart.value < 86400000) { 
       return `距开始：${formatDuration(diffToStart.value)}`;
     } else {
-      const date = new Date(beginTime);
+      const date = new Date(resolve(beginTimeSource));
       const M = date.getMonth() + 1;
       const D = date.getDate();
       const h = String(date.getHours()).padStart(2, '0');
@@ -97,8 +106,5 @@ export function useContestStatusTime(beginTime: string, endTime: string) {
     }
   });
 
-  return {
-    contestStatus,
-    timeText
-  };
+  return { contestStatus, timeText };
 }

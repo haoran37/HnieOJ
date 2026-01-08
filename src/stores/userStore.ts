@@ -3,6 +3,13 @@ import { ref } from 'vue';
 
 // TODO: 从后端用户信息接口获取
 export const useUserStore = defineStore('user', () => {
+  // 用户信息
+  const userInfo = ref({
+    id: '202202050231',
+    username: 'MyUserAccount',
+    name: '我'
+  });
+
   // AC 的题目 ID 列表
   const acceptedProblems = ref<Set<string>>(new Set(['1001', '1003', '1005', '1007']));
   // 尝试过但错误的题目 ID 列表
@@ -18,6 +25,7 @@ export const useUserStore = defineStore('user', () => {
   };
 
   return { 
+    userInfo,
     acceptedProblems, 
     wrongProblems, 
     isEmailBound,

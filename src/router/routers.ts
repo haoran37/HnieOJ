@@ -50,7 +50,33 @@ export const routes: RouteRecordRaw[] = [
     name: 'Contests',
     path: '/contests',
     meta: { title: '竞赛' },
-    component: () => import('@/views/ContestsPage.vue')
+    component: () => import('@/views/ContestsPage/ContestList.vue')
+  },
+  {
+    path: '/contest/:contestId',
+    component: () => import('@/views/ContestsPage/ContestDetail.vue'),
+    meta: { hideInMenu: true },
+    redirect: to => `/contest/${to.params.contestId}/description`,
+    children: [
+      {
+        name: 'ContestDescription',
+        path: 'description',
+        meta: { title: '比赛说明', hideInMenu: true },
+        component: () => import('@/views/ContestsPage/components/ContestDescription.vue')
+      },
+      {
+        name: 'ContestProblems',
+        path: 'problems',
+        meta: { title: '题目列表', hideInMenu: true },
+        component: () => import('@/views/ContestsPage/components/ContestProblems.vue')
+      },
+      {
+        name: 'ContestScoreboard',
+        path: 'scoreboard',
+        meta: { title: '排行榜', hideInMenu: true },
+        component: () => import('@/views/ContestsPage/components/ContestScoreboard.vue')
+      }
+    ]
   },
   {
     name: 'Homework',

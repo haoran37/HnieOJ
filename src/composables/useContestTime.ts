@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 
 /**
  * 格式化日期显示 (年-月-日 时:分:秒)
@@ -58,5 +58,47 @@ export function useContestTimer() {
 
   return {
     now
+  };
+}
+
+/**
+ * 比赛状态和时间逻辑
+ */
+export function useContestStatusTime(beginTime: string, endTime: string) {
+  const { now } = useContestTimer();
+
+  const startTimeMs = computed(() => new Date(beginTime).getTime());
+  const endTimeMs = computed(() => new Date(endTime).getTime());
+
+  const diffToStart = computed(() => startTimeMs.value - now.value.getTime());
+  const diffToEnd = computed(() => endTimeMs.value - now.value.getTime());
+
+  const contestStatus = computed(() => {
+    if (diffToStart.value > 0) return 0; // 未开始
+    if (diffToEnd.value > 0) return 1;   // 进行中
+    return 2;                            // 已结束
+  });
+
+  const timeText = computed(() => {
+    if (contestStatus.value === 2) return '已结束';
+    if (contestStatus.value === 1) {
+      return `距结束：${formatDuration(diffToEnd.value)}`;
+    }
+
+    if (diffToStart.value < 86400000) { // 开始时间在24h内
+      return `距开始：${formatDuration(diffToStart.value)}`;
+    } else {
+      const date = new Date(beginTime);
+      const M = date.getMonth() + 1;
+      const D = date.getDate();
+      const h = String(date.getHours()).padStart(2, '0');
+      const m = String(date.getMinutes()).padStart(2, '0');
+      return `${M}月${D}日 ${h}:${m}`;
+    }
+  });
+
+  return {
+    contestStatus,
+    timeText
   };
 }

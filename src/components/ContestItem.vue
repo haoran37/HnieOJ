@@ -89,7 +89,7 @@ import {
   Star as StarFilled
 } from '@vicons/ionicons5';
 import { useNotification } from 'naive-ui';
-import { useContestTimer, formatDuration } from '@/composables/useContestTime';
+import { useContestStatusTime } from '@/composables/useContestTime';
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
 import { useUserStore } from '@/stores/userStore';
 
@@ -108,7 +108,6 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits(['click']);
-const { now } = useContestTimer();
 const notification = useNotification();
 const userStore = useUserStore();
 
@@ -143,32 +142,10 @@ const handleToggleFollow = () => {
   }
 };
 
-const startTimeMs = computed(() => new Date(props.beginTime).getTime());
-const endTimeMs = computed(() => new Date(props.endTime).getTime());
-const diffToStart = computed(() => startTimeMs.value - now.value.getTime());
-const diffToEnd = computed(() => endTimeMs.value - now.value.getTime());
-
-const contestStatus = computed(() => {
-  if (diffToStart.value > 0) return 0; // 未开始
-  if (diffToEnd.value > 0) return 1;   // 进行中
-  return 2;                           // 已结束
-});
-
-const timeText = computed(() => {
-  if (contestStatus.value === 2) return '已结束';
-  if (contestStatus.value === 1) return `距结束：${formatDuration(diffToEnd.value)}`;
-  
-  if (diffToStart.value < 86400000) {
-    return `距开始：${formatDuration(diffToStart.value)}`;
-  } else {
-    const date = new Date(props.beginTime);
-    const M = date.getMonth() + 1;
-    const D = date.getDate();
-    const h = String(date.getHours()).padStart(2, '0');
-    const m = String(date.getMinutes()).padStart(2, '0');
-    return `${M}月${D}日 ${h}:${m}`;
-  }
-});
+const { contestStatus, timeText } = useContestStatusTime(
+  props.beginTime,
+  props.endTime
+);
 
 const statusStyle = computed(() => {
   const configs = {

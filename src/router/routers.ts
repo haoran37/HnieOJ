@@ -29,7 +29,6 @@ export const routes: RouteRecordRaw[] = [
     path: '/training/:trainingId',
     meta: {hideInMenu: true},
     component: () => import('@/views/TrainingPage/TrainingDetail.vue'),
-    // 重定向到简介
     redirect: to => `/training/${to.params.trainingId}/information`,
     children: [
       {
@@ -83,6 +82,32 @@ export const routes: RouteRecordRaw[] = [
     path: '/homework',
     meta: { title: '作业' },
     component: () => import('@/views/HomeworkPage/HomeworkList.vue')
+  },
+  {
+    path: '/homework/:homeworkId',
+    component: () => import('@/views/HomeworkPage/HomeworkDetail.vue'),
+    meta: { hideInMenu: true },
+    redirect: to => `/homework/${to.params.homeworkId}/overview`,
+    children: [
+      {
+        name: 'HomeworkOverview',
+        path: 'overview',
+        meta: { title: '作业概览', hideInMenu: true },
+        component: () => import('@/views/HomeworkPage/components/HomeworkOverview.vue')
+      },
+      {
+        name: 'HomeworkProblems',
+        path: 'problems',
+        meta: { title: '题目列表', hideInMenu: true },
+        component: () => import('@/views/HomeworkPage/components/HomeworkProblems.vue')
+      },
+      {
+        name: 'HomeworkRankings',
+        path: 'rankings', // 叫 Gradebook 可能更贴切，但为了统一先叫 rankings
+        meta: { title: '成绩单', hideInMenu: true },
+        component: () => import('@/views/HomeworkPage/components/HomeworkRankings.vue')
+      }
+    ]
   },
   {
     name: 'Status',

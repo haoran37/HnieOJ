@@ -87,7 +87,7 @@ import {
   CheckmarkCircleOutline as CheckCircleIcon
 } from '@vicons/ionicons5';
 import { useContestDetail } from '@/composables/useContestDetail';
-import { formatDuration } from '@/composables/useContestTime';
+import { formatDuration } from '@/composables/useTime';
 
 const route = useRoute();
 const router = useRouter();

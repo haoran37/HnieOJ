@@ -89,7 +89,7 @@ import {
   Star as StarFilled
 } from '@vicons/ionicons5';
 import { useNotification } from 'naive-ui';
-import { useContestStatusTime } from '@/composables/useContestTime';
+import { useStatusTime } from '@/composables/useTime';
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
 import { useUserStore } from '@/stores/userStore';
 
@@ -142,7 +142,7 @@ const handleToggleFollow = () => {
   }
 };
 
-const { contestStatus, timeText } = useContestStatusTime(
+const { contestStatus, timeText } = useStatusTime(
   props.beginTime,
   props.endTime
 );

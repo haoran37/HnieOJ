@@ -40,13 +40,14 @@ export const formatDuration = (ms: number) => {
 };
 
 /**
- * 比赛时间状态管理 Hook
+ * 通用计时器
  */
-export function useContestTimer() {
+export function useTimer() {
   const now = ref(new Date());
   let timer: ReturnType<typeof setInterval> | null = null;
 
   onMounted(() => {
+    now.value = new Date();
     timer = setInterval(() => {
       now.value = new Date();
     }, 1000);
@@ -62,15 +63,15 @@ export function useContestTimer() {
 }
 
 /**
- * 比赛状态和时间逻辑
+ * 通用状态时间逻辑 (未开始/进行中/已结束)
  */
 type MaybeRefOrGetter<T> = Ref<T> | (() => T) | T;
 
-export function useContestStatusTime(
+export function useStatusTime(
   beginTimeSource: MaybeRefOrGetter<string>, 
   endTimeSource: MaybeRefOrGetter<string>
 ) {
-  const { now } = useContestTimer();
+  const { now } = useTimer();
 
   const resolve = (val: MaybeRefOrGetter<string>) => {
     return typeof val === 'function' ? val() : unref(val);
@@ -94,7 +95,7 @@ export function useContestStatusTime(
     if (contestStatus.value === 1) {
       return `距结束：${formatDuration(diffToEnd.value)}`;
     }
-    if (diffToStart.value < 86400000) { 
+    if (diffToStart.value < 86400000) { // 24小时内显示倒计时
       return `距开始：${formatDuration(diffToStart.value)}`;
     } else {
       const date = new Date(resolve(beginTimeSource));
@@ -106,5 +107,5 @@ export function useContestStatusTime(
     }
   });
 
-  return { contestStatus, timeText };
+  return { contestStatus, timeText, now };
 }

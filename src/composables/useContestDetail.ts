@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import { useContestStatusTime, useContestTimer } from '@/composables/useContestTime';
+import { useStatusTime, useTimer } from '@/composables/useTime';
 
 export interface ContestDetail {
   id: string;
@@ -23,9 +23,9 @@ export function useContestDetail() {
     description: ''
   });
 
-  const { now } = useContestTimer();
+  const { now } = useTimer();
 
-  const { contestStatus, timeText } = useContestStatusTime(
+  const { contestStatus, timeText } = useStatusTime(
     () => detail.value.beginTime,
     () => detail.value.endTime
   );

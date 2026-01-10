@@ -53,17 +53,17 @@ export const createStatusColumns = (router: Router) => [
     key: 'problemId',
     width: 80,
     align: 'center' as const,
-    render: (row: Submission) => h(
-      'a',
-      { 
-        style: { color: '#2080f0', cursor: 'pointer', textDecoration: 'none' },
-        onClick: (e: MouseEvent) => {
-          e.preventDefault();
-          router.push(`/problem/${row.problemId}`);
-        }
-      },
-      row.problemId
-    )
+    // render: (row: Submission) => h(
+    //   'a',
+    //   { 
+    //     style: { color: '#2080f0', cursor: 'pointer', textDecoration: 'none' },
+    //     onClick: (e: MouseEvent) => {
+    //       e.preventDefault();
+    //       router.push(`/problem/${row.problemId}`);
+    //     }
+    //   },
+    //   row.problemId
+    // )
   },
   {
     title: 'Title',
@@ -89,13 +89,19 @@ export const createStatusColumns = (router: Router) => [
       const config = statusConfig[row.status] || { color: '#999', label: row.status };
       
       return h(
-        'span',
+        'a',
         { 
+          href: `/status/${row.id}`,
           style: { 
+            textDecoration: 'none',
             color: config.color, 
             fontWeight: 'bold',
             cursor: 'pointer' 
-          } 
+          },
+          onClick: (e: MouseEvent) => {
+            e.preventDefault();
+            router.push(`/status/${row.id}`);
+          }
         },
         config.label
       );
@@ -110,19 +116,19 @@ export const createStatusColumns = (router: Router) => [
   {
     title: 'Time',
     key: 'time',
-    width: 100,
+    width: 90,
     align: 'right' as const
   },
   {
     title: 'Memory',
     key: 'memory',
-    width: 100,
+    width: 90,
     align: 'right' as const
   },
   {
     title: 'SubmitTime',
     key: 'submitTime',
-    width: 150,
+    width: 170,
     align: 'right' as const
   }
 ];

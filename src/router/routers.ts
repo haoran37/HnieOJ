@@ -119,7 +119,6 @@ export const routes: RouteRecordRaw[] = [
     path: '/status/:id',
     component: () => import('@/views/StatusPage/StatusDetail.vue'),
     meta: { title: '评测详情', hideInMenu: true },
-    // redirect: to => `/status/${to.params.id}/code`, 
     children: [
       {
         name: 'StatusInfo',
@@ -140,6 +139,17 @@ export const routes: RouteRecordRaw[] = [
     path: '/rank',
     meta: { title: '排名' },
     component: () => import('@/views/RankPage.vue')
+  },
+  {
+    name: 'News',
+    path: '/news',
+    meta: { title: '新闻', hideInMenu: true },
+    component: () => import('@/views/NewsPage/NewsList.vue')
+  },
+  {
+    path: '/news/:id',
+    component: () => import('@/views/NewsPage/NewsDetail.vue'),
+    meta: { title: '新闻详情', hideInMenu: true }
   },
   {
     name: 'WIKI',

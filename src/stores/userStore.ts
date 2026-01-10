@@ -28,7 +28,7 @@ export const useUserStore = defineStore('user', () => {
     username: 'MyUserAccount',
     name: '我',
     email: 'test@hnie.edu.cn',
-    role: UserRole.GUEST, 
+    role: UserRole.ADMIN, 
     //TODO: 登录后从后端获取覆盖
     avatar: 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'
   });

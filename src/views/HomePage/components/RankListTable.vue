@@ -11,7 +11,15 @@
     </template>
 
     <template #extra>
-      <n-button text size="tiny" type="primary" color="#007bff">View all »</n-button>
+      <n-button
+        text
+        size="tiny"
+        type="primary"
+        color="#007bff"
+        @click="$router.push('/rank')"
+      >
+        View all »
+      </n-button>
     </template>
 
     <n-data-table
@@ -35,6 +43,15 @@ import BoardCard from '@/components/BoardCard.vue'
 import { BarChartOutline as RankIcon, ChevronDown } from '@vicons/ionicons5'
 import { NButton } from 'naive-ui'
 
+interface RankRow {
+  rank: number
+  studentId: string
+  className: string
+  name: string
+  solved: number
+  submit: number
+}
+
 const now = new Date()
 const currentMonthNum = now.getMonth() + 1
 const selectedMonth = ref(currentMonthNum.toString())
@@ -47,9 +64,8 @@ const monthOptions = computed(() => {
   return options
 })
 
-// 状态与分页响应式对象
 const loading = ref(false)
-const tableData = ref([])
+const tableData = ref<RankRow[]>([])
 
 const pagination = reactive({
   page: 1,
@@ -60,7 +76,7 @@ const pagination = reactive({
   prefix: (info: any) => `共 ${info.itemCount} 条数据`
 })
 
-// 异步请求
+//TODO: 替换真实api
 const fetchData = async () => {
   loading.value = true
   
@@ -77,7 +93,6 @@ const fetchData = async () => {
     console.log('当前页码:', params.page)
     console.log('每页个数:', params.limit)
 
-    // TODO: 替换为实际 API
     // const { data: res } = await api.getRankList(params)
     
     // 模拟后端返回过程

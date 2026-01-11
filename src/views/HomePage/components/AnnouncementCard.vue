@@ -5,70 +5,113 @@
     </template>
     
     <template #extra>
-      <n-button text size="tiny" type="primary" color="#007bff">View all »</n-button>
+      <n-button 
+        text 
+        size="tiny" 
+        type="primary" 
+        color="#007bff"
+        @click="$router.push('/news')"
+      >
+        View all »
+      </n-button>
     </template>
 
     <n-data-table 
       class="custom-announcement-table"
       :bordered="false"
       :columns="columns" 
-      :data="data" 
+      :data="newsList" 
+      :loading="loading"
       :pagination="pagination"
+      :row-key="(row: any) => row.id"
       size="small"
     />
   </BoardCard>
 </template>
 
 <script lang="ts" setup name="AnnouncementCard">
+import { h, onMounted, reactive, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { MegaphoneOutline as MegaphoneIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
-import { MegaphoneOutline as MegaphoneIcon } from '@vicons/ionicons5'
-import { reactive, h } from 'vue';
+import { useNewsList } from '@/composables/useNewsList';
 
-// TODO: 从后端获取真实公告数据并实现标签跳转
+const router = useRouter();
+const { loading, newsList, total, page, pageSize, fetchNews, handlePageChange } = useNewsList();
+
+pageSize.value = 3;
+
 const columns = [
   {
     title: 'Title',
     key: 'title',
-    // 渲染函数：让标题颜色变成蓝色 link 风格
     render(row: any) {
-      return h('span', { style: 'color: #007bff; cursor: pointer;' }, row.title)
+      return h(
+        'a',
+        {
+          href: `/news/${row.id}`,
+          style: {
+            color: '#007bff',
+            cursor: 'pointer',
+            textDecoration: 'none',
+            fontWeight: '500'
+          },
+          onClick: (e: MouseEvent) => {
+            e.preventDefault();
+            router.push(`/news/${row.id}`);
+          }
+        },
+        row.title
+      );
     }
   },
   {
-    title: 'Data',
-    key: 'date',
+    title: 'Date',
+    key: 'createTime',
     width: 120,
+    render: (row: any) => h('span', { style: 'color: #666' }, row.createTime)
   },
 ];
 
-const data = reactive([
-  { title: 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', date: 'XXXX-XX-XX' },
-  { title: 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', date: 'XXXX-XX-XX' },
-  { title: 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', date: 'XXXX-XX-XX' },
-  { title: 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', date: 'XXXX-XX-XX' },
-  { title: 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', date: 'XXXX-XX-XX' },
-]);
-
 const pagination = reactive({
-  page: 1,
-  pageSize: 3,
-  showSizePicker: true,
-  pageSizes: [3, 5, 7],
-  onChange: (page: number) => {
-    pagination.page = page
+  page: page.value,
+  pageSize: pageSize.value,
+  itemCount: total.value,
+  
+  showSizePicker: true, 
+  pageSizes: [3, 5, 7], 
+  
+  prefix: () => '', 
+  
+  onChange: (p: number) => {
+    pagination.page = p;
+    handlePageChange(p);
   },
-  onUpdatePageSize: (pageSize: number) => {
-    pagination.pageSize = pageSize
-    pagination.page = 1
+
+  onUpdatePageSize: (size: number) => {
+    pageSize.value = size;
+    pagination.pageSize = size;
+    pagination.page = 1;
+    page.value = 1;
+    fetchNews();
   }
-})
+});
+
+watch([page, pageSize, total], ([newPage, newPageSize, newTotal]) => {
+  pagination.page = newPage;
+  pagination.pageSize = newPageSize;
+  pagination.itemCount = newTotal;
+});
+
+onMounted(() => {
+  fetchNews();
+});
 </script>
 
 <style scoped lang="less">
 :deep(.custom-announcement-table) {
   background-color: transparent;
 
-  // 表头样式
   .n-data-table-th {
     background-color: #fff;
     font-weight: 800;
@@ -78,7 +121,6 @@ const pagination = reactive({
     padding-bottom: 8px;
   }
 
-  //单元格样式
   .n-data-table-td {
     background-color: #fff;
     padding: 12px 8px;

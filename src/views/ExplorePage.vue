@@ -12,7 +12,7 @@
   </n-result>
 </template>
 
-<script lang="ts" setup name="WikiPage">
+<script lang="ts" setup name="ExplorePage">
 import { ref, h } from 'vue'
 import { NImage, useNotification } from 'naive-ui'
 

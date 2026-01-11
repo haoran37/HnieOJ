@@ -170,7 +170,7 @@ const handleCategoryChange = (key: string | number) => {
 };
 
 const handleDetail = (id: number) => {
-  message.info(`查看讨论详情: ${id}`);
+  router.push(`/discuss/${id}`);
 };
 
 const handleUser = (username: string) => {
@@ -195,7 +195,7 @@ onMounted(() => {
   // width: 100%;
   // max-width: 1200px;
   margin: 0 auto;
-  padding: 0 16px 40px;
+  // padding: 0 16px 40px;
   display: flex;
   flex-direction: column;
   gap: 20px;

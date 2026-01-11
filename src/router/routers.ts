@@ -157,6 +157,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '讨论' },
     component: () => import('@/views/DiscussPage/DiscussList.vue')
   },
+    {
+    name: 'DiscussDetail',
+    path: '/discuss/:id',
+    meta: { title: '讨论详情', hideInMenu: true },
+    component: () => import('@/views/DiscussPage/DiscussDetail.vue')
+  },
   {
     name: 'WIKI',
     path: '/wiki',

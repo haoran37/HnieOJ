@@ -1,15 +1,17 @@
 <template>
   <div class="discussion-item" @click="$emit('click-card')">
+    
     <div class="avatar-box">
       <n-avatar
         round
         :size="42"
-        src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg"
+        :src="avatar || 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'"
       />
     </div>
 
     <div class="content-box">
       <div class="title" @click.stop="$emit('click-title')">
+        <n-tag v-if="isTop" type="error" size="small" :bordered="false" class="top-tag">置顶</n-tag>
         <n-ellipsis
           class="title-ellipsis"
           :line-clamp="1"
@@ -23,41 +25,58 @@
         <span class="username" @click.stop="$emit('click-user', username)">
           {{ username }}
         </span>
-        <span class="date">@{{ date }}</span>
+        <span class="date">发布于 {{ date }}</span>
       </div>
     </div>
 
-     <div class="info-box">
-      <n-button
-        text
-        type="primary"
-        class="link-btn"
-        @click.stop="$emit('click-id', problemId)"
-      >
-        {{ problemId }}
-      </n-button>
+    <div class="right-info-column">
+      
+      <div class="tags-row">
+        <n-button
+          v-if="problemId"
+          text
+          type="primary"
+          class="link-btn"
+          @click.stop="$emit('click-id', problemId)"
+        >
+          {{ problemId }}
+        </n-button>
 
-      <span class="divider">|</span>
+        <span class="divider" v-if="problemId">|</span>
 
-      <n-button
-        text
-        type="primary"
-        class="link-btn"
-        @click.stop="$emit('click-type', problemType)"
-      >
-        {{ problemType }}
-      </n-button>
+        <n-tag 
+          :type="category === 'Site' ? 'info' : 'warning'" 
+          size="small" 
+          :bordered="false"
+          class="category-tag"
+          @click.stop="$emit('click-category', category)"
+        >
+          {{ category === 'Site' ? '站内事务' : '题目讨论' }}
+        </n-tag>
+      </div>
+
+      <div class="reply-row">
+        <n-icon class="icon"><ChatbubblesIcon /></n-icon>
+        <span>{{ replyCount }}</span>
+      </div>
+
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ChatbubblesOutline as ChatbubblesIcon } from '@vicons/ionicons5';
+import { NTag, NAvatar, NEllipsis, NButton, NIcon } from 'naive-ui';
+
 defineProps<{
   title: string
   username: string
+  avatar?: string
   date: string
-  problemId: string | number
-  problemType: string
+  problemId?: string | null
+  category: 'Site' | 'Problem'
+  replyCount: number
+  isTop?: boolean
 }>()
 
 defineEmits([
@@ -65,7 +84,7 @@ defineEmits([
   'click-title',
   'click-user',
   'click-id',
-  'click-type'
+  'click-category'
 ])
 </script>
 
@@ -78,19 +97,19 @@ defineEmits([
   border-radius: 4px;
   margin-bottom: 10px;
   background-color: #fff;
-  cursor: pointer;
   transition: all 0.2s;
 
-  &:hover {
-    background-color: #f0faff;
-    border-color: #007bff;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
-    transform: translateX(4px);
-  }
+  // &:hover {
+    // background-color: #f0faff;
+    // border-color: #007bff;
+    // box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+    // transform: translateX(4px); // 向右浮动
+  // }
 }
 
 .avatar-box {
   margin-right: 15px;
+  flex-shrink: 0;
 }
 
 .content-box {
@@ -108,11 +127,21 @@ defineEmits([
   height: 22px;
   margin-bottom: 4px;
   cursor: pointer;
-  color: #007bff;
+  color: #333;
+  font-weight: 600;
+  width: fit-content;
+  max-width: 100%;
 
-  &:hover {
-    text-decoration: underline;
+  .top-tag {
+    margin-right: 6px;
+    height: 18px;
+    line-height: 18px;
+    font-size: 12px;
   }
+
+  // &:hover {
+  //   color: #2080f0;
+  // }
 }
 
 .title-ellipsis {
@@ -120,18 +149,19 @@ defineEmits([
   width: 100%;
   overflow: hidden;
   font-size: 15px;
-  font-weight: 500;
-  color: #007bff;
   line-height: 22px;
 }
 
 .meta {
   font-size: 12px;
-
+  display: flex;
+  align-items: center;
+  
   .username {
     color: #18a058;
     font-weight: bold;
     margin-right: 8px;
+    cursor: pointer;
 
     &:hover {
       text-decoration: underline;
@@ -144,21 +174,47 @@ defineEmits([
   }
 }
 
-.info-box {
+.right-info-column {
   display: flex;
-  align-items: center;
-  margin-left: 10px;
-  white-space: nowrap;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  margin-left: 16px;
+  min-width: 100px; 
 
-  .link-btn {
-    font-size: 14px;
-    font-weight: 400;
+  .tags-row {
+    display: flex;
+    align-items: center;
+    
+    .link-btn {
+      font-size: 14px;
+      font-weight: 500;
+      &:hover {
+        text-decoration: underline;
+        opacity: 0.8;
+      }
+    }
+
+    .divider {
+      margin: 0 8px;
+      color: #ccc;
+    }
+
+    .category-tag {
+      cursor: pointer;
+      &:hover { opacity: 0.8; }
+    }
   }
 
-  .divider {
-    margin: 0 8px;
-    color: #007bff;
-    opacity: 0.5;
+  .reply-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #999;
+    
+    .icon { font-size: 14px; margin-top: 1px; }
   }
 }
 </style>

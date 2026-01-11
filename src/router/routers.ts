@@ -155,7 +155,7 @@ export const routes: RouteRecordRaw[] = [
     name: 'Discuss',
     path: '/discuss',
     meta: { title: '讨论' },
-    component: () => import('@/views/DiscussPage.vue')
+    component: () => import('@/views/DiscussPage/DiscussList.vue')
   },
   {
     name: 'WIKI',

@@ -5,25 +5,35 @@
     </template>
 
     <template #extra>
-      <n-button text size="tiny" type="primary" color="#007bff">View all »</n-button>
+      <n-button 
+        text 
+        size="tiny" 
+        type="primary" 
+        color="#007bff"
+        @click="$router.push('/discuss')"
+      >
+        View all »
+      </n-button>
     </template>
     
     <n-spin :show="loading">
       <div class="discussion-list-container">
-        <template v-if="listData.length > 0">
+        <template v-if="displayList.length > 0">
           <DiscussionItem 
-            v-for="(item, index) in listData" 
-            :key="index"
+            v-for="item in displayList" 
+            :key="item.id"
             :title="item.title"
             :username="item.username"
             :date="item.date"
             :problem-id="item.problemId"
-            :problem-type="item.problemType"
+            :category="item.category" 
+            :reply-count="item.replyCount"
+            :is-top="item.isTop"
             @click-card="handleDetailOpen(item)"
             @click-title="handleDetailOpen(item)"
             @click-user="handleUserJump"
             @click-id="handleProblemJump"
-            @click-type="handleTypeFilter"
+            @click-category="handleCategoryFilter"
           />
         </template>
         <n-empty v-else description="暂无讨论内容" style="padding: 40px 0" />
@@ -32,12 +42,12 @@
 
     <div class="pagination-footer">
       <n-pagination
-        v-model:page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :item-count="pagination.total"
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :item-count="total"
         show-size-picker
         :page-sizes="[10, 15, 20, 25]"
-        @update:page="fetchData"
+        @update:page="handlePageChange"
         @update:page-size="handleSizeChange"
       >
         <template #prefix="{ itemCount }">
@@ -49,80 +59,57 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { ChatboxEllipsesOutline as ChatIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 import DiscussionItem from '@/components/DiscussionItem.vue';
+import { useDiscussList } from '@/composables/useDiscussList';
 
-const loading = ref(false);
-const listData = ref<any[]>([]);
-const pagination = reactive({
-  page: 1,
-  pageSize: 10,
-  total: 0,
-});
+const router = useRouter();
 
-// TODO: 异步数据请求
-const fetchData = async () => {
-  loading.value = true;
-  const params = {
-    page: pagination.page,
-    limit: pagination.pageSize
-  };
-  
-  console.log('--- 发送网络请求 ---', params);
+const { 
+  loading, 
+  displayList, 
+  total, 
+  page, 
+  pageSize, 
+  activeCategory,
+  fetchDiscussions,
+  handlePageChange 
+} = useDiscussList();
 
-  try {
-    // TODO: 接入真实 API，const res = await api.getDiscussions(params)
-    setTimeout(() => {
-      listData.value = Array.from({ length: pagination.pageSize }).map((_, i) => ({
-        id: 100 + i, // 讨论本身的ID
-        title: '关于字符串构造的疑问 - 案例 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ' + ((pagination.page - 1) * pagination.pageSize + i + 1),
-        username: 'username',
-        date: '2024-11-20',
-        problemId: `P${1000 + i}`,
-        problemType: i % 2 === 0 ? '字符串' : '动态规划'
-      }));
-      pagination.total = 220; 
-      loading.value = false;
-    }, 400);
-  } catch (error) {
-    loading.value = false;
-  }
-};
 
-// --- 跳转逻辑处理 ---
-
-// 进入讨论详情 (全卡片或标题)
 const handleDetailOpen = (item: any) => {
   console.log('交互：进入讨论内容详情页，讨论ID:', item.id);
-  // router.push(`/discussion/${item.id}`)
+  // router.push(`/discuss/${item.id}`)
 };
 
-// 查看用户
 const handleUserJump = (name: string) => {
   console.log('交互：查看用户信息，用户名:', name);
   // router.push(`/user/${name}`)
 };
 
-// 查看题目详情
 const handleProblemJump = (id: string | number) => {
-  console.log('交互：查看题目详情，题号:', id);
+  router.push(`/problem/${id}`);
 };
 
-// 类型过滤
-const handleTypeFilter = (type: string) => {
-  console.log('交互：按类型筛选列表，类型:', type);
+// 类型过滤 (点击分类标签时，跳转到讨论列表页并筛选)
+const handleCategoryFilter = (cat: 'Site' | 'Problem') => {
+  console.log('交互：跳转到讨论页并筛选:', cat);
+  //TODO: 这里可以带参数跳转，例如 router.push({ path: '/discuss', query: { category: cat } })
+  // 目前先简单跳转
+  router.push('/discuss');
 };
 
-// 分页条数改变
 const handleSizeChange = (size: number) => {
-  pagination.pageSize = size;
-  pagination.page = 1;
-  fetchData();
+  pageSize.value = size;
+  page.value = 1; 
 };
 
-onMounted(fetchData);
+onMounted(() => {
+  fetchDiscussions();
+});
 </script>
 
 <style scoped lang="less">

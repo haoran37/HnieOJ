@@ -111,7 +111,7 @@ onMounted(() => {
 
 <style scoped lang="less">
 .news-list-container {
-  width: 100%;
+  // width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 16px 24px; 

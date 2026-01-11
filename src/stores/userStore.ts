@@ -50,7 +50,13 @@ export const useUserStore = defineStore('user', () => {
   // 是否绑定邮箱
   const isEmailBound = computed(() => !!userInfo.value.email);
 
-  // 是否是工作人员 (助教及以上)
+  // 是否是学生及以上
+  const isStudent = computed(() => {
+    const roles = [UserRole.STUDENT, UserRole.TA, UserRole.TEACHER, UserRole.ADMIN, UserRole.ROOT];
+    return roles.includes(userInfo.value.role);
+  });
+
+  // 是否是助教及以上（工作人员）
   const isStaff = computed(() => {
     const roles = [UserRole.TA, UserRole.TEACHER, UserRole.ADMIN, UserRole.ROOT];
     return roles.includes(userInfo.value.role);
@@ -118,6 +124,7 @@ return {
 
     isLogin,
     isEmailBound,
+    isStudent,
     isStaff,
     isTeacher,
     isAdmin,

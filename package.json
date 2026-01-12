@@ -15,6 +15,13 @@
     "lint": "eslint . --fix --cache"
   },
   "dependencies": {
+    "@codemirror/lang-cpp": "^6.0.3",
+    "@codemirror/lang-go": "^6.0.1",
+    "@codemirror/lang-java": "^6.0.2",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/language": "^6.12.1",
+    "@codemirror/state": "^6.5.3",
+    "@codemirror/view": "^6.39.9",
     "@kangc/v-md-editor": "^2.3.18",
     "@vicons/ionicons5": "^0.13.0",
     "highlight.js": "^11.11.1",
@@ -22,6 +29,7 @@
     "pinia": "^3.0.4",
     "vite-plugin-vue-setup-extend": "^0.4.0",
     "vue": "^3.5.26",
+    "vue-codemirror": "^6.1.1",
     "vue-i18n": "^11.2.7",
     "vue-router": "^4.6.4"
   },

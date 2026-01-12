@@ -93,7 +93,7 @@ export function useDiscussList() {
 
   const handlePageChange = (p: number) => {
     page.value = p;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return {

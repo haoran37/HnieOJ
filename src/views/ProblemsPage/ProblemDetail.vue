@@ -39,52 +39,58 @@
         <n-grid-item span="3">
           <n-card :bordered="false" class="problem-card">
             
-            <div class="section-block" v-if="problem.description">
-              <div class="section-title">题目描述</div>
-              <v-md-preview :text="problem.description"></v-md-preview>
+            <div v-if="isSubmitMode">
+              <ProblemSubmit />
             </div>
 
-            <div class="section-block" v-if="problem.inputFormat">
-              <div class="section-title">输入格式</div>
-              <v-md-preview :text="problem.inputFormat"></v-md-preview>
-            </div>
+            <div v-else>
+              <div class="section-block" v-if="problem.description">
+                <div class="section-title">题目描述</div>
+                <v-md-preview :text="problem.description"></v-md-preview>
+              </div>
 
-            <div class="section-block" v-if="problem.outputFormat">
-              <div class="section-title">输出格式</div>
-              <v-md-preview :text="problem.outputFormat"></v-md-preview>
-            </div>
+              <div class="section-block" v-if="problem.inputFormat">
+                <div class="section-title">输入格式</div>
+                <v-md-preview :text="problem.inputFormat"></v-md-preview>
+              </div>
 
-            <div class="section-block" v-for="(sample, index) in problem.samples" :key="index">
-              <div class="section-title">输入输出样例 {{ index + 1 }}</div>
-              <n-grid :x-gap="12" cols="1 s:2" responsive="screen">
-                <n-grid-item>
-                  <div class="sample-box">
-                    <div class="sample-header">
-                      <span>输入</span>
-                      <n-button text size="tiny" @click="copyText(sample.input)">
-                        <template #icon><n-icon><CopyIcon /></n-icon></template> 复制
-                      </n-button>
+              <div class="section-block" v-if="problem.outputFormat">
+                <div class="section-title">输出格式</div>
+                <v-md-preview :text="problem.outputFormat"></v-md-preview>
+              </div>
+
+              <div class="section-block" v-for="(sample, index) in problem.samples" :key="index">
+                <div class="section-title">输入输出样例 {{ index + 1 }}</div>
+                <n-grid :x-gap="12" cols="1 s:2" responsive="screen">
+                  <n-grid-item>
+                    <div class="sample-box">
+                      <div class="sample-header">
+                        <span>输入</span>
+                        <n-button text size="tiny" @click="copyText(sample.input)">
+                          <template #icon><n-icon><CopyIcon /></n-icon></template> 复制
+                        </n-button>
+                      </div>
+                      <pre class="sample-content">{{ sample.input }}</pre>
                     </div>
-                    <pre class="sample-content">{{ sample.input }}</pre>
-                  </div>
-                </n-grid-item>
-                <n-grid-item>
-                  <div class="sample-box">
-                    <div class="sample-header">
-                      <span>输出</span>
-                      <n-button text size="tiny" @click="copyText(sample.output)">
-                        <template #icon><n-icon><CopyIcon /></n-icon></template> 复制
-                      </n-button>
+                  </n-grid-item>
+                  <n-grid-item>
+                    <div class="sample-box">
+                      <div class="sample-header">
+                        <span>输出</span>
+                        <n-button text size="tiny" @click="copyText(sample.output)">
+                          <template #icon><n-icon><CopyIcon /></n-icon></template> 复制
+                        </n-button>
+                      </div>
+                      <pre class="sample-content">{{ sample.output }}</pre>
                     </div>
-                    <pre class="sample-content">{{ sample.output }}</pre>
-                  </div>
-                </n-grid-item>
-              </n-grid>
-            </div>
+                  </n-grid-item>
+                </n-grid>
+              </div>
 
-            <div class="section-block" v-if="problem.hint">
-              <div class="section-title">说明 / 提示</div>
-              <v-md-preview :text="problem.hint"></v-md-preview>
+              <div class="section-block" v-if="problem.hint">
+                <div class="section-title">说明 / 提示</div>
+                <v-md-preview :text="problem.hint"></v-md-preview>
+              </div>
             </div>
 
           </n-card>
@@ -120,9 +126,29 @@
               </n-space>
 
               <div class="submit-btn-wrapper">
-                <n-button type="primary" block size="large" class="submit-btn">
+                <n-button 
+                  v-if="!isSubmitMode"
+                  type="primary" 
+                  block 
+                  size="large" 
+                  class="submit-btn"
+                  @click="toggleSubmitMode"
+                >
                   <template #icon><n-icon><CloudUploadIcon /></n-icon></template>
                   提交代码
+                </n-button>
+
+                <n-button 
+                  v-else
+                  secondary
+                  type="info" 
+                  block 
+                  size="large" 
+                  class="submit-btn"
+                  @click="toggleSubmitMode"
+                >
+                  <template #icon><n-icon><ReturnIcon /></n-icon></template>
+                  返回题目
                 </n-button>
               </div>
             </n-card>
@@ -172,10 +198,12 @@ import {
   HardwareChipOutline as HardwareChipIcon, 
   BarChartOutline as BarChartIcon,
   CopyOutline as CopyIcon,
-  CloudUploadOutline as CloudUploadIcon
+  CloudUploadOutline as CloudUploadIcon,
+  ArrowBackOutline as ReturnIcon
 } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
 import { renderStatusIcon } from '@/utils/statusUtils';
+import ProblemSubmit from './components/ProblemSubmit.vue';
 
 interface ProblemSample {
   input: string;
@@ -205,6 +233,7 @@ const message = useMessage();
 const userStore = useUserStore();
 
 const loading = ref(false);
+const isSubmitMode = ref(false); // 是否处于提交模式
 
 const problem = ref<Problem>({
   id: '',
@@ -225,7 +254,6 @@ const problem = ref<Problem>({
 
 const recommendedProblems = ref<any[]>([]);
 
-//TODO: 替换真实api
 const fetchProblemDetail = async (pid: string) => {
   loading.value = true;
   
@@ -322,12 +350,22 @@ const fallbackCopyText = (text: string) => {
 
 const handleRecClick = (id: string) => {
   router.push(`/problem/${id}`);
+  isSubmitMode.value = false;
+};
+
+// 切换提交模式
+const toggleSubmitMode = () => {
+  isSubmitMode.value = !isSubmitMode.value;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
 watch(
   () => route.params.id,
   (newId) => {
-    if (newId) fetchProblemDetail(newId as string);
+    if (newId) {
+      fetchProblemDetail(newId as string);
+      isSubmitMode.value = false;
+    }
   }
 );
 
@@ -346,7 +384,6 @@ onMounted(() => {
   gap: 16px;
 }
 
-// Header 样式
 .header-card {
   border-radius: 4px;
   margin-bottom: 10px;
@@ -401,7 +438,6 @@ onMounted(() => {
   }
 }
 
-// 主体区域通用样式
 .main-grid {
   align-items: start;
 }
@@ -427,7 +463,6 @@ onMounted(() => {
   }
 }
 
-// 样例框样式
 .sample-box {
   border: 1px solid #dcdfe6;
   border-radius: 6px;

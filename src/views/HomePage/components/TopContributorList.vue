@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { RibbonOutline as RibbonIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 
@@ -54,6 +55,7 @@ interface ContributionUser {
   contribution: number;
 }
 
+const router = useRouter();
 const loading = ref(false);
 const contributionList = ref<ContributionUser[]>([]);
 
@@ -75,7 +77,10 @@ const fetchTopContributions = async () => {
   }
 };
 
-const handleViewAll = () => console.log('View all contributions');
+const handleViewAll = () => {
+  //TODO: 带参
+  router.push('/rank');
+}
 
 onMounted(fetchTopContributions);
 </script>

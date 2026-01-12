@@ -51,6 +51,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { BarChartOutline as BarChartIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 
@@ -60,6 +61,7 @@ interface RatingUser {
   score: number;
 }
 
+const router = useRouter();
 const loading = ref(false);
 const ratingList = ref<RatingUser[]>([]);
 
@@ -82,7 +84,10 @@ const fetchTopRatings = async () => {
 };
 
 const handleFilter = (type: string) => console.log('Filter:', type);
-const handleViewAll = () => console.log('View All');
+const handleViewAll = () => {
+  //TODO: 带参
+  router.push('/rank');
+}
 
 onMounted(fetchTopRatings);
 </script>

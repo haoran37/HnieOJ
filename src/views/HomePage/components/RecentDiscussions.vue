@@ -81,8 +81,7 @@ const {
 
 
 const handleDetailOpen = (item: any) => {
-  console.log('交互：进入讨论内容详情页，讨论ID:', item.id);
-  // router.push(`/discuss/${item.id}`)
+  router.push(`/discuss/${item.id}`)
 };
 
 const handleUserJump = (name: string) => {

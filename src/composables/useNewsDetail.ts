@@ -60,8 +60,9 @@ $$
 \\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\pi^2}{6} = \\prod_{p \\text{ prime}} \\frac{1}{1 - p^{-2}} = \\frac{\\Gamma\\left(\\frac{1}{2}\\right)^2}{\\sqrt{2}}
 $$
 
-![哈气](https://s11.ax1x.com/2023/04/27/p9QuT2R.jpg){{{width="300" height="auto"}}}
-
+::: align-center
+  ![哈气](https://s11.ax1x.com/2023/04/27/p9QuT2R.jpg){{{width="300" height="auto"}}}
+:::
         `
       };
       loading.value = false;

@@ -20,8 +20,10 @@ declare module '@kangc/v-md-editor/lib/plugins/katex/npm' {
   export default createKatexPlugin;
 }
 
-declare module '@kangc/v-md-editor/lib/plugins/line-number/index';
-declare module '@kangc/v-md-editor/lib/plugins/copy-code/index';
+declare module '@kangc/v-md-editor/lib/plugins/tip/index' {
+  const createTipPlugin: () => any;
+  export default createTipPlugin;
+}
 
 declare module '@kangc/v-md-editor' {
   import type { DefineComponent } from 'vue';
@@ -33,3 +35,7 @@ declare module '@kangc/v-md-editor' {
   
   export default VMdEditor;
 }
+
+declare module '@kangc/v-md-editor/lib/plugins/line-number/index';
+declare module '@kangc/v-md-editor/lib/plugins/copy-code/index';
+declare module '@kangc/v-md-editor/lib/plugins/align';

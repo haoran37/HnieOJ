@@ -13,21 +13,30 @@ import '@kangc/v-md-editor/lib/theme/style/github.css';
 import hljs from 'highlight.js';
 import createKatexPlugin from '@kangc/v-md-editor/lib/plugins/katex/npm';
 import 'katex/dist/katex.css'; 
-// import createTipPlugin from '@kangc/v-md-editor/lib/plugins/tip/index';
+import createTipPlugin from '@kangc/v-md-editor/lib/plugins/tip/index';
+import '@kangc/v-md-editor/lib/plugins/tip/tip.css';
+import createCopyCodePlugin from '@kangc/v-md-editor/lib/plugins/copy-code/index';
+import '@kangc/v-md-editor/lib/plugins/copy-code/copy-code.css';
+import createLineNumbertPlugin from '@kangc/v-md-editor/lib/plugins/line-number/index';
+import createAlignPlugin from '@kangc/v-md-editor/lib/plugins/align';
+
 // 通用字体
 import 'vfonts/Lato.css'
 // 等宽字体
 import 'vfonts/FiraCode.css'
 
-// VMdEditor.use(createTipPlugin());
-VMdEditor.use(githubTheme, {
-  Hljs: hljs,
-});
-VMdPreview.use(githubTheme, {
-  Hljs: hljs,
-});
+// 先加载主题再加载插件
+VMdEditor.use(githubTheme, { Hljs: hljs });
+VMdEditor.use(createTipPlugin());
+VMdEditor.use(createLineNumbertPlugin());
+VMdEditor.use(createAlignPlugin());
 
+VMdPreview.use(githubTheme, { Hljs: hljs });
 VMdPreview.use(createKatexPlugin());
+VMdPreview.use(createCopyCodePlugin());
+VMdPreview.use(createTipPlugin());
+VMdPreview.use(createLineNumbertPlugin());
+VMdPreview.use(createAlignPlugin());
 
 const app = createApp(App)
 

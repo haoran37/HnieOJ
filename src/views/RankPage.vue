@@ -126,7 +126,7 @@ const columns = [
             cursor: 'pointer',
           },
           onClick: () => {
-            console.log(`Maps to user profile: ${row.studentId}`);
+            router.push(`/user/${row.studentId}`);
           }
         },
         row.studentId

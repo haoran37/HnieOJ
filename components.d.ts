@@ -17,6 +17,7 @@ declare module 'vue' {
     Home: typeof import('./src/components/Home.vue')['default']
     NAffix: typeof import('naive-ui')['NAffix']
     NAlert: typeof import('naive-ui')['NAlert']
+    NAutoComplete: typeof import('naive-ui')['NAutoComplete']
     NAvatar: typeof import('naive-ui')['NAvatar']
     NBadge: typeof import('naive-ui')['NBadge']
     NButton: typeof import('naive-ui')['NButton']

@@ -19,17 +19,21 @@ export interface UserInfo {
   email?: string;
   role: UserRole;
   avatar?: string;
+  college?: string;
+  class?: string;
 }
 
 export const useUserStore = defineStore('user', () => {
   // State
+  //TODO: 登录后从后端获取覆盖
   const userInfo = ref({
     id: '202202050231',
     username: 'MyUserAccount',
     name: '我',
     email: 'test@hnie.edu.cn',
     role: UserRole.ADMIN, 
-    //TODO: 登录后从后端获取覆盖
+    college: '信息科学与工程学院',
+    class: '计算机2202',
     avatar: 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'
   });
 
@@ -112,27 +116,15 @@ export const useUserStore = defineStore('user', () => {
       name: '',
       email: '',
       role: UserRole.GUEST,
+      college: '',
+      class: '',
       avatar: ''
     };
   };
 
 return {
-    userInfo,
-    token,
-    acceptedProblems,
-    wrongProblems,
-
-    isLogin,
-    isEmailBound,
-    isStudent,
-    isStaff,
-    isTeacher,
-    isAdmin,
-
-    UserRole,
-
-    getProblemStatus,
-    setUserInfo,
-    logout
+    userInfo, token, acceptedProblems, wrongProblems,
+    isLogin, isEmailBound, isStudent, isStaff, isTeacher, isAdmin, UserRole,
+    getProblemStatus, setUserInfo, logout
   };
 });

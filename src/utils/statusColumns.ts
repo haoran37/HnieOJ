@@ -35,8 +35,18 @@ export const createStatusColumns = (router: Router) => [
   {
     title: 'SID',
     key: 'studentId',
-    width: 120,
-    render: (row: Submission) => h('span', { style: { color: '#2080f0', cursor: 'pointer' } }, row.studentId)
+    width: 140,
+    render: (row: Submission) => h(
+      'a',
+      {
+        style: { color: '#2080f0', cursor: 'pointer' },
+        onClick: (e: MouseEvent) => {
+          e.preventDefault();
+          router.push(`/user/${row.studentId}`);
+        }
+      },
+      row.studentId
+    )
   },
   {
     title: 'Name',

@@ -44,11 +44,13 @@
 <script lang="ts" setup name="TopNavi">
 import logo from '@/assets/hie.svg'
 import { computed, h } from 'vue';
+import { useUserStore } from '@/stores/userStore';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import type { MenuOption } from 'naive-ui';
 import { routes } from '@/router/routers';
 import { ChevronDown as ChevronDownIcon } from '@vicons/ionicons5'
 
+const userStore = useUserStore();
 const route = useRoute();
 const router = useRouter();
 const activeKey = computed(() => route.path);
@@ -81,7 +83,10 @@ const userOptions = [
 
 function handleUserSelect(key: string) {
   console.log('点击了：', key);
-  // 根据 key 跳转路由或执行退出操作
+  //TODO: 根据 key 跳转路由或执行退出操作
+  switch(key) {
+    case "profile": router.push(`/user/${userStore.userInfo.id}`); break;
+  }
 }
 
 function handleMenuChange(key: string) {

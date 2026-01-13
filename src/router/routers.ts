@@ -164,6 +164,56 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/DiscussPage/DiscussDetail.vue')
   },
   {
+    path: '/user/:uid',
+    component: () => import('@/views/UserPage/UserLayout.vue'),
+    meta: { title: '用户中心', hideInMenu: true },
+    redirect: to => `/user/${to.params.uid}/home`,
+    children: [
+      {
+        path: 'home',
+        name: 'UserHome',
+        meta: { title: '主页' },
+        component: () => import('@/views/UserPage/views/UserHome.vue')
+      },
+      {
+        path: 'homework',
+        name: 'UserHomework',
+        meta: { title: '作业' },
+        component: () => import('@/views/UserPage/views/UserHomework.vue')
+      },
+      {
+        path: 'contest',
+        name: 'UserContest',
+        meta: { title: '比赛' },
+        component: () => import('@/views/UserPage/views/UserContest.vue')
+      },
+      {
+        path: 'training',
+        name: 'UserTraining',
+        meta: { title: '题单' },
+        component: () => import('@/views/UserPage/views/UserTraining.vue')
+      },
+      {
+        path: 'discuss',
+        name: 'UserDiscuss',
+        meta: { title: '讨论' },
+        component: () => import('@/views/UserPage/views/UserDiscuss.vue')
+      },
+      {
+        path: 'message',
+        name: 'UserMessage',
+        meta: { title: '消息' },
+        component: () => import('@/views/UserPage/views/UserMessage.vue')
+      },
+      {
+        path: 'setting',
+        name: 'UserSetting',
+        meta: { title: '设置' },
+        component: () => import('@/views/UserPage/views/UserSetting.vue')
+      }
+    ]
+  },
+  {
     name: 'WIKI',
     path: '/wiki',
     meta: { title: 'WIKI' },

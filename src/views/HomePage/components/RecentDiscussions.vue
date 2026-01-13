@@ -65,9 +65,10 @@ import { ChatboxEllipsesOutline as ChatIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 import DiscussionItem from '@/components/DiscussionItem.vue';
 import { useDiscussList } from '@/composables/useDiscussList';
+import { useMessage } from 'naive-ui';
 
 const router = useRouter();
-
+const message = useMessage()
 const { 
   loading, 
   displayList, 
@@ -84,9 +85,11 @@ const handleDetailOpen = (item: any) => {
   router.push(`/discuss/${item.id}`)
 };
 
-const handleUserJump = (name: string) => {
-  console.log('交互：查看用户信息，用户名:', name);
-  // router.push(`/user/${name}`)
+const handleUserJump = (username: string) => {
+  //TODO: 实现根据username查询id的api
+  message.info(`查看用户: ${username}`);
+  message.warning('TODO: 实现根据username查询id的api');
+  router.push(`/user/${username}`);
 };
 
 const handleProblemJump = (id: string | number) => {

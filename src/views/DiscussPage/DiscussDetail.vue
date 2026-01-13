@@ -103,7 +103,7 @@
                 </div>
               </div>
               <div class="info-item">
-                <span class="label">提时间</span>
+                <span class="label">提出时间</span>
                 <span class="val">{{ post.time }}</span>
               </div>
               <div class="info-item">

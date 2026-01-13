@@ -39,9 +39,10 @@
 
 <script lang="ts" setup>
 import { ref, reactive, onMounted, h, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import BoardCard from '@/components/BoardCard.vue'
 import { BarChartOutline as RankIcon, ChevronDown } from '@vicons/ionicons5'
-import { NButton } from 'naive-ui'
+import { NButton, useMessage } from 'naive-ui'
 
 interface RankRow {
   rank: number
@@ -52,6 +53,8 @@ interface RankRow {
   submit: number
 }
 
+const router = useRouter()
+const message = useMessage()
 const now = new Date()
 const currentMonthNum = now.getMonth() + 1
 const selectedMonth = ref(currentMonthNum.toString())
@@ -99,8 +102,8 @@ const fetchData = async () => {
     setTimeout(() => {
       tableData.value = Array.from({ length: pagination.pageSize }).map((_, i) => ({
         rank: (pagination.page - 1) * pagination.pageSize + i + 1,
-        studentId: `2024${params.month}${String(i).padStart(3, '0')}`,
-        className: '计算2401',
+        studentId: `20221234${params.month}${String(i).padStart(3, '0')}`,
+        className: '计算2202',
         name: '测试用户',
         solved: Math.floor(Math.random() * 100),
         submit: 200
@@ -110,7 +113,7 @@ const fetchData = async () => {
       loading.value = false
     }, 400)
   } catch (error) {
-    console.error('获取排名失败:', error)
+    message.error(`获取排名失败:${error}`)
     loading.value = false
   }
 }
@@ -133,8 +136,7 @@ const columns = [
               textDecoration: 'none'
             },
             onClick: () => {
-              // TODO: 实现跳转到用户主页
-              console.log('准备跳转到用户主页:', row.studentId)
+              router.push(`/user/${row.studentId}`)
             }
           },
           { default: () => row.studentId }

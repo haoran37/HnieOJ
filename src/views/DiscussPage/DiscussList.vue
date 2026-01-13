@@ -175,6 +175,8 @@ const handleDetail = (id: number) => {
 
 const handleUser = (username: string) => {
   message.info(`查看用户: ${username}`);
+  message.warning('TODO: 实现根据username查询id的api');
+  router.push(`/user/${username}`);
 };
 
 const handleProblem = (pid: string) => {

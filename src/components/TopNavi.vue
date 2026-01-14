@@ -16,11 +16,9 @@
           mode="horizontal"
           :options="menuOptions"
           :value="activeKey"
-          @update:value="handleMenuChange"
         />
-      </div>
+        </div>
 
-      <!-- TODO: 根据实际情况修改用户信息区域 -->
       <div class="user-action-area">
         <n-dropdown :options="userOptions" @select="handleUserSelect" trigger="hover">
           <div class="user-info-trigger">
@@ -37,7 +35,6 @@
         </n-dropdown>
       </div>
     </div>
-
   </n-flex>
 </template>
 
@@ -47,32 +44,41 @@ import { computed, h } from 'vue';
 import { useUserStore } from '@/stores/userStore';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import type { MenuOption } from 'naive-ui';
-import { routes } from '@/router/routers';
+import { routes } from '@/router/routers'; // 修正引用路径，原文件可能是 @/router/routers
 import { ChevronDown as ChevronDownIcon } from '@vicons/ionicons5'
 
 const userStore = useUserStore();
 const route = useRoute();
 const router = useRouter();
-const activeKey = computed(() => route.path);
 
-const menuOptions = computed<MenuOption[]>(() =>
-  routes
-    .filter(r => !r.meta?.hideInMenu) 
-    .map((r) => ({
-      key: r.path!,
-      label: () =>
-        h(
-          RouterLink,
-          { to: r.path! },
-          { default: () => r.meta?.title as string }
-        )
-    }))
-);
+// 修复高亮逻辑：优先读取 meta.activeMenu，解决详情页菜单不高亮的问题
+const activeKey = computed(() => (route.meta?.activeMenu as string) || (route.name as string));
 
-/**
- * 用户下拉菜单配置
- */
-// TODO: 根据实际需求修改菜单项
+const ojRoute = routes.find(r => r.path === '/');
+
+const menuOptions = computed<MenuOption[]>(() => {
+  const menuRoutes = ojRoute?.children || [];
+
+  return menuRoutes
+    .filter(r => !r.meta?.hideInMenu)
+    .map((r) => {
+      // 确保路径拼接正确
+      const fullPath = r.path === '' ? '/' : `/${r.path}`;
+      return {
+        key: r.name as string,
+        label: () =>
+          h(
+            RouterLink,
+            { 
+              to: fullPath 
+              // RouterLink 会自动处理 active class，但 naiv-ui 需要 key 匹配来控制下划线
+            },
+            { default: () => r.meta?.title as string }
+          )
+      };
+    });
+});
+
 const userOptions = [
   { label: '个人中心', key: 'profile' },
   { label: '后台管理', key: 'admin' },
@@ -82,15 +88,14 @@ const userOptions = [
 ];
 
 function handleUserSelect(key: string) {
-  console.log('点击了：', key);
-  //TODO: 根据 key 跳转路由或执行退出操作
   switch(key) {
-    case "profile": router.push(`/user/${userStore.userInfo.id}`); break;
+    case "profile": router.push(`/user/${userStore.userInfo?.id || 0}/home`); break; 
+    case "admin": router.push(`/admin`); break;
+    case "logout": 
+      userStore.logout();
+      router.push('/login'); 
+      break;
   }
-}
-
-function handleMenuChange(key: string) {
-  router.push(key);
 }
 </script>
 

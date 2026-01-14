@@ -5,7 +5,7 @@
       <n-notification-provider>
         <n-message-provider>
           <n-modal-provider>
-            <MainPage />
+            <router-view />
           </n-modal-provider>
         </n-message-provider>
       </n-notification-provider>
@@ -14,15 +14,13 @@
 </template>
 
 <script setup lang="ts">
-import MainPage from './views/MainPage.vue';
-
 </script>
-
 
 <style>
 body {
   --header-height: 60px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
 }
 </style>

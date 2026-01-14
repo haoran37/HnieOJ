@@ -5,5 +5,5 @@
 </template>
 
 <script setup lang="ts">
-import ContestProblems from '@/views/ContestsPage/components/ContestProblems.vue';
+import ContestProblems from '@/views/oj/ContestsPage/components/ContestProblems.vue';
 </script>

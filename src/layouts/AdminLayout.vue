@@ -27,69 +27,71 @@
       />
     </n-layout-sider>
 
-    <n-layout class="main-layout">
-      <n-layout-header bordered class="admin-header">
-        <div class="header-left">
-          <n-breadcrumb>
-            <n-breadcrumb-item @click="$router.push('/')">HnieOJ</n-breadcrumb-item>
-            <n-breadcrumb-item v-for="item in breadcrumbs" :key="item.path">
-              {{ item.meta.title }}
-            </n-breadcrumb-item>
-          </n-breadcrumb>
-        </div>
+    <n-layout class="main-layout" :native-scrollbar="false">
+      <div class="flex-container">
+        <n-layout-header bordered class="admin-header">
+          <div class="header-left">
+            <n-breadcrumb>
+              <n-breadcrumb-item @click="$router.push('/')">HnieOJ</n-breadcrumb-item>
+              <n-breadcrumb-item v-for="item in breadcrumbs" :key="item.path">
+                {{ item.meta.title }}
+              </n-breadcrumb-item>
+            </n-breadcrumb>
+          </div>
 
-        <div class="header-right">
-          <n-tooltip trigger="hover">
-            <template #trigger>
-              <n-button circle quaternary @click="$router.push('/')">
-                <template #icon><n-icon><HomeOutline /></n-icon></template>
-              </n-button>
-            </template>
-            返回主站
-          </n-tooltip>
+          <div class="header-right">
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <n-button circle quaternary @click="$router.push('/')">
+                  <template #icon><n-icon><HomeOutline /></n-icon></template>
+                </n-button>
+              </template>
+              返回主站
+            </n-tooltip>
 
-          <n-tooltip trigger="hover">
-            <template #trigger>
-              <n-button circle quaternary @click="toggleFullScreen">
-                <template #icon>
-                  <n-icon>
-                    <ExpandOutline v-if="!isFullScreen" />
-                    <ContractOutline v-else />
-                  </n-icon>
-                </template>
-              </n-button>
-            </template>
-            {{ isFullScreen ? '退出全屏' : '全屏模式' }}
-          </n-tooltip>
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <n-button circle quaternary @click="toggleFullScreen">
+                  <template #icon>
+                    <n-icon>
+                      <ExpandOutline v-if="!isFullScreen" />
+                      <ContractOutline v-else />
+                    </n-icon>
+                  </template>
+                </n-button>
+              </template>
+              {{ isFullScreen ? '退出全屏' : '全屏模式' }}
+            </n-tooltip>
 
-          <n-divider vertical />
-          
-          <n-switch
-            :value="appStore.darkMode"
-            @update:value="appStore.toggleDarkMode"
-            size="medium"
-          >
-            <template #checked-icon><n-icon><Moon /></n-icon></template>
-            <template #unchecked-icon><n-icon><Sunny /></n-icon></template>
-          </n-switch>
-          <n-divider vertical />
+            <n-divider vertical />
+            
+            <n-switch
+              :value="appStore.darkMode"
+              @update:value="appStore.toggleDarkMode"
+              size="medium"
+            >
+              <template #checked-icon><n-icon><Moon /></n-icon></template>
+              <template #unchecked-icon><n-icon><Sunny /></n-icon></template>
+            </n-switch>
+            <n-divider vertical />
 
-          <n-dropdown :options="userOptions" @select="handleUserSelect">
-            <div class="user-trigger">
-              <n-avatar round size="small" :src="userStore.userInfo?.avatar || 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'" />
-              <span class="username">{{ userStore.userInfo?.username || 'Admin' }}</span>
-            </div>
-          </n-dropdown>
-        </div>
-      </n-layout-header>
+            <n-dropdown :options="userOptions" @select="handleUserSelect">
+              <div class="user-trigger">
+                <n-avatar round size="small" :src="userStore.userInfo?.avatar || 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'" />
+                <span class="username">{{ userStore.userInfo?.username || 'Admin' }}</span>
+              </div>
+            </n-dropdown>
+          </div>
+        </n-layout-header>
 
-      <n-layout-content content-style="padding: 24px;" class="admin-content">
-        <router-view v-slot="{ Component }">
-          <transition name="fade-slide" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </n-layout-content>
+        <n-layout-content content-style="padding: 24px;" class="admin-content">
+          <router-view v-slot="{ Component }">
+            <transition name="fade-slide" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </n-layout-content>
+      </div>
     </n-layout>
   </n-layout>
 </template>
@@ -135,7 +137,6 @@ function renderIcon(icon: any) {
 // 动态生成菜单
 const menuOptions = computed(() => {
   const routes = adminRouters.children || [];
-
   const buildMenu = (routes: any[]) => {
     return routes
       .filter(r => !r.meta?.hideInMenu)
@@ -187,6 +188,12 @@ const handleUserSelect = (key: string) => {
   height: 100vh;
 }
 
+.flex-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; 
+}
+
 .logo-wrapper {
   height: 64px;
   display: flex;
@@ -210,13 +217,9 @@ const handleUserSelect = (key: string) => {
     font-weight: bold;
     color: var(--n-text-color);
     white-space: nowrap;
-    
     opacity: 1;
     max-width: 150px; 
-    transition: 
-      opacity 0.3s ease-in-out, 
-      max-width 0.3s ease-in-out, 
-      margin 0.3s ease-in-out;
+    transition: opacity 0.3s ease-in-out, max-width 0.3s ease-in-out, margin 0.3s ease-in-out;
   }
 
   &.collapsed {
@@ -230,52 +233,29 @@ const handleUserSelect = (key: string) => {
 
 .admin-header {
   height: 64px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
+  z-index: 10;
   
-  .header-left {
-    display: flex;
-    align-items: center;
-  }
-  
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .header-left { display: flex; align-items: center; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
 
   .user-trigger {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    padding: 6px 12px;
-    border-radius: 4px;
-    transition: background-color 0.3s;
-    
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.05);
-    }
+    display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 12px; border-radius: 4px; transition: background-color 0.3s;
+    &:hover { background-color: rgba(0, 0, 0, 0.05); }
   }
 }
 
 .admin-content {
+  flex: 1;
+  overflow-y: auto;
   background-color: rgba(245, 247, 249, 0.5);
 }
 
-// 路由过渡动画
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 0.3s ease;
-}
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateX(-10px);
-}
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateX(10px);
-}
+.fade-slide-enter-active, .fade-slide-leave-active { transition: all 0.3s ease; }
+.fade-slide-enter-from { opacity: 0; transform: translateX(-10px); }
+.fade-slide-leave-to { opacity: 0; transform: translateX(10px); }
 </style>

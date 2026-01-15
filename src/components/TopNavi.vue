@@ -17,17 +17,22 @@
           :options="menuOptions"
           :value="activeKey"
         />
-        </div>
+      </div>
 
       <div class="user-action-area">
-        <n-dropdown :options="userOptions" @select="handleUserSelect" trigger="hover">
+        <n-space v-if="!userStore.isLogin">
+          <n-button quaternary @click="router.push('/login')">登录</n-button>
+          <n-button secondary type="primary" @click="router.push('/register')">注册</n-button>
+        </n-space>
+
+        <n-dropdown v-else :options="userOptions" @select="handleUserSelect" trigger="hover">
           <div class="user-info-trigger">
             <n-avatar
               round
               size="small"
-              src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg"
+              :src="userStore.userInfo?.avatar"
             />
-            <span class="username">username</span>
+            <span class="username">{{ userStore.userInfo?.username }}</span>
             <n-icon class="arrow-icon">
               <ChevronDownIcon /> 
             </n-icon>
@@ -44,52 +49,50 @@ import { computed, h } from 'vue';
 import { useUserStore } from '@/stores/userStore';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import type { MenuOption } from 'naive-ui';
-import { routes } from '@/router/routers'; // 修正引用路径，原文件可能是 @/router/routers
+import { ojRouters } from '@/router/routers';
 import { ChevronDown as ChevronDownIcon } from '@vicons/ionicons5'
 
 const userStore = useUserStore();
 const route = useRoute();
 const router = useRouter();
 
-// 修复高亮逻辑：优先读取 meta.activeMenu，解决详情页菜单不高亮的问题
 const activeKey = computed(() => (route.meta?.activeMenu as string) || (route.name as string));
 
-const ojRoute = routes.find(r => r.path === '/');
-
+// 动态生成菜单项
 const menuOptions = computed<MenuOption[]>(() => {
-  const menuRoutes = ojRoute?.children || [];
+  const menuRoutes = ojRouters.children || []; //
 
   return menuRoutes
-    .filter(r => !r.meta?.hideInMenu)
+    .filter(r => {
+      if (r.meta?.hideInMenu) return false;
+      return true
+    })
     .map((r) => {
-      // 确保路径拼接正确
       const fullPath = r.path === '' ? '/' : `/${r.path}`;
       return {
         key: r.name as string,
         label: () =>
           h(
             RouterLink,
-            { 
-              to: fullPath 
-              // RouterLink 会自动处理 active class，但 naiv-ui 需要 key 匹配来控制下划线
-            },
+            { to: fullPath },
             { default: () => r.meta?.title as string }
           )
       };
     });
 });
 
+// 用户下拉菜单配置
 const userOptions = [
   { label: '个人中心', key: 'profile' },
-  { label: '后台管理', key: 'admin' },
   { label: '消息通知', key: 'message' },
+  { label: '后台管理', key: 'admin', show: userStore.isAdmin },
   { type: 'divider', key: 'd1' },
   { label: '退出登录', key: 'logout' }
 ];
 
 function handleUserSelect(key: string) {
   switch(key) {
-    case "profile": router.push(`/user/${userStore.userInfo?.id || 0}/home`); break; 
+    case "profile": router.push(`/user/${userStore.userInfo?.id || 0}`); break; 
     case "admin": router.push(`/admin`); break;
     case "logout": 
       userStore.logout();
@@ -100,13 +103,13 @@ function handleUserSelect(key: string) {
 </script>
 
 <style scoped lang="less">
-@side-padding: 5%;          // 响应式边距：屏幕缩小时，左右至少保持 5% 的距离
-@logo-menu-gap: 56px;       // Logo与菜单的间隔 
-@item-gap: 56px;            // 每个菜单项之间的间距
-@font-size: 16px;           // 字体大小
-@text-color: #515A6E;       // 默认文字颜色
-@active-color: #1a3968;     // 选中颜色
-@line-thickness: 4px;       // 下划线粗细
+@side-padding: 5%;
+@logo-menu-gap: 56px;
+@item-gap: 56px;
+@font-size: 16px;
+@text-color: #515A6E;
+@active-color: #1a3968;
+@line-thickness: 4px;
 
 .navi-bar {
   background-color: rgba(216, 216, 216, 0.13);
@@ -122,7 +125,7 @@ function handleUserSelect(key: string) {
   align-items: center;
   width: 100%;
   height: 100%;
-  padding: 0 @side-padding; // 左右自动留空
+  padding: 0 @side-padding;
   box-sizing: border-box;
 }
 
@@ -146,19 +149,12 @@ function handleUserSelect(key: string) {
   margin-left: @logo-menu-gap;
   flex: 1;
   height: 100%;
-  min-width: 0; // 防止Flex溢出
+  min-width: 0;
 }
 
 :deep(.n-menu.n-menu--horizontal) {
   height: 100%;
   align-items: center;
-
-  // 禁用原生过渡效果
-  .n-menu-item-content,
-  .n-menu-item-content-header,
-  .n-menu-item-content-header a {
-    transition: none !important; 
-  }
 
   .n-menu-item-content-bottom-line {
     display: none !important; 
@@ -184,13 +180,6 @@ function handleUserSelect(key: string) {
     display: flex;
     align-items: center;
     position: relative;
-    overflow: visible;
-
-    .n-menu-item-content-header {
-      color: inherit !important;
-      white-space: nowrap; // 文本不换行
-      a { color: inherit !important; text-decoration: none; }
-    }
 
     &.n-menu-item-content--selected {
       color: @active-color !important;
@@ -206,17 +195,13 @@ function handleUserSelect(key: string) {
         border-radius: 2px;
       }
     }
-
-    &:hover {
-      color: @active-color !important;
-    }
   }
 }
 
 .user-action-area {
   display: flex;
   align-items: center;
-  margin-left: auto; // 关键：将用户信息推向最右侧
+  margin-left: auto;
   cursor: pointer;
 }
 
@@ -239,7 +224,6 @@ function handleUserSelect(key: string) {
   }
 }
 
-// 当屏幕非常小时减小间距，防止挤压
 @media (max-width: 1024px) {
   .menu-wrapper { margin-left: 24px; }
   :deep(.n-menu-item) { margin-right: 24px !important; }

@@ -1,5 +1,5 @@
 <template>
-  <h1>Dashboard Index Page</h1>
+  <h1>403 Forbidden</h1>
 </template>
 
 <script lang="ts" setup name="">

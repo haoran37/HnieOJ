@@ -48,24 +48,35 @@ import UserSideBar from './components/UserSideBar.vue';
 
 const route = useRoute();
 const router = useRouter();
-const currentTab = ref('home');
+
+const currentTab = ref<'home' | string>('home');
 
 const updateTab = () => {
-  const pathParts = route.path.split('/');
-  const lastPart = pathParts[pathParts.length - 1];
-  if (lastPart) {
-    currentTab.value = lastPart;
+  const name = route.name as string | undefined;
+  if (!name) {
+    currentTab.value = 'home';
+    return;
+  }
+  if (name === 'UserHome') {
+    currentTab.value = 'home';
+  } else if (name.startsWith('User')) {
+    currentTab.value = name.replace('User', '').toLowerCase();
   }
 };
-
 const handleTabChange = (val: string) => {
   currentTab.value = val;
-  router.push({ name: `User${val.charAt(0).toUpperCase() + val.slice(1)}` });
+  const name =
+    val === 'home'
+      ? 'UserHome'
+      : `User${val.charAt(0).toUpperCase()}${val.slice(1)}`;
+
+  router.push({ name });
 };
 
-watch(() => route.path, updateTab);
+watch(() => route.name, updateTab);
 onMounted(updateTab);
 </script>
+
 
 <style scoped lang="less">
 .user-layout-container {

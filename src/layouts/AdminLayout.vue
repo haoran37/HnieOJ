@@ -4,46 +4,88 @@
       bordered
       collapse-mode="width"
       :collapsed-width="64"
-      :width="240"
-      :collapsed="collapsed"
+      :width="220"
+      :collapsed="appStore.collapsed"
       show-trigger
-      @collapse="collapsed = true"
-      @expand="collapsed = false"
+      @collapse="appStore.collapsed = true"
+      @expand="appStore.collapsed = false"
       class="admin-sider"
     >
-      <div class="logo">
-        <n-icon size="30" color="#18a058"><HardwareChipOutline /></n-icon>
-        <span v-show="!collapsed" class="title">OJ Admin</span>
+      <div class="logo-wrapper" :class="{ collapsed: appStore.collapsed }">
+        <img src="@/assets/hie.svg" alt="Logo" class="logo-img" />
+        <span class="logo-text">HnieOJ Admin</span>
       </div>
-      
+
       <n-menu
-        :collapsed="collapsed"
+        :collapsed="appStore.collapsed"
         :collapsed-width="64"
         :collapsed-icon-size="22"
         :options="menuOptions"
         :value="activeKey"
-        @update:value="handleMenuUpdate"
+        :indent="24"
+        :default-expanded-keys="defaultExpandedKeys"
       />
     </n-layout-sider>
 
-    <n-layout>
+    <n-layout class="main-layout">
       <n-layout-header bordered class="admin-header">
         <div class="header-left">
-          <span class="page-title">{{ currentRouteTitle }}</span>
+          <n-breadcrumb>
+            <n-breadcrumb-item @click="$router.push('/')">HnieOJ</n-breadcrumb-item>
+            <n-breadcrumb-item v-for="item in breadcrumbs" :key="item.path">
+              {{ item.meta.title }}
+            </n-breadcrumb-item>
+          </n-breadcrumb>
         </div>
+
         <div class="header-right">
+          <n-tooltip trigger="hover">
+            <template #trigger>
+              <n-button circle quaternary @click="$router.push('/')">
+                <template #icon><n-icon><HomeOutline /></n-icon></template>
+              </n-button>
+            </template>
+            返回主站
+          </n-tooltip>
+
+          <n-tooltip trigger="hover">
+            <template #trigger>
+              <n-button circle quaternary @click="toggleFullScreen">
+                <template #icon>
+                  <n-icon>
+                    <ExpandOutline v-if="!isFullScreen" />
+                    <ContractOutline v-else />
+                  </n-icon>
+                </template>
+              </n-button>
+            </template>
+            {{ isFullScreen ? '退出全屏' : '全屏模式' }}
+          </n-tooltip>
+
+          <n-divider vertical />
+          
+          <n-switch
+            :value="appStore.darkMode"
+            @update:value="appStore.toggleDarkMode"
+            size="medium"
+          >
+            <template #checked-icon><n-icon><Moon /></n-icon></template>
+            <template #unchecked-icon><n-icon><Sunny /></n-icon></template>
+          </n-switch>
+          <n-divider vertical />
+
           <n-dropdown :options="userOptions" @select="handleUserSelect">
             <div class="user-trigger">
-              <n-avatar round size="small" :src="userStore.userInfo.avatar" />
-              <span class="username">{{ userStore.userInfo.username }}</span>
+              <n-avatar round size="small" :src="userStore.userInfo?.avatar || 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'" />
+              <span class="username">{{ userStore.userInfo?.username || 'Admin' }}</span>
             </div>
           </n-dropdown>
         </div>
       </n-layout-header>
 
-      <n-layout-content content-style="padding: 24px; background-color: #f5f7f9; min-height: calc(100vh - 64px);">
+      <n-layout-content content-style="padding: 24px;" class="admin-content">
         <router-view v-slot="{ Component }">
-          <transition name="fade-scale" mode="out-in">
+          <transition name="fade-slide" mode="out-in">
             <component :is="Component" />
           </transition>
         </router-view>
@@ -53,63 +95,79 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h } from 'vue';
+import { ref, computed, h, isRef } from 'vue';
 import { useRouter, useRoute, RouterLink } from 'vue-router';
 import { NIcon } from 'naive-ui';
-import { 
-  SpeedometerOutline, 
-  ListOutline, 
-  PeopleOutline, 
-  HardwareChipOutline,
-  LogOutOutline
-} from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
+import { useAppStore } from '@/stores/app';
+import { adminRouters } from '@/router/routers';
+import { 
+  LogOutOutline, 
+  HomeOutline, 
+  ExpandOutline, 
+  ContractOutline, 
+  Moon, 
+  Sunny 
+} from '@vicons/ionicons5';
 
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
-const collapsed = ref(false);
+const appStore = useAppStore();
 
-// 渲染图标工具函数
+// 全屏控制
+const isFullScreen = ref(false);
+const toggleFullScreen = () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+    isFullScreen.value = true;
+  } else {
+    document.exitFullscreen();
+    isFullScreen.value = false;
+  }
+};
+
 function renderIcon(icon: any) {
-  return () => h(NIcon, null, { default: () => h(icon) });
+  const component = isRef(icon) ? icon.value : icon;
+  return () => h(NIcon, null, { default: () => h(component) });
 }
 
-// 菜单配置
-const menuOptions = [
-  {
-    label: () => h(RouterLink, { to: '/admin/dashboard' }, { default: () => '仪表盘' }),
-    key: 'AdminDashboard',
-    icon: renderIcon(SpeedometerOutline)
-  },
-  {
-    label: '题目管理',
-    key: 'problem-manage',
-    icon: renderIcon(ListOutline),
-    children: [
-      {
-        label: () => h(RouterLink, { to: '/admin/problem/list' }, { default: () => '题目列表' }),
-        key: 'AdminProblemList'
-      },
-      {
-        label: '创建题目',
-        key: 'AdminProblemCreate'
-      }
-    ]
-  },
-  {
-    label: '用户管理',
-    key: 'user-manage',
-    icon: renderIcon(PeopleOutline),
-    children: [
-      { label: '用户列表', key: 'AdminUserList' }
-    ]
-  }
-];
+// 动态生成菜单
+const menuOptions = computed(() => {
+  const routes = adminRouters.children || [];
 
-// 当前高亮的菜单项
+  const buildMenu = (routes: any[]) => {
+    return routes
+      .filter(r => !r.meta?.hideInMenu)
+      .map(r => {
+        const option: any = {
+          label: r.children 
+            ? r.meta?.title 
+            : () => h(RouterLink, { to: { name: r.name } }, { default: () => r.meta?.title }),
+          key: r.name, 
+          icon: r.meta?.icon ? renderIcon(r.meta.icon) : undefined
+        };
+        if (r.children) {
+          option.children = buildMenu(r.children);
+        }
+        return option;
+      });
+  };
+  return buildMenu(routes);
+});
+
 const activeKey = computed(() => route.name as string);
-const currentRouteTitle = computed(() => route.meta.title || '后台管理');
+
+const defaultExpandedKeys = computed(() => {
+  return route.matched
+    .map(r => r.name as string)
+    .filter(name => name !== activeKey.value);
+});
+
+// 面包屑逻辑
+const breadcrumbs = computed(() => {
+  return route.matched.filter(item => item.meta?.title && item.path !== '/admin'); 
+});
 
 // 用户下拉菜单
 const userOptions = [
@@ -118,13 +176,9 @@ const userOptions = [
 
 const handleUserSelect = (key: string) => {
   if (key === 'logout') {
-    userStore.logout();
+    // userStore.logout(); 
     router.push('/login');
   }
-};
-
-const handleMenuUpdate = (key: string) => {
-  // 可以在这里处理非 RouterLink 的跳转逻辑
 };
 </script>
 
@@ -133,21 +187,43 @@ const handleMenuUpdate = (key: string) => {
   height: 100vh;
 }
 
-.admin-sider {
-  .logo {
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    border-bottom: 1px solid #efeff5;
-    overflow: hidden;
+.logo-wrapper {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; 
+  padding: 0 16px; 
+  overflow: hidden;
+  background-color: var(--n-color);
+  border-bottom: 1px solid var(--n-border-color);
+  box-sizing: border-box;
+
+  .logo-img {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0; 
+  }
+
+  .logo-text {
+    margin-left: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--n-text-color);
+    white-space: nowrap;
     
-    .title {
-      font-size: 18px;
-      font-weight: bold;
-      color: #333;
-      white-space: nowrap;
+    opacity: 1;
+    max-width: 150px; 
+    transition: 
+      opacity 0.3s ease-in-out, 
+      max-width 0.3s ease-in-out, 
+      margin 0.3s ease-in-out;
+  }
+
+  &.collapsed {
+    .logo-text {
+      opacity: 0;
+      max-width: 0;
+      margin-left: 0;
     }
   }
 }
@@ -158,13 +234,18 @@ const handleMenuUpdate = (key: string) => {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: #fff;
   
-  .page-title {
-    font-size: 16px;
-    font-weight: 500;
+  .header-left {
+    display: flex;
+    align-items: center;
   }
   
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
   .user-trigger {
     display: flex;
     align-items: center;
@@ -172,19 +253,29 @@ const handleMenuUpdate = (key: string) => {
     cursor: pointer;
     padding: 6px 12px;
     border-radius: 4px;
-    transition: background 0.3s;
-    &:hover { background: #f0f0f0; }
-    .username { font-weight: 500; }
+    transition: background-color 0.3s;
+    
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
   }
 }
 
-.fade-scale-enter-active,
-.fade-scale-leave-active {
-  transition: all 0.2s ease;
+.admin-content {
+  background-color: rgba(245, 247, 249, 0.5);
 }
-.fade-scale-enter-from,
-.fade-scale-leave-to {
+
+// 路由过渡动画
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease;
+}
+.fade-slide-enter-from {
   opacity: 0;
-  transform: scale(0.98);
+  transform: translateX(-10px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
 }
 </style>

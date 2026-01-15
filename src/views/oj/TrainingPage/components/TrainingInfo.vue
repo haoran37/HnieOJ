@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import type { TrainingDetail } from '@/composables/useTrainingDetail';
+import type { TrainingDetail } from '@/composables/oj/useTrainingDetail';
 
 // 由父组件传参
 defineProps<{

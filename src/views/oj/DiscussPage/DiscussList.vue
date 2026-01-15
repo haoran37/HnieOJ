@@ -139,7 +139,7 @@ import {
   CodeSlashOutline as ProblemIcon
 } from '@vicons/ionicons5';
 import DiscussionItem from '@/components/DiscussionItem.vue';
-import { useDiscussList } from '@/composables/useDiscussList';
+import { useDiscussList } from '@/composables/oj/useDiscussList';
 import { useUserStore } from '@/stores/userStore';
 
 const router = useRouter();

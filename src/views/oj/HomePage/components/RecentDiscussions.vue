@@ -64,7 +64,7 @@ import { useRouter } from 'vue-router';
 import { ChatboxEllipsesOutline as ChatIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 import DiscussionItem from '@/components/DiscussionItem.vue';
-import { useDiscussList } from '@/composables/useDiscussList';
+import { useDiscussList } from '@/composables/oj/useDiscussList';
 import { useMessage } from 'naive-ui';
 
 const router = useRouter();

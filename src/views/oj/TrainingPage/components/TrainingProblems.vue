@@ -22,7 +22,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useTrainingProblems } from '@/composables/useTrainingProblems';
+import { useTrainingProblems } from '@/composables/oj/useTrainingProblems';
 import { createColumns } from '@/utils/problemColumns';
 import { useUserStore } from '@/stores/userStore';
 

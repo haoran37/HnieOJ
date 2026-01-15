@@ -105,7 +105,7 @@ import {
   CloseOutline as CloseIcon,
   Create as CreateIcon
 } from '@vicons/ionicons5';
-import { useNewsDetail } from '@/composables/useNewsDetail';
+import { useNewsDetail } from '@/composables/oj/useNewsDetail';
 import { useUserStore } from '@/stores/userStore';
 
 const route = useRoute();

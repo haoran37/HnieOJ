@@ -1,6 +1,6 @@
 import { h } from 'vue';
 import { NProgress, NRate, NTooltip } from 'naive-ui';
-import type { TrainingSheet } from '@/composables/useTrainingList';
+import type { TrainingSheet } from '@/composables/oj/useTrainingList';
 
 export const createTrainingColumns = (onTitleClick: (id: string) => void) => [
   {

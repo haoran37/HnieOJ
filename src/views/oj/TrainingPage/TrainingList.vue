@@ -90,7 +90,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useTrainingList } from '@/composables/useTrainingList';
+import { useTrainingList } from '@/composables/oj/useTrainingList';
 import { createTrainingColumns } from '@/utils/trainingColumns';
 
 const router = useRouter();

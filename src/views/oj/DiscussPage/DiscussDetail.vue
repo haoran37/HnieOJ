@@ -158,7 +158,7 @@ import { useRoute } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { CaretUpOutline as CaretUp, CaretDownOutline as CaretDown } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
-import { useDiscussDetail } from '@/composables/useDiscussDetail';
+import { useDiscussDetail } from '@/composables/oj/useDiscussDetail';
 import DiscussAnswerItem from './components/DiscussAnswerItem.vue';
 
 const route = useRoute();

@@ -34,7 +34,7 @@ import { h, onMounted, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { MegaphoneOutline as MegaphoneIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
-import { useNewsList } from '@/composables/useNewsList';
+import { useNewsList } from '@/composables/oj/useNewsList';
 
 const router = useRouter();
 const { loading, newsList, total, page, pageSize, fetchNews, handlePageChange } = useNewsList();

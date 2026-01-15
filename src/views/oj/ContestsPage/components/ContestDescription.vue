@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ContestDetail } from '@/composables/useContestDetail';
+import type { ContestDetail } from '@/composables/oj/useContestDetail';
 
 defineProps<{
   detail: ContestDetail

@@ -45,7 +45,7 @@ import { h, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { NTag, useMessage } from 'naive-ui';
 import { AddOutline as AddIcon, Flame as HotIcon } from '@vicons/ionicons5';
-import { useNewsList } from '@/composables/useNewsList';
+import { useNewsList } from '@/composables/oj/useNewsList';
 import { useUserStore } from '@/stores/userStore';
 
 const router = useRouter();

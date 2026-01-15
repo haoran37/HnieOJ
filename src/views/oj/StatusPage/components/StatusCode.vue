@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { useMessage } from 'naive-ui';
-import type { StatusDetail } from '@/composables/useStatusDetail';
+import type { StatusDetail } from '@/composables/oj/useStatusDetail';
 import hljs from 'highlight.js/lib/core';
 import cpp from 'highlight.js/lib/languages/cpp';
 

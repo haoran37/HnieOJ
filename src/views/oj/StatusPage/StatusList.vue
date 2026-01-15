@@ -83,7 +83,7 @@ import {
   RefreshOutline as RefreshIcon, 
   SearchOutline as SearchIcon 
 } from '@vicons/ionicons5';
-import { useStatusList } from '@/composables/useStatusList';
+import { useStatusList } from '@/composables/oj/useStatusList';
 import { createStatusColumns } from '@/utils/statusColumns';
 
 const { 

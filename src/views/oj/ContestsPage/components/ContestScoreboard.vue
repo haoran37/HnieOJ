@@ -99,8 +99,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { SearchOutline as SearchIcon, CloudDownloadOutline as DownloadIcon } from '@vicons/ionicons5';
-import { useContestScoreboard, type ScoreboardProblem } from '@/composables/useContestScoreboard';
-import { useContestProblems } from '@/composables/useContestProblems';
+import { useContestScoreboard, type ScoreboardProblem } from '@/composables/oj/useContestScoreboard';
+import { useContestProblems } from '@/composables/oj/useContestProblems';
 import { useUserStore } from '@/stores/userStore';
 
 const route = useRoute();

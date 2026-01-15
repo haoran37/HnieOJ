@@ -121,7 +121,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { RefreshOutline as RefreshIcon } from '@vicons/ionicons5';
-import { useStatusDetail } from '@/composables/useStatusDetail';
+import { useStatusDetail } from '@/composables/oj/useStatusDetail';
 import { useUserStore } from '@/stores/userStore';
 
 const route = useRoute();

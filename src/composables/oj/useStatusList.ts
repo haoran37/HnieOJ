@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { formatAllTime } from './useTime';
+import { formatAllTime } from '@/composables/useTime';
 
 // 提交记录接口
 export interface Submission {

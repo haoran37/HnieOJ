@@ -38,7 +38,7 @@
 import { ref, computed, onMounted, h } from 'vue';
 import { useRoute } from 'vue-router';
 import { CloudDownloadOutline as DownloadIcon } from '@vicons/ionicons5';
-import { useHomeworkRankings } from '@/composables/useHomeworkRankings';
+import { useHomeworkRankings } from '@/composables/oj/useHomeworkRankings';
 import { formatDuration } from '@/composables/useTime';
 
 const { loading, rawRankData, fetchRankings } = useHomeworkRankings();

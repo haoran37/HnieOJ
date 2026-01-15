@@ -90,8 +90,8 @@
 import { ref, onMounted, h } from 'vue';
 import { useRouter } from 'vue-router';
 import { SearchOutline as SearchIcon } from '@vicons/ionicons5';
-import { useRankFilters } from '@/composables/useRankFilters';
-import { useRankList, type RankUser } from '@/composables/useRankList';
+import { useRankFilters } from '@/composables/oj/useRankFilters';
+import { useRankList, type RankUser } from '@/composables/oj/useRankList';
 
 const router = useRouter();
 const searchKeyword = ref('');

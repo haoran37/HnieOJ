@@ -17,7 +17,7 @@
 <script setup lang="ts">
 import { h, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useContestProblems } from '@/composables/useContestProblems';
+import { useContestProblems } from '@/composables/oj/useContestProblems';
 import { useUserStore } from '@/stores/userStore';
 import { renderStatusIcon } from '@/utils/statusUtils';
 

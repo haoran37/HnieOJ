@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import type { HomeworkDetail } from '@/composables/useHomeworkDetail';
+import type { HomeworkDetail } from '@/composables/oj/useHomeworkDetail';
 defineProps<{ detail: HomeworkDetail }>();
 </script>
 

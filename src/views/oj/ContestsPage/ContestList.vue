@@ -85,7 +85,7 @@ import {
   PersonOutline as PersonIcon 
 } from '@vicons/ionicons5';
 import ContestItem from '@/components/ContestItem.vue';
-import { useContests } from '@/composables/useContests';
+import { useContests } from '@/composables/oj/useContests';
 
 const router = useRouter();
 const { 

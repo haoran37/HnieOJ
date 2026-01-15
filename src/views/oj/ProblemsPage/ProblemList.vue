@@ -116,7 +116,7 @@ import { useRouter } from 'vue-router';
 import { ChevronDownOutline as ChevronDown, SearchOutline as SearchIcon } from '@vicons/ionicons5';
 import type { DropdownOption } from 'naive-ui';
 import { useUserStore } from '@/stores/userStore';
-import { useProblemsList } from '@/composables/useProblemsList';
+import { useProblemsList } from '@/composables/oj/useProblemsList';
 import { useTags } from '@/composables/useTags';
 import { createColumns } from '@/utils/problemColumns';
 

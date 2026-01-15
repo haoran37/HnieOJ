@@ -126,8 +126,8 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search as SearchIcon } from '@vicons/ionicons5';
 import ContestItem from '@/components/ContestItem.vue';
-import { useHomeworkFilters } from '@/composables/useHomeworkFilters';
-import { useHomeworkList } from '@/composables/useHomeworkList';
+import { useHomeworkFilters } from '@/composables/oj/useHomeworkFilters';
+import { useHomeworkList } from '@/composables/oj/useHomeworkList';
 
 const router = useRouter();
 const searchKeyword = ref('');

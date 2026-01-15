@@ -84,7 +84,7 @@ import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NTag, NProgress } from 'naive-ui';
 import { BookOutline as BookIcon } from '@vicons/ionicons5';
-import { useHomeworkDetail } from '@/composables/useHomeworkDetail';
+import { useHomeworkDetail } from '@/composables/oj/useHomeworkDetail';
 import { formatTime, useStatusTime } from '@/composables/useTime';
 import { useUserStore } from '@/stores/userStore';
 

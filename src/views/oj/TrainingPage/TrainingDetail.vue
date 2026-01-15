@@ -72,7 +72,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useMessage, useNotification } from 'naive-ui';
 import { StarOutline, Star as StarFilled } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
-import { useTrainingDetail } from '@/composables/useTrainingDetail';
+import { useTrainingDetail } from '@/composables/oj/useTrainingDetail';
 
 const route = useRoute();
 const router = useRouter();

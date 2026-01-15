@@ -85,7 +85,7 @@ import {
   DocumentTextOutline as DocumentIcon
 } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
-import type { StatusDetail } from '@/composables/useStatusDetail';
+import type { StatusDetail } from '@/composables/oj/useStatusDetail';
 
 const props = defineProps<{ detail: StatusDetail }>();
 const userStore = useUserStore();

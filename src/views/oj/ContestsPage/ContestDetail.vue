@@ -86,7 +86,7 @@ import {
   HourglassOutline as HourglassIcon,
   CheckmarkCircleOutline as CheckCircleIcon
 } from '@vicons/ionicons5';
-import { useContestDetail } from '@/composables/useContestDetail';
+import { useContestDetail } from '@/composables/oj/useContestDetail';
 import { formatDuration } from '@/composables/useTime';
 
 const route = useRoute();

@@ -38,6 +38,7 @@ export const useUserStore = defineStore('user', () => {
   });
 
   const token = ref<string | null>(localStorage.getItem('token'));
+  token.value = 'whatcanisay';
 
   // 用户题目数据
   //TODO: 登录后从后端获取覆盖

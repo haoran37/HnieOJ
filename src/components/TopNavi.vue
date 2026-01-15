@@ -60,7 +60,7 @@ const activeKey = computed(() => (route.meta?.activeMenu as string) || (route.na
 
 // 动态生成菜单项
 const menuOptions = computed<MenuOption[]>(() => {
-  const menuRoutes = ojRouters.children || []; //
+  const menuRoutes = ojRouters.children || [];
 
   return menuRoutes
     .filter(r => {
@@ -157,32 +157,32 @@ function handleUserSelect(key: string) {
   align-items: center;
 
   .n-menu-item-content-bottom-line {
-    display: none !important; 
+    display: none; 
   }
 
   .n-menu-item {
-    margin-right: @item-gap !important;
-    height: 100% !important;
+    margin-right: @item-gap;
+    height: 100%;
     display: flex;
     align-items: center;
     
     &:last-child {
-      margin-right: 0 !important;
+      margin-right: 0;
     }
   }
 
   .n-menu-item-content {
-    padding: 0 !important;
-    font-size: @font-size !important;
-    font-weight: bold !important;
-    color: @text-color !important;
+    padding: 0;
+    font-size: @font-size;
+    font-weight: bold;
+    color: @text-color;
     height: 100%;
     display: flex;
     align-items: center;
     position: relative;
 
     &.n-menu-item-content--selected {
-      color: @active-color !important;
+      color: @active-color;
       
       &::after {
         content: "";
@@ -226,6 +226,6 @@ function handleUserSelect(key: string) {
 
 @media (max-width: 1024px) {
   .menu-wrapper { margin-left: 24px; }
-  :deep(.n-menu-item) { margin-right: 24px !important; }
+  :deep(.n-menu-item) { margin-right: 24px; }
 }
 </style>

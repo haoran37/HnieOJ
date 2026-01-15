@@ -24,6 +24,7 @@
     "@codemirror/view": "^6.39.9",
     "@kangc/v-md-editor": "^2.3.18",
     "@vicons/ionicons5": "^0.13.0",
+    "@vueuse/core": "^14.1.0",
     "codemirror": "^6.0.2",
     "echarts": "^6.0.0",
     "highlight.js": "^11.11.1",

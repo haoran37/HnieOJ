@@ -1,7 +1,8 @@
 import { ref, onMounted, onUnmounted, computed, unref, type Ref } from 'vue';
 
 /**
- * 格式化日期显示 (年-月-日 时:分:秒)
+ * 获取当前时间的格式化字符串 (年-月-日 时:分:秒)
+ * @deprecated 建议使用 formatFullTime(new Date()) 代替
  */
 export const formatAllTime = () => {
   const date = new Date();
@@ -18,7 +19,7 @@ export const formatAllTime = () => {
 /**
  * 格式化日期显示 (月-日 时:分)
  */
-export const formatTime = (timeStr: string) => {
+export const formatTime = (timeStr: string | number | Date) => {
   const date = new Date(timeStr);
   if (isNaN(date.getTime())) return '无效时间';
   const M = date.getMonth() + 1;
@@ -26,6 +27,24 @@ export const formatTime = (timeStr: string) => {
   const h = String(date.getHours()).padStart(2, '0');
   const m = String(date.getMinutes()).padStart(2, '0');
   return `${M}-${D} ${h}:${m}`;
+};
+
+/**
+ * 格式化完整日期 (YYYY/MM/DD HH:mm:ss)
+ */
+export const formatFullTime = (time: string | number | Date | null | undefined) => {
+  if (!time) return '-';
+  const date = new Date(time);
+  if (isNaN(date.getTime())) return '-';
+  
+  const Y = date.getFullYear();
+  const M = String(date.getMonth() + 1).padStart(2, '0');
+  const D = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const s = String(date.getSeconds()).padStart(2, '0');
+  
+  return `${Y}/${M}/${D} ${h}:${m}:${s}`;
 };
 
 /**

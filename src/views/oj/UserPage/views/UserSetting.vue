@@ -103,6 +103,49 @@
     </div>
 
     <div class="setting-card">
+      <div class="card-header">
+        <div class="title">成就认证申请</div>
+      </div>
+      <div class="achievement-form">
+        <n-form
+          label-placement="left"
+          label-width="100"
+          size="small"
+        >
+          <n-form-item label="比赛名称" required>
+            <n-input v-model:value="achievementForm.title" placeholder="请输入比赛名称" />
+          </n-form-item>
+          <n-form-item label="证明文件" required>
+            <n-upload
+              action="#"
+              :default-upload="false"
+              :max="1"
+              accept=".jpg,.jpeg,.png,.pdf"
+              @change="handleAchievementFileChange"
+            >
+              <n-button size="small">
+                <template #icon><n-icon><UploadIcon /></n-icon></template>
+                上传文件 (图片或PDF)
+              </n-button>
+            </n-upload>
+          </n-form-item>
+          <n-form-item label="详细信息">
+            <n-input
+              v-model:value="achievementForm.description"
+              type="textarea"
+              placeholder="请输入详细信息"
+              :rows="3"
+            />
+          </n-form-item>
+          <n-button type="primary" @click="handleSubmitAchievement" size="small">
+            <template #icon><n-icon><TrophyIcon /></n-icon></template>
+            提交申请
+          </n-button>
+        </n-form>
+      </div>
+    </div>
+
+    <div class="setting-card">
       <div class="card-header"><div class="title">账号安全</div></div>
       <div class="security-list">
         <div class="security-item">
@@ -182,11 +225,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue';
 import { useMessage } from 'naive-ui';
+import type { UploadFileInfo } from 'naive-ui';
 import { 
   CameraOutline as CameraIcon, 
   CreateOutline as CreateIcon,
   MailOutline as MailIcon,
-  LockClosedOutline as LockIcon
+  LockClosedOutline as LockIcon,
+  TrophyOutline as TrophyIcon,
+  CloudUploadOutline as UploadIcon
 } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
 
@@ -202,6 +248,13 @@ const formValue = reactive({
   college: '',
   class: '',
   reason: null
+});
+
+// 成就申请表单
+const achievementForm = reactive({
+  title: '',
+  description: '',
+  file: null as File | null
 });
 
 // 邮箱表单
@@ -256,6 +309,36 @@ const handleBindEmail = () => {
   showEmailModal.value = false;
 };
 
+const handleAchievementFileChange = (options: { fileList: UploadFileInfo[] }) => {
+  const file = options.fileList[0]?.file;
+  if (file) {
+    achievementForm.file = file;
+  } else {
+    achievementForm.file = null;
+  }
+};
+
+const handleSubmitAchievement = () => {
+  if (!achievementForm.title) {
+    message.warning('请输入比赛名称');
+    return;
+  }
+  if (!achievementForm.file) {
+    message.warning('请上传证明文件');
+    return;
+  }
+  
+  // TODO: 调用 API 提交成就申请
+  console.log('提交成就申请:', achievementForm);
+  
+  message.success('成就认证申请已提交，请等待审核');
+  
+  // 重置表单
+  achievementForm.title = '';
+  achievementForm.description = '';
+  achievementForm.file = null;
+};
+
 //TODO: 从后端获取数据
 const collegeOptions = [
   { label: '计算机与人工智能学院', value: 'cs_ai' },
@@ -286,7 +369,7 @@ const ojList = ref([
 
 .setting-card {
   background: #fff;
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 24px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   margin-bottom: 24px;

@@ -330,11 +330,6 @@ export const adminRouters: RouteRecordRaw = {
           meta: { title: '编辑题目', hideInMenu: true, activeMenu: 'AdminProblemList' },
           component: () => import('@/views/admin/ProblemManage/ProblemList/components/ProblemEdit.vue') },
         {
-          path: 'category',
-          name: 'AdminProblemCategory',
-          meta: { title: '分类管理' },
-          component: () => import('@/views/admin/ProblemManage/Category.vue') },
-        {
           path: 'tag',
           name: 'AdminProblemTag',
           meta: { title: '标签管理' },

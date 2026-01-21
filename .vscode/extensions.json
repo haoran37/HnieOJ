@@ -2,6 +2,15 @@
   "recommendations": [
     "Vue.volar",
     "dbaeumer.vscode-eslint",
-    "EditorConfig.EditorConfig"
+    "EditorConfig.EditorConfig",
+    "PKief.material-icon-theme",
+    "akamud.vscode-theme-onedark",
+    "formulahendry.auto-rename-tag",
+    "lokalise.i18n-ally",
+    "antfu.iconify",
+    "kisstkondoros.vscode-gutter-preview",
+    "tu6ge.naive-ui-intelligence",
+    "zhuxiuxiang.path-prompt",
+    "sdras.vue-vscode-snippets"
   ]
 }

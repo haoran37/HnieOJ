@@ -1,10 +1,10 @@
 import { h } from 'vue';
 import { NTag } from 'naive-ui';
 import type { Router } from 'vue-router';
-import type { Submission } from '@/composables/useStatusList';
+import type { Submission } from '@/composables/oj/useStatusList';
 
 // 状态枚举与颜色配置
-const statusConfig: Record<string, { color: string; label: string }> = {
+export const statusConfig: Record<string, { color: string; label: string }> = {
   'Accepted': { color: '#d03050', label: 'Accepted' },
   
   'Wrong Answer': { color: '#18a058', label: 'Wrong Answer' },
@@ -30,11 +30,22 @@ export const createStatusColumns = (router: Router) => [
     title: 'Run ID',
     key: 'id',
     width: 80,
-    align: 'center' as const
+    align: 'center' as const,
+    render: (row: Submission) => h(
+      'a',
+      {
+        style: { color: '#2080f0', cursor: 'pointer', fontWeight: 'bold' },
+        onClick: (e: MouseEvent) => {
+          e.preventDefault();
+          router.push(`/status/${row.id}`);
+        }
+      },
+      row.id
+    )
   },
   {
-    title: 'SID',
-    key: 'studentId',
+    title: 'UID',
+    key: 'userId',
     width: 140,
     render: (row: Submission) => h(
       'a',

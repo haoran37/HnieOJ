@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { formatAllTime } from '@/composables/useTime';
+import { formatFullTime } from '@/composables/useTime';
 
 // 提交记录接口
 export interface Submission {
@@ -76,7 +76,7 @@ export function useStatusList() {
           language: language,
           time: status === 'Accepted' ? `${Math.floor(Math.random() * 500)} MS` : '--',
           memory: status === 'Accepted' ? `${Math.floor(Math.random() * 10000)} KB` : '--',
-          submitTime: formatAllTime(),
+          submitTime: formatFullTime(new Date()),
           contestId: contestId.value || undefined
         };
       });

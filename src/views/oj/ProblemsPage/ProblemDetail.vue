@@ -59,7 +59,7 @@
                 <v-md-preview :text="problem.outputFormat"></v-md-preview>
               </div>
 
-              <div class="section-block" v-for="(sample, index) in problem.samples" :key="index">
+              <div class="section-block" v-for="(sample, index) in problem.examples" :key="index">
                 <div class="section-title">输入输出样例 {{ index + 1 }}</div>
                 <n-grid :x-gap="12" cols="1 s:2" responsive="screen">
                   <n-grid-item>
@@ -90,6 +90,14 @@
               <div class="section-block" v-if="problem.hint">
                 <div class="section-title">说明 / 提示</div>
                 <v-md-preview :text="problem.hint"></v-md-preview>
+              </div>
+              <div class="section-block" v-if="problem.source">
+                <div class="section-title">来源</div>
+                  <div class="problem-tag">
+                    <n-tag v-for="tag in problem.source" :key="tag" size="medium" :bordered="false" type="default">
+                      {{ tag }}
+                    </n-tag>
+                  </div>
               </div>
             </div>
 
@@ -220,10 +228,11 @@ interface Problem {
   difficulty: string;
   uploader: string;
   tags: string[];
+  source: string[];
   description: string;
   inputFormat: string;
   outputFormat: string;
-  samples: ProblemSample[];
+  examples: ProblemSample[];
   hint: string;
 }
 
@@ -245,10 +254,11 @@ const problem = ref<Problem>({
   difficulty: '',
   uploader: '',
   tags: [],
+  source: [],
   description: '',
   inputFormat: '',
   outputFormat: '',
-  samples: [],
+  examples: [],
   hint: ''
 });
 
@@ -268,6 +278,7 @@ const fetchProblemDetail = async (pid: string) => {
       difficulty: '困难',
       uploader: 'VinstaG173',
       tags: ['树', 'DP', '搜索', '组合数学'],
+      source: ['洛谷'],
       description: `
 为了迎接新年，Farmer John 决定给他的奶牛们一个节点数为 $N$ 的二叉搜索树！
 
@@ -288,7 +299,7 @@ generate(l, r):
       `,
       inputFormat: `输入只有一行，包含三个整数 $N, K, M$。`,
       outputFormat: `输出一行 $N$ 个整数，第 $i$ 个整数表示 $\\sum_a d_i(a) \\pmod M$。`,
-      samples: [
+      examples: [
         { input: "3 0 19260817", output: "1 2 3" },
         { input: "3 1 144408983", output: "3 4 4" }
       ],
@@ -296,10 +307,6 @@ generate(l, r):
 **数据范围**
 
 对于全部数据，$1 \\le N \\le 300$， $0 \\le K \\le \\frac{N(N-1)}{2}$。
-
-**来源**
-
-洛谷
       `
     };
 
@@ -443,7 +450,7 @@ onMounted(() => {
 }
 
 .section-block {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 
   .section-title {
     font-size: 18px;
@@ -454,7 +461,7 @@ onMounted(() => {
     padding-left: 12px;
     line-height: 1.2;
   }
-  
+
   :deep(.github-markdown-body) {
     padding: 0;
     font-size: 15px;

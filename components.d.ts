@@ -105,6 +105,7 @@ declare module 'vue' {
     PageFooter: typeof import('./src/components/PageFooter.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TagSelectModal: typeof import('./src/components/TagSelectModal.vue')['default']
     ThemeSwitch: typeof import('./src/components/TopNavi/ThemeSwitch.vue')['default']
     TopNavi: typeof import('./src/components/TopNavi.vue')['default']
   }

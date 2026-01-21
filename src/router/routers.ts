@@ -318,7 +318,17 @@ export const adminRouters: RouteRecordRaw = {
           path: 'list',
           name: 'AdminProblemList',
           meta: { title: '题目列表' },
-          component: () => import('@/views/admin/ProblemManage/ProblemList.vue') },
+          component: () => import('@/views/admin/ProblemManage/ProblemList/index.vue') },
+        {
+          path: 'add',
+          name: 'AdminProblemAdd',
+          meta: { title: '添加题目', hideInMenu: true, activeMenu: 'AdminProblemList' },
+          component: () => import('@/views/admin/ProblemManage/ProblemList/components/ProblemAdd.vue') },
+        {
+          path: 'edit/:id',
+          name: 'AdminProblemEdit',
+          meta: { title: '编辑题目', hideInMenu: true, activeMenu: 'AdminProblemList' },
+          component: () => import('@/views/admin/ProblemManage/ProblemList/components/ProblemEdit.vue') },
         {
           path: 'category',
           name: 'AdminProblemCategory',

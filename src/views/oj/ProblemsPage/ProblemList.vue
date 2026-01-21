@@ -3,11 +3,6 @@
 
     <div class="problem-filter-card">
       <n-card :bordered="false" size="small">
-        <div class="filter-row">
-          <span class="filter-label">所属题库</span>
-          <n-menu v-model:value="localSearch.source" mode="horizontal" :options="sourceOptions" class="source-menu" />
-        </div>
-
         <div class="filter-row inline-form">
           <div class="filter-item">
             <span class="filter-label">筛选条件</span>
@@ -29,7 +24,7 @@
               高级筛选 / 标签
             </n-button>
           </div>
-
+          
           <div class="filter-item keyword-search">
             <span class="filter-label compact">关键词</span>
             <n-input size="small" placeholder="算法、标题或题目编号" v-model:value="localSearch.keyword" clearable />
@@ -41,7 +36,11 @@
           <div class="tags-left">
             <span class="filter-label">已选择</span>
             <div class="tag-container">
-              <template v-if="localSearch.tags.length > 0">
+              <template v-if="localSearch.tags.length > 0 || localSearch.source.length > 0">
+                <n-tag v-for="source in localSearch.source" :key="source" closable size="small" type="info"
+                  @close="removeSource(source)">
+                  {{ source }}
+                </n-tag>
                 <n-tag v-for="tag in localSearch.tags" :key="tag" closable size="small" type="primary"
                   @close="removeTag(tag)">
                   {{ tag }}
@@ -83,29 +82,8 @@
       </n-card>
     </div>
 
-    <n-modal v-model:show="showTagModal" preset="card" style="width: 850px" title="筛选标签" :auto-focus="false">
-      <n-spin :show="tagLoading">
-        <n-tabs type="line" animated>
-          <n-tab-pane v-for="cat in tagData" :key="cat.id" :name="cat.id" :tab="cat.name">
-            <n-scrollbar style="max-height: 450px">
-              <div class="tag-modal-scroll-content">
-                <div v-for="group in cat.groups" :key="group.title" class="tag-group-section">
-                  <div class="group-title">{{ group.title }}</div>
-                  <n-space :size="[8, 12]">
-                    <n-button v-for="tag in group.tags" :key="tag" size="tiny"
-                      :type="localSearch.tags.includes(tag) ? 'primary' : 'default'" @click="toggleTag(tag)">{{ tag
-                      }}</n-button>
-                  </n-space>
-                </div>
-              </div>
-            </n-scrollbar>
-          </n-tab-pane>
-        </n-tabs>
-      </n-spin>
-      <template #footer>
-        <div style="text-align: right"><n-button type="primary" @click="showTagModal = false">确认选择</n-button></div>
-      </template>
-    </n-modal>
+    <TagSelectModal v-model:show="showTagModal" v-model:source="localSearch.source" v-model:tags="localSearch.tags"
+      mode="all" />
 
   </div>
 </template>
@@ -119,6 +97,7 @@ import { useUserStore } from '@/stores/userStore';
 import { useProblemsList } from '@/composables/oj/useProblemsList';
 import { useTags } from '@/composables/useTags';
 import { createColumns } from '@/utils/problemColumns';
+import TagSelectModal from '@/components/TagSelectModal.vue';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -127,7 +106,7 @@ const {
   updateSearch, handlePageChange, fetchProblems
 } = useProblemsList();
 
-const { tagData, loading: tagLoading, fetchTags } = useTags();
+const { loading: tagLoading, fetchTags } = useTags();
 
 const handleProblemClick = (id: string) => {
   router.push(`/problem/${id}`);
@@ -142,35 +121,29 @@ const columns = createColumns(
 
 // 本地筛选表单
 const localSearch = reactive({
-  source: 'HNIE',
+  source: [] as string[],
   difficulty: '',
   keyword: '',
   searchInContent: false,
   tags: [] as string[]
 });
 
-// 静态选项
-const sourceOptions = [
-  { label: 'HNIEOJ', key: 'HNIE' }, { label: 'Codeforces', key: 'CF' },
-  { label: 'AtCoder', key: 'AT' }, { label: '洛谷', key: 'LG' }, { label: 'ALL', key: 'ALL' }
-];
 const difficultyOptions = [
   { label: '入门', key: '1' }, { label: '简单', key: '2' },
   { label: '中等', key: '3' }, { label: '困难', key: '4' }
 ];
 
-const toggleTag = (tag: string) => {
-  const idx = localSearch.tags.indexOf(tag);
-  if (idx > -1) localSearch.tags.splice(idx, 1);
-  else localSearch.tags.push(tag);
-};
-
 const removeTag = (tag: string) => {
   localSearch.tags = localSearch.tags.filter(t => t !== tag);
 };
 
+const removeSource = (source: string) => {
+  localSearch.source = localSearch.source.filter(s => s !== source);
+};
+
 const clearAll = () => {
   localSearch.tags = [];
+  localSearch.source = [];
   localSearch.difficulty = '';
   localSearch.keyword = '';
 };

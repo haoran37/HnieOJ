@@ -345,7 +345,26 @@ export const adminRouters: RouteRecordRaw = {
       path: 'training',
       name: 'TrainingManage',
       meta: { title: '题单管理', icon: icon(FileTrayFullOutline) },
-      component: () => import('@/views/admin/TrainingManage/index.vue')
+      children: [
+        {
+          path: 'list',
+          name: 'AdminTrainingList',
+          meta: { title: '题单列表' },
+          component: () => import('@/views/admin/TrainingManage/TrainingList/index.vue')
+        },
+        {
+          path: 'add',
+          name: 'AdminTrainingAdd',
+          meta: { title: '添加题单', hideInMenu: true, activeMenu: 'AdminTrainingList' },
+          component: () => import('@/views/admin/TrainingManage/TrainingList/components/TrainingAdd.vue')
+        },
+        {
+          path: 'edit/:id',
+          name: 'AdminTrainingEdit',
+          meta: { title: '编辑题单', hideInMenu: true, activeMenu: 'AdminTrainingList' },
+          component: () => import('@/views/admin/TrainingManage/TrainingList/components/TrainingEdit.vue')
+        }
+      ]
     },
     {
       path: 'contest',

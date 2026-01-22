@@ -157,7 +157,7 @@ const menuOptions = computed(() => {
   return buildMenu(routes);
 });
 
-const activeKey = computed(() => route.name as string);
+const activeKey = computed(() => (route.meta?.activeMenu as string) || (route.name as string));
 
 const defaultExpandedKeys = computed(() => {
   return route.matched

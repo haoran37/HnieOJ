@@ -375,7 +375,17 @@ export const adminRouters: RouteRecordRaw = {
           path: 'list',
           name: 'AdminContestList',
           meta: { title: '比赛列表' },
-          component: () => import('@/views/admin/ContestManage/ContestList.vue') },
+          component: () => import('@/views/admin/ContestManage/ContestList/index.vue') },
+        {
+          path: 'add',
+          name: 'AdminContestAdd',
+          meta: { title: '添加比赛', hideInMenu: true, activeMenu: 'AdminContestList' },
+          component: () => import('@/views/admin/ContestManage/ContestList/components/ContestAdd.vue') },
+        {
+          path: 'edit/:id',
+          name: 'AdminContestEdit',
+          meta: { title: '编辑比赛', hideInMenu: true, activeMenu: 'AdminContestList' },
+          component: () => import('@/views/admin/ContestManage/ContestList/components/ContestEdit.vue') },
         {
           path: 'team',
           name: 'AdminContestTeam',

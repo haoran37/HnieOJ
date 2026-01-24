@@ -164,9 +164,19 @@
             <n-card :bordered="false" size="small" class="sidebar-card">
               <n-collapse arrow-placement="right">
                 <n-collapse-item title="相关讨论" name="1">
-                  <n-empty description="暂无讨论" size="small" />
+                  <div v-if="relatedDiscussions.length > 0">
+                    <n-list hoverable clickable size="small" class="rec-list">
+                      <n-list-item v-for="discuss in relatedDiscussions" :key="discuss.id">
+                        <div class="rec-item" @click="handleDiscussClick(discuss.id)">
+                           <n-icon size="16" color="#666"><ChatbubblesIcon /></n-icon>
+                           <span class="rec-title">{{ discuss.title }}</span>
+                        </div>
+                      </n-list-item>
+                    </n-list>
+                  </div>
+                  <n-empty v-else description="暂无讨论" size="small" />
                   <template #header-extra>
-                    <n-button text size="tiny" type="primary">进入讨论版</n-button>
+                    <n-button text size="tiny" type="primary" @click.stop="handleCreateDiscuss">新建讨论</n-button>
                   </template>
                 </n-collapse-item>
               </n-collapse>
@@ -207,7 +217,8 @@ import {
   BarChartOutline as BarChartIcon,
   CopyOutline as CopyIcon,
   CloudUploadOutline as CloudUploadIcon,
-  ArrowBackOutline as ReturnIcon
+  ArrowBackOutline as ReturnIcon,
+  ChatbubblesOutline as ChatbubblesIcon
 } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
 import { renderStatusIcon } from '@/utils/statusUtils';
@@ -263,6 +274,7 @@ const problem = ref<Problem>({
 });
 
 const recommendedProblems = ref<any[]>([]);
+const relatedDiscussions = ref<any[]>([]);
 
 const fetchProblemDetail = async (pid: string) => {
   loading.value = true;
@@ -317,6 +329,12 @@ generate(l, r):
       { id: '1007', title: '最长公共子序列' }   
     ];
 
+    relatedDiscussions.value = [
+      { id: '1001', title: '这个题的数据范围是不是有问题？' },
+      { id: '1002', title: '求助，为什么第二个点过不去' },
+      { id: '1003', title: 'Python 3 AC代码分享' }
+    ];
+
     loading.value = false;
   }, 300);
 };
@@ -358,6 +376,14 @@ const fallbackCopyText = (text: string) => {
 const handleRecClick = (id: string) => {
   router.push(`/problem/${id}`);
   isSubmitMode.value = false;
+};
+
+const handleDiscussClick = (id: string) => {
+  router.push(`/discuss/${id}`);
+};
+
+const handleCreateDiscuss = () => {
+  router.push(`/discuss/add?problemId=${problem.value.id}`);
 };
 
 // 切换提交模式

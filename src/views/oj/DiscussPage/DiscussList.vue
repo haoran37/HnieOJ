@@ -184,7 +184,7 @@ const handleProblem = (pid: string) => {
 };
 
 const handleCreate = () => {
-  message.success('跳转到发布页面...');
+  router.push('/discuss/add');
 };
 
 onMounted(() => {

@@ -174,6 +174,12 @@ export const ojRouters: RouteRecordRaw = {
       component: () => import('@/views/oj/DiscussPage/DiscussList.vue')
     },
     {
+      path: 'discuss/add',
+      name: 'DiscussAdd',
+      meta: { title: '新建讨论', hideInMenu: true, activeMenu: 'DiscussList' },
+      component: () => import('@/views/oj/DiscussPage/DiscussAdd.vue')
+    },
+    {
       path: 'discuss/:id',
       name: 'DiscussDetail',
       meta: { title: '讨论详情', hideInMenu: true, activeMenu: 'DiscussList' },

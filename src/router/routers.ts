@@ -402,7 +402,26 @@ export const adminRouters: RouteRecordRaw = {
       path: 'homework',
       name: 'HomeworkManage',
       meta: { title: '作业管理', icon: icon(BookOutline) },
-      component: () => import('@/views/admin/HomeworkManage/index.vue')
+      children: [
+        {
+          path: 'list',
+          name: 'AdminHomeworkList',
+          meta: { title: '作业列表' },
+          component: () => import('@/views/admin/HomeworkManage/HomeworkList.vue')
+        },
+        {
+          path: 'add',
+          name: 'AdminHomeworkAdd',
+          meta: { title: '添加作业', hideInMenu: true, activeMenu: 'AdminHomeworkList' },
+          component: () => import('@/views/admin/HomeworkManage/HomeworkAdd.vue')
+        },
+        {
+          path: 'edit/:id',
+          name: 'AdminHomeworkEdit',
+          meta: { title: '编辑作业', hideInMenu: true, activeMenu: 'AdminHomeworkList' },
+          component: () => import('@/views/admin/HomeworkManage/HomeworkEdit.vue')
+        }
+      ]
     },
     {
       path: 'discuss',

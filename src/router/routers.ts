@@ -413,19 +413,19 @@ export const adminRouters: RouteRecordRaw = {
           path: 'list',
           name: 'AdminHomeworkList',
           meta: { title: '作业列表' },
-          component: () => import('@/views/admin/HomeworkManage/HomeworkList.vue')
+          component: () => import('@/views/admin/HomeworkManage/HomeworkList/index.vue')
         },
         {
           path: 'add',
           name: 'AdminHomeworkAdd',
           meta: { title: '添加作业', hideInMenu: true, activeMenu: 'AdminHomeworkList' },
-          component: () => import('@/views/admin/HomeworkManage/HomeworkAdd.vue')
+          component: () => import('@/views/admin/HomeworkManage/HomeworkList/components/HomeworkAdd.vue')
         },
         {
           path: 'edit/:id',
           name: 'AdminHomeworkEdit',
           meta: { title: '编辑作业', hideInMenu: true, activeMenu: 'AdminHomeworkList' },
-          component: () => import('@/views/admin/HomeworkManage/HomeworkEdit.vue')
+          component: () => import('@/views/admin/HomeworkManage/HomeworkList/components/HomeworkEdit.vue')
         }
       ]
     },
@@ -433,7 +433,14 @@ export const adminRouters: RouteRecordRaw = {
       path: 'discuss',
       name: 'DiscussManage',
       meta: { title: '讨论管理', icon: icon(ChatbubblesOutline) },
-      component: () => import('@/views/admin/DiscussManage/index.vue')
+      children: [
+        {
+          path: 'list',
+          name: 'AdminDiscussList',
+          meta: { title: '讨论列表' },
+          component: () => import('@/views/admin/DiscussManage/DiscussList.vue')
+        }
+      ]
     },
     {
       path: 'system',

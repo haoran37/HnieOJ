@@ -5,7 +5,11 @@
       <div 
         class="filter-card internal" 
         :class="{ active: activeTab === 'INTERNAL' }"
+        role="button"
+        tabindex="0"
         @click="handleTabChange('INTERNAL')"
+        @keydown.enter="handleTabChange('INTERNAL')"
+        @keydown.space.prevent="handleTabChange('INTERNAL')"
       >
         <div class="icon-box"><n-icon :component="SchoolIcon" /></div>
         <div class="text-box">
@@ -18,7 +22,11 @@
       <div 
         class="filter-card external" 
         :class="{ active: activeTab === 'EXTERNAL' }"
+        role="button"
+        tabindex="0"
         @click="handleTabChange('EXTERNAL')"
+        @keydown.enter="handleTabChange('EXTERNAL')"
+        @keydown.space.prevent="handleTabChange('EXTERNAL')"
       >
         <div class="icon-box"><n-icon :component="PlanetIcon" /></div>
         <div class="text-box">
@@ -31,7 +39,11 @@
       <div 
         class="filter-card user" 
         :class="{ active: activeTab === 'USER' }"
+        role="button"
+        tabindex="0"
         @click="handleTabChange('USER')"
+        @keydown.enter="handleTabChange('USER')"
+        @keydown.space.prevent="handleTabChange('USER')"
       >
         <div class="icon-box"><n-icon :component="PersonIcon" /></div>
         <div class="text-box">
@@ -105,9 +117,8 @@ onMounted(() => {
 <style scoped lang="less">
 .contests-page-container {
   width: 100%;
-  // max-width: 1200px;
   margin: 0 auto;
-  padding: 0 10px;
+  padding: 0 8px;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -130,7 +141,7 @@ onMounted(() => {
     gap: 16px;
     cursor: pointer;
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
     border: 1px solid transparent;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 
@@ -144,14 +155,14 @@ onMounted(() => {
       justify-content: center;
       font-size: 24px;
       color: #666;
-      transition: all 0.3s;
+      transition: color 0.25s ease, background-color 0.25s ease;
       z-index: 2;
     }
 
     .text-box {
       z-index: 2;
       .title { font-size: 16px; font-weight: bold; color: #333; transition: color 0.3s;}
-      .desc { font-size: 12px; color: #999; margin-top: 2px; transition: color 0.3s;}
+      .desc { font-size: 12px; color: #999; margin-top: 2px; transition: color 0.3s ease;}
     }
 
     .bg-shape {
@@ -171,6 +182,11 @@ onMounted(() => {
     &:hover {
       transform: translateY(-4px);
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    &:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
     }
 
     // 激活态样式

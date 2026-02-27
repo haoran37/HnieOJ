@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div class="page-container page-shell">
     <div class="main-layout">
       <div class="layout-left">
         <AnnouncementCard />
@@ -28,6 +28,8 @@ import TopRatingList from './components/TopRatingList.vue'
 import UserSearchBox from './components/UserSearchBox.vue'
 import FriendLinks from './components/FriendLinks.vue'
 import TopContributorList from './components/TopContributorList.vue'
+
+defineOptions({ name: 'OjHomePage' })
 </script>
 
 <style scoped lang="less">
@@ -41,26 +43,24 @@ import TopContributorList from './components/TopContributorList.vue'
   display: flex;
   flex-direction: row;
   width: 100%;
-  gap: 10px;
+  gap: 14px;
   align-items: flex-start;
   flex-wrap: nowrap;
 }
 
 .layout-left {
-  flex: 65;
-  // width: calc(65% - 10px);
+  flex: 1 1 65%;
   min-width: 0;
 }
 
 .layout-right {
-  flex: 35;
-  // width: calc(35% - 10px);
+  flex: 0 0 35%;
   min-width: 0;
 }
 
 .page-container * {
   word-wrap: break-word;
-  word-break: break-all;
+  word-break: break-word;
   white-space: normal;
   overflow-wrap: break-word;
   box-sizing: border-box;
@@ -70,7 +70,7 @@ import TopContributorList from './components/TopContributorList.vue'
 @media (max-width: 768px) {
   .main-layout {
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
   }
   .layout-left,
   .layout-right {
@@ -81,7 +81,7 @@ import TopContributorList from './components/TopContributorList.vue'
 
 .layout-left > *,
 .layout-right > * {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   width: 100%;
 }
 .layout-left > :last-child,

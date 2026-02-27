@@ -112,7 +112,7 @@ const {
   removeTagGroup,
   moveTagGroup,
   handleJsonInput,
-  exportJson
+  exportJson: _exportJson
 } = useTagManage();
 
 const extensions = computed(() => [json()]);

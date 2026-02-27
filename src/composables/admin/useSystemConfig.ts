@@ -166,7 +166,7 @@ export function useSystemConfig() {
         maxUploadSize: 50,
         storageDriver: 'LOCAL'
       });
-    } catch (error) {
+    } catch (_error) {
       message.error('加载配置失败');
     } finally {
       loading.value = false;
@@ -180,7 +180,7 @@ export function useSystemConfig() {
       console.log('API: Saving system config...', JSON.parse(JSON.stringify(config)));
       await new Promise(resolve => setTimeout(resolve, 1000));
       message.success('配置保存成功');
-    } catch (error) {
+    } catch (_error) {
       message.error('保存配置失败');
     } finally {
       loading.value = false;
@@ -205,7 +205,7 @@ export function useSystemConfig() {
         contestIdValidation.status = 'error';
         contestIdValidation.message = '比赛不存在或无效';
       }
-    } catch (error) {
+    } catch (_error) {
       contestIdValidation.status = 'error';
       contestIdValidation.message = '验证请求失败';
     } finally {
@@ -224,7 +224,7 @@ export function useSystemConfig() {
       console.log(`API: Sending test email to ${testEmailRecipient.value}...`);
       await new Promise(resolve => setTimeout(resolve, 1500));
       message.success('测试邮件发送成功');
-    } catch (error) {
+    } catch (_error) {
       message.error('测试邮件发送失败');
     } finally {
       sendingEmail.value = false;

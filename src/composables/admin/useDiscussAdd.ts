@@ -98,7 +98,7 @@ export function useDiscussAdd() {
                         validatingProblem.value = false;
                         return;
                     }
-                } catch (err) {
+                } catch (_err) {
                     message.error('校验题目失败');
                     validatingProblem.value = false;
                     return;

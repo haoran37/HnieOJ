@@ -69,7 +69,7 @@ import { ref, h, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
   NButton, NDataTable, NModal, NForm, NFormItem, NInput, 
-  NRadioGroup, NRadio, NSpace, NDatePicker, NProgress, NTag 
+  NRadioGroup, NRadio, NSpace, NDatePicker, NProgress
 } from 'naive-ui';
 import { useRejudge, type RejudgeTask, type RejudgeDetail } from '@/composables/admin/useRejudge';
 import { statusConfig } from '@/utils/statusColumns';

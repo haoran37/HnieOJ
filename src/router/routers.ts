@@ -6,7 +6,7 @@ import {
 } from '@vicons/ionicons5';
 import { shallowRef } from 'vue';
 
-const icon = (c: any) => shallowRef(c);
+const icon = (c: unknown) => shallowRef(c as object);
 
 export const ojRouters: RouteRecordRaw = {
   path: '/',

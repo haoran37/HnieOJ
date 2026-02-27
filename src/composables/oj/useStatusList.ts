@@ -1,5 +1,5 @@
 import { ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { formatFullTime } from '@/composables/useTime';
 
 // 提交记录接口
@@ -19,7 +19,6 @@ export interface Submission {
 
 export function useStatusList() {
   const route = useRoute();
-  const router = useRouter();
 
   const loading = ref(false);
   const listData = ref<Submission[]>([]);

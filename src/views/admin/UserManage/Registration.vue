@@ -88,7 +88,7 @@
 <script setup lang="ts">
 import { h } from 'vue';
 import { NButton, NSpace, NTag, NIcon, type DataTableColumns, type UploadCustomRequestOptions } from 'naive-ui';
-import { CloudUploadOutline, CheckmarkDoneOutline, CheckmarkOutline, CloseOutline } from '@vicons/ionicons5';
+import { CloudUploadOutline, CheckmarkDoneOutline } from '@vicons/ionicons5';
 import { useRegistration, type RegistrationItem } from '@/composables/admin/useRegistration';
 
 const {

@@ -97,7 +97,7 @@ defineEmits([
   border-radius: 4px;
   margin-bottom: 10px;
   background-color: #fff;
-  transition: all 0.2s;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 
   // &:hover {
     // background-color: #f0faff;

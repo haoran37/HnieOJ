@@ -1,6 +1,5 @@
 <template>
   <n-layout class="oj-layout">
-    
     <n-layout-header class="header-container">
       <TopNavi />
     </n-layout-header>
@@ -14,7 +13,6 @@
     <n-layout-footer>
       <PageFooter />
     </n-layout-footer>
-    
   </n-layout>
 </template>
 
@@ -23,6 +21,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--oj-bg-page);
 }
 
 .header-container {
@@ -32,23 +31,21 @@
   width: 100%;
   height: var(--header-height);
   z-index: 1000;
-  
   padding: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   background-color: #fff;
 }
 
 .content-limit-container {
-  background-color: #EFEFEF;
+  background: var(--oj-bg-page);
   margin-top: var(--header-height);
-  min-height: calc(100vh - var(--header-height) - 100px); 
+  min-height: calc(100vh - var(--header-height) - 100px);
 }
 
 .router-view-wrapper {
-  width: 90%; 
+  width: min(90%, 1400px);
   max-width: 1400px;
-  margin: 0 auto; 
-  padding: 20px 0;
+  margin: 0 auto;
+  padding: 20px 0 24px;
   box-sizing: border-box;
 }
 </style>

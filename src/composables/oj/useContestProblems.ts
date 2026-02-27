@@ -5,7 +5,7 @@ export function useContestProblems() {
   const problems = ref<any[]>([]);
 
   //TODO: 替换真实api
-  const fetchContestProblems = async (cid: string) => {
+  const fetchContestProblems = async (_cid: string) => {
     console.log("请求题目");
     loading.value = true;
     setTimeout(() => {

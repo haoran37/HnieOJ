@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { h } from 'vue';
 import { useRouter } from 'vue-router';
-import { NTag, NProgress, NRate } from 'naive-ui';
+import { NProgress, NRate } from 'naive-ui';
 
 const router = useRouter();
 

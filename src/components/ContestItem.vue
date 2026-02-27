@@ -3,7 +3,7 @@
     class="contest-item" 
     :class="{ 'is-compact': compact }"
     :style="{ borderColor: statusStyle.borderColor }" 
-    @click="$emit('click')"
+    @click="handleClick"
   >
     
     <div class="header-section" :style="statusStyle.header">
@@ -65,13 +65,18 @@
 
         <n-tooltip trigger="hover" v-if="showFollow">
           <template #trigger>
-            <div class="star-btn" @click.stop="handleToggleFollow">
+            <button
+              class="star-btn"
+              type="button"
+              :aria-label="isFollowed ? '取消关注比赛' : '关注比赛'"
+              @click.stop="handleToggleFollow"
+            >
                <n-icon 
                  size="18" 
                  :component="isFollowed ? StarFilled : StarOutline" 
                  :color="isFollowed ? '#f0a020' : '#999'" 
                />
-            </div>
+            </button>
           </template>
           {{ isFollowed ? '点击取消关注' : '关注后会邮件通知您' }}
         </n-tooltip>
@@ -107,9 +112,15 @@ const props = withDefaults(defineProps<{
   showFollow: true,
 });
 
-const emit = defineEmits(['click']);
+const emit = defineEmits<{
+  (event: 'click'): void
+}>()
 const notification = useNotification();
 const userStore = useUserStore();
+
+const handleClick = () => {
+  emit('click')
+}
 
 const isFollowed = ref(false);
 
@@ -148,7 +159,12 @@ const { contestStatus, timeText } = useStatusTime(
 );
 
 const statusStyle = computed(() => {
-  const configs = {
+  const defaultStyle = {
+    header: { backgroundColor: '#f0f9f4', color: '#18a058' },
+    descColor: '#999',
+    borderColor: '#18a05880',
+  }
+  const configs: Record<number, { header: { backgroundColor: string; color: string }; descColor: string; borderColor: string }> = {
     0: { 
       header: { backgroundColor: '#f0f9f4', color: '#18a058' }, 
       descColor: '#999',
@@ -165,16 +181,20 @@ const statusStyle = computed(() => {
       borderColor: '#f56c6c90'
     }
   };
-  return configs[contestStatus.value];
+  return configs[contestStatus.value] ?? defaultStyle
 });
 
 const statusConfig = computed(() => {
-  const map = {
+  const defaultConfig: { text: string; type: 'success' | 'warning' | 'error' } = {
+    text: '未开始',
+    type: 'success',
+  }
+  const map: Record<number, { text: string; type: 'success' | 'warning' | 'error' }> = {
     0: { text: '未开始', type: 'success' as const },
     1: { text: '进行中', type: 'warning' as const },
     2: { text: '已结束', type: 'error' as const }
   };
-  return map[contestStatus.value];
+  return map[contestStatus.value] ?? defaultConfig
 });
 
 const getTagStyle = (tag: string) => ({
@@ -188,7 +208,7 @@ const getTagStyle = (tag: string) => ({
   background: #fff;
   border: 2px solid #efeff5;
   border-radius: 8px;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   cursor: pointer;
   overflow: hidden;
   display: flex;
@@ -295,10 +315,19 @@ const getTagStyle = (tag: string) => ({
       .star-btn {
         display: flex;
         align-items: center;
+        justify-content: center;
         padding: 4px;
+        border: 0;
+        background: transparent;
         border-radius: 50%;
         transition: background-color 0.2s;
         cursor: pointer;
+
+        &:focus-visible {
+          outline: 2px solid var(--oj-color-primary);
+          outline-offset: 2px;
+        }
+
         &:hover { background-color: rgba(0,0,0,0.05); }
       }
     }

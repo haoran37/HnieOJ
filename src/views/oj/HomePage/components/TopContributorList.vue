@@ -72,7 +72,7 @@ const fetchTopContributions = async () => {
       }));
       loading.value = false;
     }, 400);
-  } catch (e) {
+  } catch (_e) {
     loading.value = false;
   }
 };

@@ -73,7 +73,7 @@ export function useTrainingManage() {
     fetchTrainings();
   };
 
-  const handleToggleStatus = (row: any) => {
+  const _handleToggleStatus = (row: any) => {
     const newStatus = !row.status;
     console.log('API Request: PUT /api/admin/training/status', { id: row.id, status: newStatus });
     row.status = newStatus;

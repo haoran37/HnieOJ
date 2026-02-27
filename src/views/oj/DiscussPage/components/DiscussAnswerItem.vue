@@ -71,7 +71,7 @@ const props = defineProps<{
   canDelete?: boolean;
 }>();
 
-const emit = defineEmits(['vote', 'submit-comment']);
+const _emit = defineEmits(['vote', 'submit-comment']);
 
 const showCommentEditor = ref(false);
 const commentText = ref('');

@@ -67,9 +67,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useMessage, useNotification } from 'naive-ui';
+import { useNotification } from 'naive-ui';
 import { StarOutline, Star as StarFilled } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingDetail } from '@/composables/oj/useTrainingDetail';

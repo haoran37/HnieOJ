@@ -22,7 +22,13 @@ body {
   --header-height: 60px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.3s;
+  transition: background-color 0.3s ease;
   margin: 0;
+  color: var(--oj-text-primary);
+  background: var(--oj-bg-page);
+}
+
+#app {
+  min-height: 100vh;
 }
 </style>

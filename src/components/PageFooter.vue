@@ -1,14 +1,17 @@
 <template>
   <footer class="page-footer">
     <div class="content-limit-container">
-      <div class="powered-info">
-        {{ SITE_CONFIG.footer.poweredBy }}
-      </div>
-      
+      <div class="powered-info">{{ SITE_CONFIG.footer.poweredBy }}</div>
+
       <div class="copyright-info">
         <span>{{ SITE_CONFIG.footer.copyright }}</span>
         <span class="divider">|</span>
-        <a :href="SITE_CONFIG.footer.icpLink" target="_blank" class="icp-link">
+        <a
+          :href="SITE_CONFIG.footer.icpLink"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="icp-link"
+        >
           {{ SITE_CONFIG.footer.icp }}
         </a>
       </div>
@@ -17,26 +20,15 @@
 </template>
 
 <script lang="ts" setup>
-import { SITE_CONFIG } from '@/configs';
+import { SITE_CONFIG } from '@/configs'
 </script>
 
 <style scoped lang="less">
-@side-padding: 5%;
-
-@color-gray: #999999;
-@color-dark: #333333;
-
 .page-footer {
   width: 100%;
-  padding: 10px 0;
-  background-color: white;
-  border-top: 1px solid #eeeeee;
-  display: flex;
-  justify-content: center;
-  box-shadow: 0 -2px 2px rgba(0, 0, 0, 0.15);
-  position: relative;
-  z-index: 100;
-  overflow: visible;
+  padding: 16px 0;
+  background-color: #fff;
+  border-top: 1px solid #eef2f7;
 }
 
 .content-limit-container {
@@ -45,51 +37,41 @@ import { SITE_CONFIG } from '@/configs';
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center; // 居中排列
+  align-items: center;
   text-align: center;
-  font-size: 14px;
-  line-height: 1;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .powered-info {
-  color: @color-gray;
-  margin-bottom: 8px;
+  color: #8791a5;
+  margin-bottom: 6px;
 }
 
 .copyright-info {
-  color: @color-dark;
+  color: #4a5468;
   display: flex;
   align-items: center;
-  flex-wrap: wrap; // 手机端自动换行
+  flex-wrap: wrap;
   justify-content: center;
 
   .divider {
-    margin: 0 12px;
-    color: #ccc;
-  }
-
-  .icp-link {
-    color: @color-dark;
-    text-decoration: none;
-    transition: color 0.2s;
-
-    &:hover {
-      color: #1a3968;
-    }
-    // 禁用原生过渡效果
-    .n-menu-item-content,
-    .n-menu-item-content-header,
-    .n-menu-item-content-header a {
-        transition: none !important; 
-    }
+    margin: 0 10px;
+    color: #c6ceda;
   }
 }
 
-/* 适配手机端 */
-@media (max-width: 640px) {
-  .page-footer {
-    padding: 24px 0;
+.icp-link {
+  color: #4a5468;
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: var(--oj-color-primary);
   }
+}
+
+@media (max-width: 640px) {
   .content-limit-container {
     font-size: 12px;
   }

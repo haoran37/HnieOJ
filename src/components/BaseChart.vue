@@ -29,7 +29,7 @@ watch(() => props.option, (newVal) => {
   chartInstance.value?.setOption(newVal);
 }, { deep: true });
 
-watch(() => appStore.darkMode, (isDark) => {
+watch(() => appStore.darkMode, (_isDark) => {
   if (chartInstance.value) {
     chartInstance.value.dispose();
     initChart();

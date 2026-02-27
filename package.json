@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "lint": "eslint . --fix --cache"
+    "lint": "eslint . --fix --cache",
+    "lint:encoding": "node scripts/check-utf8.mjs",
+    "lint:all": "pnpm lint && pnpm lint:encoding"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",

@@ -139,7 +139,7 @@ const {
   selectedClassList,
   problemInput,
   loading,
-  fetchColleges,
+  fetchColleges: _fetchColleges,
   fetchMajors,
   fetchClasses,
   handleRemoveClass,

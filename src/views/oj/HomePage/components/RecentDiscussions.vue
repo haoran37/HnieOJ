@@ -75,7 +75,7 @@ const {
   total, 
   page, 
   pageSize, 
-  activeCategory,
+  activeCategory: _activeCategory,
   fetchDiscussions,
   handlePageChange 
 } = useDiscussList();

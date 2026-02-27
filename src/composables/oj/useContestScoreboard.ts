@@ -22,7 +22,7 @@ export function useContestScoreboard() {
   const rankData = ref<RankItem[]>([]);
 
   //TODO: 替换真实api
-  const fetchScoreboard = async (cid: string) => {
+  const fetchScoreboard = async (_cid: string) => {
     loading.value = true;
     setTimeout(() => {
       const mockProblems = (acRate: number): Record<string, ScoreboardProblem> => {

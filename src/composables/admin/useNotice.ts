@@ -263,9 +263,9 @@ export function useNotice() {
   };
 
   const confirmAddStaff = () => {
-    const teachers = staffState.teachersList.filter(u => staffState.tempSelectedTeachers.includes(u.value));
-    const tas = staffState.tasList.filter(u => staffState.tempSelectedTAs.includes(u.value));
-    const admins = staffState.adminsList.filter(u => staffState.tempSelectedAdmins.includes(u.value));
+    const _teachers = staffState.teachersList.filter(u => staffState.tempSelectedTeachers.includes(u.value));
+    const _tas = staffState.tasList.filter(u => staffState.tempSelectedTAs.includes(u.value));
+    const _admins = staffState.adminsList.filter(u => staffState.tempSelectedAdmins.includes(u.value));
     
     const preserveSelected = (currentList: UserNode[], tempIds: string[], role: UserRole) => {
       const selectedInList = currentList.filter(u => tempIds.includes(u.value));

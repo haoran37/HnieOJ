@@ -94,7 +94,7 @@ export function useHomeworkList() {
     fetchHomeworks();
   };
 
-  const handleToggleStatus = (row: any) => {
+  const _handleToggleStatus = (row: any) => {
     const newStatus = !row.status;
     console.log('API Request: PUT /api/admin/homework/status', { id: row.id, status: newStatus });
     row.status = newStatus;

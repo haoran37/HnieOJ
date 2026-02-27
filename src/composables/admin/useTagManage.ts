@@ -57,7 +57,10 @@ export function useTagManage() {
     
     loading.value = true;
     // Strip _id before sending
-    const payload = tagGroups.value.map(({ _id, ...rest }) => rest);
+    const payload = tagGroups.value.map((group) => {
+      const { _id: _omitId, ...rest } = group;
+      return rest;
+    });
     console.log('API Request: PUT /api/admin/tags', payload);
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -151,7 +154,10 @@ export function useTagManage() {
   watch(tagGroups, (newVal) => {
     if (!isUpdatingFromJson) {
       // Strip _id before stringifying
-      const cleanData = newVal.map(({ _id, ...rest }) => rest);
+      const cleanData = newVal.map((group) => {
+        const { _id: _omitId, ...rest } = group;
+        return rest;
+      });
       jsonString.value = JSON.stringify(cleanData, null, 2);
       jsonError.value = null;
     }

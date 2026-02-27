@@ -33,7 +33,6 @@
 import { useMessage } from 'naive-ui';
 import type { StatusDetail } from '@/composables/oj/useStatusDetail';
 import hljs from 'highlight.js/lib/core';
-import cpp from 'highlight.js/lib/languages/cpp';
 
 // 如果需要其他语言需要在这里继续 register
 // hljs.registerLanguage('cpp', cpp);
@@ -72,7 +71,7 @@ const fallbackCopyText = (text: string) => {
     const successful = document.execCommand('copy');
     if (successful) message.success('复制成功');
     else message.error('复制失败');
-  } catch (err) {
+  } catch (_err) {
     message.error('复制失败');
   }
   document.body.removeChild(textArea);

@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 
 // 题目状态结构
 export interface ProblemResult {
@@ -24,7 +24,7 @@ export function useHomeworkRankings() {
   const rawRankData = ref<StudentRank[]>([]);
 
   //TODO: 替换真实api
-  const fetchRankings = async (hid: string) => {
+  const fetchRankings = async (_hid: string) => {
     loading.value = true;
     setTimeout(() => {
       const mockData = Array.from({ length: 45 }, (_, i) => {

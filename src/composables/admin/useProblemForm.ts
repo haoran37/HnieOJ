@@ -1,4 +1,4 @@
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useMessage } from 'naive-ui';
 import { useRouter } from 'vue-router';
 import { useTags } from '@/composables/useTags';
@@ -79,7 +79,7 @@ export function useProblemForm() {
   };
 
   const handleSubmit = () => {
-    // @ts-ignore
+    // @ts-expect-error legacy form ref type from Naive UI
     formRef.value?.validate((errors: any) => {
       if (!errors) {
         loading.value = true;

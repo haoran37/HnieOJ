@@ -1,8 +1,8 @@
 {
-  "locale": "English",
+  "locale": "中文",
   "oj": "湖南工程学院算法设计在线评测系统",
   "header": {
-    "home": "主页",
+    "home": "首页",
     "bank": "题库",
     "set": "题单",
     "contest": "竞赛",

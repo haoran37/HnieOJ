@@ -38,3 +38,6 @@ components.d.ts
 # Vite / Vue 相关
 .vite
 .eslintcache
+
+# CODEX
+AGENTS.md

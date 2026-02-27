@@ -1,22 +1,13 @@
 <template>
-  <n-flex
-    class="navi-bar"
-    align="center"
-    justify="center"
-    :wrap="false"
-  >
+  <n-flex class="navi-bar" align="center" justify="center" :wrap="false">
     <div class="content-limit-container">
-      <n-text class="logo-container">
-        <img :src="logo" alt="Hie Logo" />
+      <RouterLink class="logo-container" to="/">
+        <img :src="logo" alt="HNIEOJ Logo" width="35" height="35" />
         <span>HNIEOJ</span>
-      </n-text>
+      </RouterLink>
 
       <div class="menu-wrapper">
-        <n-menu
-          mode="horizontal"
-          :options="menuOptions"
-          :value="activeKey"
-        />
+        <n-menu mode="horizontal" :options="menuOptions" :value="activeKey" />
       </div>
 
       <div class="user-action-area">
@@ -25,99 +16,99 @@
           <n-button secondary type="primary" @click="router.push('/register')">注册</n-button>
         </n-space>
 
-        <n-dropdown v-else :options="userOptions" @select="handleUserSelect" trigger="hover">
-          <div class="user-info-trigger">
-            <n-avatar
-              round
-              size="small"
-              :src="userStore.userInfo?.avatar"
-            />
+        <n-dropdown v-else :options="userOptions" trigger="hover" @select="handleUserSelect">
+          <button class="user-info-trigger" type="button" aria-label="打开用户菜单">
+            <n-avatar round size="small" :src="userStore.userInfo?.avatar" />
             <span class="username">{{ userStore.userInfo?.username }}</span>
-            <n-icon class="arrow-icon">
-              <ChevronDownIcon /> 
-            </n-icon>
-          </div>
+            <n-icon class="arrow-icon"><ChevronDownIcon /></n-icon>
+          </button>
         </n-dropdown>
       </div>
     </div>
   </n-flex>
 </template>
 
-<script lang="ts" setup name="TopNavi">
+<script lang="ts" setup>
 import logo from '@/assets/hie.svg'
-import { computed, h } from 'vue';
-import { useUserStore } from '@/stores/userStore';
-import { useRoute, useRouter, RouterLink } from 'vue-router';
-import type { MenuOption } from 'naive-ui';
-import { ojRouters } from '@/router/routers';
+import { computed, h } from 'vue'
+import { useUserStore } from '@/stores/userStore'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
+import type { DropdownOption, MenuOption } from 'naive-ui'
+import { ojRouters } from '@/router/routers'
 import { ChevronDown as ChevronDownIcon } from '@vicons/ionicons5'
 
-const userStore = useUserStore();
-const route = useRoute();
-const router = useRouter();
+const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
 
-const activeKey = computed(() => (route.meta?.activeMenu as string) || (route.name as string));
+const activeKey = computed(() => (route.meta?.activeMenu as string) || (route.name as string))
 
-// 动态生成菜单项
 const menuOptions = computed<MenuOption[]>(() => {
-  const menuRoutes = ojRouters.children || [];
+  const menuRoutes = ojRouters.children ?? []
 
   return menuRoutes
-    .filter(r => {
-      if (r.meta?.hideInMenu) return false;
-      return true
-    })
-    .map((r) => {
-      const fullPath = r.path === '' ? '/' : `/${r.path}`;
+    .filter((item) => !item.meta?.hideInMenu)
+    .map((item) => {
+      const fullPath = item.path === '' ? '/' : `/${item.path}`
       return {
-        key: r.name as string,
-        label: () =>
-          h(
-            RouterLink,
-            { to: fullPath },
-            { default: () => r.meta?.title as string }
-          )
-      };
-    });
-});
+        key: item.name as string,
+        label: () => h(RouterLink, { to: fullPath }, { default: () => String(item.meta?.title ?? item.name) }),
+      }
+    })
+})
 
-// 用户下拉菜单配置
-const userOptions = [
-  { label: '个人中心', key: 'profile' },
-  { label: '消息通知', key: 'message' },
-  { label: '后台管理', key: 'admin', show: userStore.isAdmin },
-  { type: 'divider', key: 'd1' },
-  { label: '退出登录', key: 'logout' }
-];
+const userOptions = computed<DropdownOption[]>(() => {
+  const base: DropdownOption[] = [
+    { label: '个人中心', key: 'profile' },
+    { label: '消息通知', key: 'message' },
+    { type: 'divider', key: 'divider' },
+    { label: '退出登录', key: 'logout' },
+  ]
 
-function handleUserSelect(key: string) {
-  switch(key) {
-    case "profile": router.push(`/user/${userStore.userInfo?.id || 0}`); break; 
-    case "admin": router.push(`/admin`); break;
-    case "logout": 
-      userStore.logout();
-      router.push('/login'); 
-      break;
+  if (userStore.isAdmin) {
+    base.splice(2, 0, { label: '后台管理', key: 'admin' })
+  }
+
+  return base
+})
+
+function handleUserSelect(key: string | number) {
+  switch (key) {
+    case 'profile':
+      router.push(`/user/${userStore.userInfo?.id || 0}`)
+      break
+    case 'message':
+      router.push(`/user/${userStore.userInfo?.id || 0}/message`)
+      break
+    case 'admin':
+      router.push('/admin')
+      break
+    case 'logout':
+      userStore.logout()
+      router.push('/login')
+      break
+    default:
+      break
   }
 }
 </script>
 
 <style scoped lang="less">
 @side-padding: 5%;
-@logo-menu-gap: 56px;
-@item-gap: 56px;
-@font-size: 16px;
-@text-color: #515A6E;
+@logo-menu-gap: 40px;
+@item-gap: 36px;
+@font-size: 15px;
+@text-color: #515a6e;
 @active-color: #1a3968;
-@line-thickness: 4px;
+@line-thickness: 3px;
 
 .navi-bar {
-  background-color: rgba(216, 216, 216, 0.13);
+  background-color: rgba(255, 255, 255, 0.95);
   height: var(--header-height);
   width: 100%;
   position: relative;
-  overflow: visible;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #eef2f7;
 }
 
 .content-limit-container {
@@ -133,12 +124,17 @@ function handleUserSelect(key: string) {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  cursor: pointer;
+  color: #1f2d3d;
+  text-decoration: none;
+
   span {
     padding: 0 10px;
     font-size: 18px;
-    font-weight: bold;
+    font-weight: 700;
     white-space: nowrap;
   }
+
   img {
     width: 35px;
     height: 35px;
@@ -157,7 +153,7 @@ function handleUserSelect(key: string) {
   align-items: center;
 
   .n-menu-item-content-bottom-line {
-    display: none; 
+    display: none;
   }
 
   .n-menu-item {
@@ -165,27 +161,24 @@ function handleUserSelect(key: string) {
     height: 100%;
     display: flex;
     align-items: center;
-    
-    &:last-child {
-      margin-right: 0;
-    }
   }
 
   .n-menu-item-content {
     padding: 0;
     font-size: @font-size;
-    font-weight: bold;
+    font-weight: 600;
     color: @text-color;
     height: 100%;
     display: flex;
     align-items: center;
     position: relative;
+    transition: color 0.2s ease;
 
     &.n-menu-item-content--selected {
       color: @active-color;
-      
+
       &::after {
-        content: "";
+        content: '';
         position: absolute;
         bottom: 0;
         left: 0;
@@ -202,30 +195,46 @@ function handleUserSelect(key: string) {
   display: flex;
   align-items: center;
   margin-left: auto;
-  cursor: pointer;
 }
 
 .user-info-trigger {
   display: flex;
   align-items: center;
+  border: 0;
+  background: transparent;
   padding: 4px 8px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
 
   &:hover {
     background-color: rgba(0, 0, 0, 0.05);
   }
 
+  &:focus-visible {
+    outline: 2px solid var(--oj-color-primary);
+    outline-offset: 2px;
+  }
+
   .username {
     margin-left: 10px;
     font-size: 14px;
-    font-weight: bold;
+    font-weight: 600;
     color: @text-color;
   }
 }
 
 @media (max-width: 1024px) {
-  .menu-wrapper { margin-left: 24px; }
-  :deep(.n-menu-item) { margin-right: 24px; }
+  .menu-wrapper {
+    margin-left: 20px;
+  }
+
+  :deep(.n-menu-item) {
+    margin-right: 18px;
+  }
+
+  .user-info-trigger .username {
+    display: none;
+  }
 }
 </style>

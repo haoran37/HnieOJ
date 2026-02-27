@@ -75,7 +75,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useMessage } from 'naive-ui';
 import { 
   CheckmarkCircle, CloseCircle, AlertCircle, 
@@ -87,7 +86,7 @@ import {
 import { useUserStore } from '@/stores/userStore';
 import type { StatusDetail } from '@/composables/oj/useStatusDetail';
 
-const props = defineProps<{ detail: StatusDetail }>();
+defineProps<{ detail: StatusDetail }>();
 const userStore = useUserStore();
 const message = useMessage();
 

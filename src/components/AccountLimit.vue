@@ -28,7 +28,7 @@
 <script setup lang="ts">
 //TODO: 实现对学院、年纪、专业的限定
 import { ref, h } from 'vue';
-import { NFormItem, NInputGroup, NInput, NButton, NDataTable, NTag, type DataTableColumns } from 'naive-ui';
+import { NFormItem, NInputGroup, NInput, NButton, NDataTable, type DataTableColumns } from 'naive-ui';
 
 interface Account {
   uid: string;
@@ -36,7 +36,7 @@ interface Account {
   type: 'Personal' | 'Team';
 }
 
-const props = defineProps<{
+defineProps<{
   accountList: Account[];
   loading?: boolean;
 }>();

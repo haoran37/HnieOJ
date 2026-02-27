@@ -1,5 +1,4 @@
 import { h } from 'vue';
-import { NTag } from 'naive-ui';
 import type { Router } from 'vue-router';
 import type { Submission } from '@/composables/oj/useStatusList';
 

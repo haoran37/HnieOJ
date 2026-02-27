@@ -3,7 +3,7 @@
     
     <n-card :bordered="false" size="small" class="filter-card">
       <div class="filter-row">
-        <n-button secondary circle size="small" class="refresh-btn" @click="handleRefresh">
+        <n-button secondary circle size="small" class="refresh-btn" aria-label="刷新状态列表" @click="handleRefresh">
           <template #icon><n-icon><RefreshIcon /></n-icon></template>
         </n-button>
 
@@ -53,7 +53,7 @@
           :columns="columns"
           :data="listData"
           :loading="loading"
-          :row-key="(row: any) => row.id"
+          :row-key="(row: { id: string | number }) => row.id"
           :striped="true" 
           :single-line="false"
           size="small"

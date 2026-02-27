@@ -97,7 +97,7 @@ export function useContestList() {
     fetchContests();
   };
 
-  const handleToggleStatus = (row: any) => {
+  const _handleToggleStatus = (row: any) => {
     const newStatus = !row.status;
     console.log('API Request: PUT /api/admin/contest/status', { id: row.id, status: newStatus });
     row.status = newStatus;

@@ -87,7 +87,7 @@
 
 <script setup lang="ts">
 import { h } from 'vue';
-import { NButton, NTag, NSpace, NIcon, NPopconfirm, NCard, NInput, NInputGroup, NDataTable, NModal, NForm, NFormItem, NSelect, NDynamicTags } from 'naive-ui';
+import { NButton, NTag, NSpace, NPopconfirm, NCard, NInput, NInputGroup, NDataTable, NModal, NForm, NFormItem, NSelect, NDynamicTags } from 'naive-ui';
 import { useDiscussManage, type DiscussItem } from '@/composables/admin/useDiscussManage';
 
 const {

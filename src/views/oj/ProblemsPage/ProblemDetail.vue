@@ -111,11 +111,11 @@
               <n-space vertical>
                 <div class="info-row">
                   <span class="label">上传者</span>
-                  <a class="value link user-link">{{ problem.uploader }}</a>
+                  <span class="value user-link">{{ problem.uploader }}</span>
                 </div>
                 <div class="info-row">
                   <span class="label">提交记录</span>
-                  <a class="value link" @click="$router.push(`/status?pid=${problem.id}`)">查看记录</a>
+                  <button class="value link link-btn" type="button" @click="$router.push(`/status?pid=${problem.id}`)">查看记录</button>
                 </div>
                 <div class="info-row">
                   <span class="label">难度</span>
@@ -273,8 +273,18 @@ const problem = ref<Problem>({
   hint: ''
 });
 
-const recommendedProblems = ref<any[]>([]);
-const relatedDiscussions = ref<any[]>([]);
+interface RecommendedProblem {
+  id: string;
+  title: string;
+}
+
+interface RelatedDiscussion {
+  id: string;
+  title: string;
+}
+
+const recommendedProblems = ref<RecommendedProblem[]>([]);
+const relatedDiscussions = ref<RelatedDiscussion[]>([]);
 
 const fetchProblemDetail = async (pid: string) => {
   loading.value = true;
@@ -367,7 +377,7 @@ const fallbackCopyText = (text: string) => {
     const successful = document.execCommand('copy');
     if (successful) message.success('复制成功');
     else message.error('复制失败');
-  } catch (err) {
+  } catch {
     message.error('复制失败');
   }
   document.body.removeChild(textArea);
@@ -578,13 +588,26 @@ onMounted(() => {
       height: 42px;
       font-size: 16px;
       box-shadow: 0 4px 14px rgba(32, 128, 240, 0.3);
-      transition: all 0.3s;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
       
       &:hover {
         transform: translateY(-1px);
         box-shadow: 0 6px 18px rgba(32, 128, 240, 0.4);
       }
     }
+  }
+}
+
+.link-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+
+  &:focus-visible {
+    outline: 2px solid var(--oj-color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
 }
 

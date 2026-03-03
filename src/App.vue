@@ -1,5 +1,10 @@
 <template>
-  <n-config-provider :theme="appStore.naiveTheme" :locale="zhCN" :date-locale="dateZhCN">
+  <n-config-provider
+    :theme="appStore.naiveTheme"
+    :theme-overrides="themeOverrides"
+    :locale="zhCN"
+    :date-locale="dateZhCN"
+  >
     <n-loading-bar-provider>
       <n-message-provider>
         <n-dialog-provider>
@@ -13,8 +18,23 @@
 </template>
 
 <script setup lang="ts">
+  import type { GlobalThemeOverrides } from 'naive-ui';
   import { useAppStore } from '@/stores/app.ts';
   import { zhCN, dateZhCN } from 'naive-ui';
+
+  const themeOverrides: GlobalThemeOverrides = {
+    common: {
+      primaryColor: '#2F6EE5',
+      primaryColorHover: '#4A84EA',
+      primaryColorPressed: '#2658B8',
+      primaryColorSuppl: '#2F6EE5',
+      infoColor: '#2F6EE5',
+      infoColorHover: '#4A84EA',
+      infoColorPressed: '#2658B8',
+      infoColorSuppl: '#2F6EE5',
+    },
+  };
+
   const appStore = useAppStore();
 </script>
 <style>

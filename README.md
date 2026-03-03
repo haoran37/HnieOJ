@@ -3,7 +3,7 @@
 > ⚠️ **项目状态：开发暂停中 / WIP**
 > HnieOJ 在线评测系统前端仓库。由于个人安排，项目长期内可能无法持续维护。
 
-[API文档](https://s.apifox.cn/91edc2c6-6918-4179-9852-9ec3742377c8)
+[API文档](https://s.apifox.cn/91edc2c6-6918-4179-9852-9ec3742377c8)、[后端仓库](https://github.com/haoran37/HnieOJ-backend)、[在线演示](https://haoran37.github.io/HnieOJ/)
 
 ## 项目状态
 

@@ -8,8 +8,12 @@ import AutoImport from 'unplugin-auto-import/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 
+const repo = process.env.GITHUB_REPOSITORY?.split('/')[1]                                                                     
+const isGhPages = process.env.GITHUB_ACTIONS === 'true' 
+
 // https://vite.dev/config/
 export default defineConfig({
+  base: isGhPages && repo ? `/${repo}/` : '/',
   plugins: [
     vue(),
     vueDevTools(),

@@ -15,12 +15,17 @@
         </n-button>
       </n-space>
 
+      <n-alert type="info" :bordered="false" class="mb-4">
+        可管理的角色为 ADMIN / TEACHER / TA；root 用户权限不可修改，保存时会被拒绝。
+      </n-alert>
+
       <!-- 权限用户列表 -->
       <n-data-table
         :columns="columns"
         :data="permissionUserList"
         :loading="loading"
         :row-key="(row) => row.uid"
+        :checked-row-keys="selectedUserIds"
         @update:checked-row-keys="handleCheck"
         :scroll-x="1200"
         class="mt-4"
@@ -36,7 +41,7 @@
           show-size-picker
           show-quick-jumper
           @update:page="pagination.onChange"
-          @update:page-size="pagination.onChange"
+          @update:page-size="pagination.onUpdatePageSize"
         />
       </div>
     </n-card>
@@ -67,6 +72,7 @@
           :data="searchResultList"
           :loading="searchLoading"
           :row-key="(row) => row.uid"
+          :checked-row-keys="selectedSearchUserIds"
           @update:checked-row-keys="handleSearchCheck"
           max-height="300"
         />
@@ -113,6 +119,9 @@
       title="修改用户权限"
       style="width: 400px"
     >
+      <n-alert type="warning" :bordered="false" class="mb-3">
+        保存修改会用所选角色替换该用户当前的可管理角色（ADMIN / TEACHER / TA）；如需为该用户追加角色，请使用「添加权限用户」。
+      </n-alert>
       <n-form>
         <n-form-item label="用户">
           <n-input :value="`${editForm.username} (${editForm.uid})`" disabled />
@@ -138,14 +147,14 @@
 </template>
 
 <script lang="ts" setup>
-import { h } from 'vue';
+import { h, onMounted } from 'vue';
 import { 
-  NCard, NSpace, NButton, NDataTable, NPagination, NModal, 
+  NCard, NSpace, NButton, NDataTable, NPagination, NModal, NAlert,
   NInput, NInputGroup, NSelect, NForm, NFormItem, NTag, NA 
 } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { usePermissionManage, type PermissionUserItem, type SearchUserItem } from '@/composables/admin/usePermissionManage';
-import { UserRole } from '@/stores/userStore';
+import { normalizeRoles, primaryRole, type Role } from '@/types/user';
 
 const {
   loading,
@@ -163,6 +172,7 @@ const {
   selectedUserIds,
   editForm,
   roleOptions,
+  fetchPermissionUsers,
   handleSearch,
   openAddModal,
   handleAddSubmit,
@@ -182,16 +192,19 @@ const handleSearchCheck = (rowKeys: (string | number)[]) => {
   selectedSearchUserIds.value = rowKeys.map(String);
 };
 
-// 角色标签颜色映射
-const getRoleType = (role: UserRole) => {
+const getRoleType = (role: Role) => {
   switch (role) {
-    case UserRole.ROOT: return 'error';
-    case UserRole.ADMIN: return 'warning';
-    case UserRole.TEACHER: return 'success';
-    case UserRole.TA: return 'info';
+    case 'ROOT': return 'error';
+    case 'ADMIN': return 'warning';
+    case 'TEACHER': return 'success';
+    case 'TA': return 'info';
     default: return 'default';
   }
 };
+
+// 显示后端返回的全部真实角色（多角色不丢失）
+const roleText = (roles: string[]) => normalizeRoles(roles).join(' / ') || '—';
+const roleType = (roles: string[]) => getRoleType(primaryRole(normalizeRoles(roles)));
 
 // 主表格列定义
 const columns: DataTableColumns<PermissionUserItem> = [
@@ -204,7 +217,7 @@ const columns: DataTableColumns<PermissionUserItem> = [
       return h(
         NA,
         {
-          href: `/user/${row.uid}`, // 假设用户详情页路由
+          href: `/user/${row.uid}`,
           target: '_blank',
           style: { color: '#007BFF', textDecoration: 'none' }
         },
@@ -212,20 +225,20 @@ const columns: DataTableColumns<PermissionUserItem> = [
       );
     }
   },
-  { title: '姓名', key: 'username', width: 120 },
+  { title: '用户名', key: 'username', width: 120 },
   { title: '专业班级', key: 'majorClass', width: 150 },
   { title: '学院', key: 'college', width: 200 },
   { title: '邮箱', key: 'email', width: 200 },
   { title: '手机号', key: 'phone', width: 150 },
   {
     title: '角色',
-    key: 'role',
-    width: 100,
+    key: 'roles',
+    width: 160,
     render(row) {
       return h(
         NTag,
-        { type: getRoleType(row.role), bordered: false },
-        { default: () => row.role }
+        { type: roleType(row.roles), bordered: false },
+        { default: () => roleText(row.roles) }
       );
     }
   },
@@ -267,22 +280,26 @@ const columns: DataTableColumns<PermissionUserItem> = [
 const searchColumns: DataTableColumns<SearchUserItem> = [
   { type: 'selection' },
   { title: 'UID', key: 'uid', width: 150 },
-  { title: '姓名', key: 'username', width: 120 },
+  { title: '用户名', key: 'username', width: 120 },
   { title: '专业班级', key: 'majorClass', width: 150 },
   { title: '学院', key: 'college', width: 200 },
   {
     title: '当前角色',
-    key: 'role',
-    width: 120,
+    key: 'roles',
+    width: 160,
     render(row) {
       return h(
         NTag,
-        { type: getRoleType(row.role), bordered: false },
-        { default: () => row.role }
+        { type: roleType(row.roles), bordered: false },
+        { default: () => roleText(row.roles) }
       );
     }
   }
 ];
+
+onMounted(() => {
+  void fetchPermissionUsers();
+});
 </script>
 
 <style scoped lang="less">

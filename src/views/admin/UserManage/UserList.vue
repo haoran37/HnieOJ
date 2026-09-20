@@ -11,22 +11,22 @@
             <template #icon><n-icon><CloudUploadOutline /></n-icon></template>
             导入
           </n-button>
-          <n-button 
-            type="success" 
+          <n-button
+            type="success"
             :disabled="selectedUserIds.length === 0"
             @click="handleBatchEnable"
           >
             批量激活
           </n-button>
-          <n-button 
-            type="warning" 
+          <n-button
+            type="warning"
             :disabled="selectedUserIds.length === 0"
             @click="handleBatchDisable"
           >
             批量禁用
           </n-button>
-          <n-button 
-            type="error" 
+          <n-button
+            type="error"
             :disabled="selectedUserIds.length === 0"
             @click="handleBatchDelete"
           >
@@ -35,81 +35,52 @@
         </n-space>
       </template>
 
-      <!-- 筛选区 -->
-      <n-space vertical :size="16" style="margin-bottom: 16px">
-        <n-space :size="12" align="center">
-          <n-input
-            v-model:value="filters.keyword"
-            placeholder="用户名 / UID"
-            clearable
-            style="width: 200px"
-          />
-          <n-input
-            v-model:value="filters.email"
-            placeholder="邮箱"
-            clearable
-            style="width: 200px"
-          />
-          <n-select
-            v-model:value="filters.role"
-            placeholder="角色"
-            clearable
-            :options="roleOptions"
-            style="width: 150px"
-          />
-          <n-select
-            v-model:value="filters.status"
-            placeholder="状态"
-            clearable
-            :options="statusOptions"
-            style="width: 120px"
-          />
-          <n-date-picker
-            v-model:value="filters.registerTimeRange"
-            type="daterange"
-            clearable
-            placeholder="注册时间范围"
-            style="width: 280px"
-          />
-          <n-button @click="resetFilters">重置</n-button>
-        </n-space>
-
-        <n-space :size="12" align="center">
-          <n-select
-            v-model:value="filters.college"
-            placeholder="学院"
-            clearable
-            filterable
-            :options="collegeOptions"
-            style="width: 200px"
-            @update:value="handleCollegeChange"
-          />
-          <n-select
-            v-model:value="filters.grade"
-            placeholder="年级"
-            clearable
-            filterable
-            :options="gradeOptions"
-            :disabled="!filters.college"
-            style="width: 120px"
-            @update:value="handleGradeChange"
-          />
-          <n-select
-            v-model:value="filters.class"
-            placeholder="班级"
-            clearable
-            filterable
-            :options="classOptions"
-            :disabled="!filters.grade"
-            style="width: 150px"
-          />
-        </n-space>
+      <!-- 筛选区（仅后端真实支持的字段） -->
+      <n-space :size="12" align="center" style="margin-bottom: 16px">
+        <n-input
+          v-model:value="filters.keyword"
+          placeholder="用户名 / UID"
+          clearable
+          style="width: 200px"
+          @keyup.enter="handleSearch"
+        />
+        <n-select
+          v-model:value="filters.collegeId"
+          placeholder="学院"
+          clearable
+          filterable
+          :options="collegeOptions"
+          style="width: 200px"
+          @update:value="handleFilterCollegeChange"
+        />
+        <n-select
+          v-model:value="filters.grade"
+          placeholder="年级"
+          clearable
+          filterable
+          :options="filterGradeOptions"
+          :disabled="!filters.collegeId"
+          style="width: 120px"
+          @update:value="handleFilterGradeChange"
+        />
+        <n-select
+          v-model:value="filters.classId"
+          placeholder="班级"
+          clearable
+          filterable
+          :options="filterClassOptions"
+          :disabled="!filters.grade"
+          style="width: 160px"
+        />
+        <n-button type="primary" @click="handleSearch">查询</n-button>
+        <n-button @click="resetFilters">重置</n-button>
       </n-space>
 
-      <!-- 用户列表 -->
+      <!-- 用户列表（服务端分页，total 来自后端） -->
       <n-data-table
+        remote
         :columns="columns"
-        :data="filteredUserList"
+        :data="userList"
         :loading="loading"
         :pagination="pagination"
         :row-key="(row: UserItem) => row.uid"
@@ -124,24 +95,24 @@
       preset="card"
       title="编辑用户"
       :mask-closable="false"
-      style="width: auto; min-width: 600px; max-width: 90vw"
+      style="width: auto; min-width: 640px; max-width: 90vw"
     >
       <n-form label-placement="left" :label-width="80" :disabled="submitting">
         <n-form-item label="UID" required>
-          <n-input v-model:value="editForm.uid" placeholder="请输入UID" />
+          <n-input v-model:value="editForm.uid" disabled />
         </n-form-item>
         <n-form-item label="用户名" required>
           <n-input v-model:value="editForm.username" placeholder="请输入用户名" />
         </n-form-item>
-        <n-form-item label="邮箱" required>
-          <n-input v-model:value="editForm.email" placeholder="请输入邮箱" />
+        <n-form-item label="邮箱">
+          <n-input v-model:value="editForm.email" placeholder="留空表示不修改" />
         </n-form-item>
         <n-form-item label="状态">
           <n-select v-model:value="editForm.status" :options="statusOptions" />
         </n-form-item>
         <n-form-item label="学院">
-          <n-select 
-            v-model:value="editForm.college" 
+          <n-select
+            v-model:value="editForm.collegeId"
             :options="collegeOptions"
             filterable
             clearable
@@ -149,24 +120,31 @@
           />
         </n-form-item>
         <n-form-item label="年级">
-          <n-select 
-            v-model:value="editForm.grade" 
-            :options="gradeOptions"
+          <n-select
+            v-model:value="editForm.grade"
+            :options="editGradeOptions"
             filterable
             clearable
-            :disabled="!editForm.college"
+            :disabled="!editForm.collegeId"
             @update:value="handleEditGradeChange"
           />
         </n-form-item>
         <n-form-item label="班级">
-          <n-select 
-            v-model:value="editForm.class" 
-            :options="classOptions"
+          <n-select
+            v-model:value="editForm.classId"
+            :options="editClassOptions"
             filterable
             clearable
             :disabled="!editForm.grade"
+            @update:value="handleEditClassChange"
           />
         </n-form-item>
+        <ClassStaffReadonly
+          :loading="classStaffLoading"
+          :error="classStaffError"
+          :teachers="classTeachers"
+          :tas="classTas"
+        />
       </n-form>
       <template #footer>
         <n-space justify="end">
@@ -184,7 +162,7 @@
       preset="card"
       title="添加用户"
       :mask-closable="false"
-      style="width: auto; min-width: 600px; max-width: 90vw"
+      style="width: auto; min-width: 640px; max-width: 90vw"
     >
       <n-form label-placement="left" :label-width="80" :disabled="submitting">
         <n-form-item label="UID" required>
@@ -193,12 +171,20 @@
         <n-form-item label="用户名" required>
           <n-input v-model:value="addUserForm.username" placeholder="请输入用户名" />
         </n-form-item>
-        <n-form-item label="邮箱" required>
+        <n-form-item label="邮箱">
           <n-input v-model:value="addUserForm.email" placeholder="请输入邮箱" />
         </n-form-item>
+        <n-form-item label="初始密码">
+          <n-input
+            v-model:value="addUserForm.password"
+            type="password"
+            show-password-on="click"
+            placeholder="留空由后端生成随机初始密码"
+          />
+        </n-form-item>
         <n-form-item label="学院">
-          <n-select 
-            v-model:value="addUserForm.college" 
+          <n-select
+            v-model:value="addUserForm.collegeId"
             :options="collegeOptions"
             filterable
             clearable
@@ -206,26 +192,33 @@
           />
         </n-form-item>
         <n-form-item label="年级">
-          <n-select 
-            v-model:value="addUserForm.grade" 
-            :options="gradeOptions"
+          <n-select
+            v-model:value="addUserForm.grade"
+            :options="addGradeOptions"
             filterable
             clearable
-            :disabled="!addUserForm.college"
+            :disabled="!addUserForm.collegeId"
             @update:value="handleAddGradeChange"
           />
         </n-form-item>
         <n-form-item label="班级">
-          <n-select 
-            v-model:value="addUserForm.class" 
-            :options="classOptions"
+          <n-select
+            v-model:value="addUserForm.classId"
+            :options="addClassOptions"
             filterable
             clearable
             :disabled="!addUserForm.grade"
+            @update:value="handleAddClassChange"
           />
         </n-form-item>
+        <ClassStaffReadonly
+          :loading="classStaffLoading"
+          :error="classStaffError"
+          :teachers="classTeachers"
+          :tas="classTas"
+        />
         <n-alert type="info" style="margin-top: 8px">
-          默认角色为学生，状态为激活
+          默认角色为学生；年级、班级与班级师资来自基础数据。
         </n-alert>
       </n-form>
       <template #footer>
@@ -269,48 +262,12 @@
       </template>
     </n-modal>
 
-    <!-- 转移源码模态框 -->
-    <n-modal
-      v-model:show="showTransferModal"
-      preset="card"
-      title="转移源码"
-      :mask-closable="false"
-      style="width: auto; min-width: 500px; max-width: 90vw"
-    >
-      <n-form label-placement="left" :label-width="120" :disabled="submitting">
-        <n-form-item label="当前用户">
-          <n-input :value="`${transferForm.sourceUsername} (${transferForm.sourceUid})`" disabled />
-        </n-form-item>
-        <n-form-item label="目标用户" required>
-          <n-select
-            v-model:value="transferForm.targetUid"
-            placeholder="请选择目标用户"
-            :options="targetUserOptions"
-            filterable
-          />
-        </n-form-item>
-        <n-form-item label="删除原用户源码">
-          <n-checkbox v-model:checked="transferForm.deleteOriginal">
-            转移后删除原用户的源码
-          </n-checkbox>
-        </n-form-item>
-      </n-form>
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showTransferModal = false">取消</n-button>
-          <n-button type="primary" :loading="submitting" @click="handleTransferSubmit">
-            确定转移
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
-
     <!-- 成就管理模态框 -->
     <n-modal
       v-model:show="showAchievementModal"
       preset="card"
-      title="成就管理"
-      style="width: auto; min-width: 600px; max-width: 90vw" 
+      title="用户成就管理"
+      style="width: auto; min-width: 640px; max-width: 90vw"
       :mask-closable="false"
     >
       <n-space vertical :size="16">
@@ -319,8 +276,8 @@
         </n-alert>
 
         <n-divider style="margin: 0">已有成就</n-divider>
-        
-        <n-scrollbar style="min-height: 180px; max-height: 180px; padding-right: 10px;">
+
+        <n-scrollbar style="min-height: 180px; max-height: 220px; padding-right: 10px;">
           <n-list v-if="achievementForm.achievements.length > 0" bordered>
             <n-list-item v-for="ach in achievementForm.achievements" :key="ach.id">
               <template #suffix>
@@ -328,15 +285,20 @@
                   size="small"
                   type="error"
                   secondary
+                  :loading="submitting"
                   @click="handleDeleteAchievement(ach.id)"
                 >
                   删除
                 </n-button>
               </template>
               <n-space vertical :size="4">
-                <n-text strong>{{ ach.content }}</n-text>
+                <n-text strong>{{ ach.title || ach.content }}</n-text>
+                <n-text v-if="ach.title && ach.content" depth="3">{{ ach.content }}</n-text>
+                <n-text v-if="ach.proofUrl" depth="3" style="font-size: 12px">
+                  证明：{{ ach.proofUrl }}
+                </n-text>
                 <n-text depth="3" style="font-size: 12px">
-                  {{ formatFullTime(ach.date) }}
+                  {{ ach.achieveTime ? formatFullTime(ach.achieveTime) : '无时间' }}
                 </n-text>
               </n-space>
             </n-list-item>
@@ -347,6 +309,9 @@
         <n-divider style="margin: 0">添加新成就</n-divider>
 
         <n-form label-placement="left" :label-width="80">
+          <n-form-item label="标题">
+            <n-input v-model:value="achievementForm.newTitle" placeholder="选填" />
+          </n-form-item>
           <n-form-item label="成就内容" required>
             <n-input
               v-model:value="achievementForm.newContent"
@@ -354,6 +319,9 @@
               type="textarea"
               :rows="2"
             />
+          </n-form-item>
+          <n-form-item label="证明 URL">
+            <n-input v-model:value="achievementForm.newProofUrl" placeholder="选填" />
           </n-form-item>
           <n-form-item label="获得时间">
             <n-date-picker
@@ -363,7 +331,7 @@
             />
           </n-form-item>
           <n-form-item :show-label="false">
-            <n-button type="primary" @click="handleAddAchievement">
+            <n-button type="primary" :loading="submitting" @click="handleAddAchievement">
               添加成就
             </n-button>
           </n-form-item>
@@ -376,44 +344,36 @@
       </template>
     </n-modal>
 
-    <!-- IP 限制模态框 -->
+    <!-- 用户详情（按 uid 真实读取 /api/user/users/{uid}） -->
     <n-modal
-      v-model:show="showIpModal"
+      v-model:show="showDetailModal"
       preset="card"
-      title="指定登录 IP"
+      title="用户详情"
+      style="width: auto; min-width: 560px; max-width: 90vw"
       :mask-closable="false"
-      style="width: auto; min-width: 500px; max-width: 90vw"
     >
-      <n-form label-placement="left" :label-width="100" :disabled="submitting">
-        <n-form-item label="用户">
-          <n-input :value="`${ipForm.username} (${ipForm.uid})`" disabled />
-        </n-form-item>
-        <n-form-item label="是否限制 IP">
-          <n-switch v-model:value="ipForm.ipRestricted" />
-        </n-form-item>
-        <n-form-item label="IP 白名单" v-if="ipForm.ipRestricted">
-          <n-input
-            v-model:value="ipForm.ipWhitelist"
-            type="textarea"
-            placeholder="每行一个 IP 地址或 CIDR 表示法&#10;例如：&#10;192.168.1.100&#10;10.0.0.0/24"
-            :rows="6"
-          />
-        </n-form-item>
-        <n-alert type="info" v-if="ipForm.ipRestricted" style="margin-top: 8px">
-          支持单个 IP 地址或 CIDR 表示法（如 192.168.1.0/24）
-        </n-alert>
-      </n-form>
+      <n-spin :show="detailLoading">
+        <n-descriptions v-if="detail" :column="1" label-placement="left" bordered size="small">
+          <n-descriptions-item label="UID">{{ detail.uid }}</n-descriptions-item>
+          <n-descriptions-item label="用户名">{{ detail.username }}</n-descriptions-item>
+          <n-descriptions-item label="真实姓名">{{ detail.realname || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="学院">{{ detail.college || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="年级">{{ detail.grade || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="班级">{{ detail.majorClass || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="角色">{{ normalizeRoles(detail.roles || []).join(' / ') || '—' }}</n-descriptions-item>
+          <n-descriptions-item label="CF 用户名">{{ detail.cf_username || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="GitHub">{{ detail.github || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="博客">{{ detail.blog || '-' }}</n-descriptions-item>
+        </n-descriptions>
+      </n-spin>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showIpModal = false">取消</n-button>
-          <n-button type="primary" :loading="submitting" @click="handleIpSubmit">
-            保存
-          </n-button>
+          <n-button @click="showDetailModal = false">关闭</n-button>
         </n-space>
       </template>
     </n-modal>
 
-    <!-- 导入用户模态框 -->
+    <!-- 导入用户模态框（后端无上传接口，仅模板下载可用） -->
     <n-modal
       v-model:show="showImportModal"
       preset="card"
@@ -422,32 +382,26 @@
       style="width: auto; min-width: 600px; max-width: 90vw"
     >
       <n-space vertical :size="16">
-        <n-alert type="info">
-          请上传 Excel 文件导入用户，默认角色为学生，状态为激活
+        <n-alert type="warning">
+          {{ importUnavailableMessage }}
         </n-alert>
 
-        <n-upload
-          :max="1"
-          accept=".xlsx,.xls"
-          :default-upload="false"
-          @change="handleFileChange"
-        >
-          <n-button>选择文件</n-button>
-        </n-upload>
-
-        <n-space>
+        <n-space align="center">
           <n-button text type="primary" @click="handleDownloadTemplate">
             <template #icon><n-icon><DownloadOutline /></n-icon></template>
             下载模板
           </n-button>
+          <span class="tip-text">下载模板后按模板填写，登录后即可下载</span>
         </n-space>
+
+        <n-upload disabled :max="1" accept=".xlsx,.xls" :default-upload="false">
+          <n-button disabled>选择文件（暂不可用）</n-button>
+        </n-upload>
       </n-space>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showImportModal = false">取消</n-button>
-          <n-button type="primary" :loading="submitting" @click="handleImport">
-            导入
-          </n-button>
+          <n-button @click="showImportModal = false">关闭</n-button>
+          <n-button type="primary" disabled @click="handleImport">导入（暂不可用）</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -455,61 +409,76 @@
 </template>
 
 <script setup lang="ts">
-import { h, computed, onMounted } from 'vue';
-import { NButton, NSpace, NTag, NDropdown, NIcon, type DataTableColumns, type UploadFileInfo } from 'naive-ui';
+import { h, onMounted } from 'vue';
+import { NButton, NSpace, NTag, NIcon, useMessage, type DataTableColumns } from 'naive-ui';
 import {
   PersonAddOutline,
   CloudUploadOutline,
   CreateOutline,
   KeyOutline,
-  SwapHorizontalOutline,
   TrophyOutline,
-  LockClosedOutline,
+  SearchOutline,
+  EyeOutline,
   TrashOutline,
-  EllipsisHorizontalOutline,
-  DownloadOutline
+  DownloadOutline,
 } from '@vicons/ionicons5';
-import { useUserManage, type UserItem } from '@/composables/admin/useUserManage';
-import { UserRole } from '@/stores/userStore';
+import { useUserManage, USER_STATUS, type UserItem } from '@/composables/admin/useUserManage';
+import { normalizeRoles } from '@/types/user';
+import ClassStaffReadonly from './components/ClassStaffReadonly.vue';
 
 const {
   loading,
   submitting,
-  filteredUserList,
+  checking,
+  userList,
   selectedUserIds,
   filters,
+  pagination,
   showEditModal,
   showPasswordModal,
-  showTransferModal,
   showAchievementModal,
-  showIpModal,
   showAddUserModal,
   showImportModal,
+  showDetailModal,
+  detailLoading,
+  detail,
   editForm,
   passwordForm,
-  transferForm,
   achievementForm,
-  ipForm,
   addUserForm,
-  importForm,
-  userList,
+  importUnavailableMessage,
   collegeOptions,
-  gradeOptions,
-  classOptions,
+  filterGradeOptions,
+  filterClassOptions,
+  editGradeOptions,
+  editClassOptions,
+  addGradeOptions,
+  addClassOptions,
+  classTeachers,
+  classTas,
+  classStaffLoading,
+  classStaffError,
   fetchColleges,
-  fetchGradesByCollege,
-  fetchClassesByCollegeAndGrade,
+  fetchUsers,
+  handleSearch,
+  resetFilters,
+  handleFilterCollegeChange,
+  handleFilterGradeChange,
+  handleEditCollegeChange,
+  handleEditGradeChange,
+  handleEditClassChange,
+  handleAddCollegeChange,
+  handleAddGradeChange,
+  handleAddClassChange,
   openEditModal,
   handleEditSubmit,
   openPasswordModal,
   handlePasswordSubmit,
-  openTransferModal,
-  handleTransferSubmit,
+  handleCheckUser,
+  openDetailModal,
   openAchievementModal,
   handleAddAchievement,
   handleDeleteAchievement,
-  openIpModal,
-  handleIpSubmit,
   handleDelete,
   handleBatchDisable,
   handleBatchEnable,
@@ -518,175 +487,77 @@ const {
   handleAddUser,
   handleImport,
   handleDownloadTemplate,
-  resetFilters,
-  formatFullTime
+  formatFullTime,
 } = useUserManage();
 
-const pagination = { pageSize: 15 };
-
-const roleOptions = [
-  { label: '学生', value: UserRole.STUDENT },
-  { label: '助教', value: UserRole.TA },
-  { label: '教师', value: UserRole.TEACHER },
-  { label: '管理员', value: UserRole.ADMIN },
-  { label: '超级管理员', value: UserRole.ROOT }
-];
-
 const statusOptions = [
-  { label: '正常', value: 'normal' },
-  { label: '禁用', value: 'disabled' }
+  { label: '正常', value: USER_STATUS.NORMAL },
+  { label: '禁用', value: USER_STATUS.DISABLED },
 ];
 
-const targetUserOptions = computed(() => {
-  return userList.value
-    .filter(u => u.uid !== transferForm.sourceUid)
-    .map(u => ({
-      label: `${u.username} (${u.uid})`,
-      value: u.uid
-    }));
-});
+const message = useMessage();
 
-const getRoleLabel = (role: UserRole) => {
-  const map: Record<UserRole, string> = {
-    [UserRole.GUEST]: '游客',
-    [UserRole.STUDENT]: '学生',
-    [UserRole.TA]: '助教',
-    [UserRole.TEACHER]: '教师',
-    [UserRole.ADMIN]: '管理员',
-    [UserRole.ROOT]: '超管'
-  };
-  return map[role] || role;
-};
+const roleText = (roles: string[]) => normalizeRoles(roles).join(' / ') || '—';
 
-const getRoleType = (role: UserRole) => {
-  if (role === UserRole.ROOT) return 'error';
-  if (role === UserRole.ADMIN) return 'warning';
-  if (role === UserRole.TEACHER) return 'info';
-  if (role === UserRole.TA) return 'success';
-  return 'default';
-};
-
-// 筛选区学院变化
-const handleCollegeChange = async (value: string) => {
-  filters.grade = '';
-  filters.class = '';
-  if (value) {
-    await fetchGradesByCollege(value);
-  } else {
-    gradeOptions.value = [];
-    classOptions.value = [];
-  }
-};
-
-// 筛选区年级变化
-const handleGradeChange = async (value: string) => {
-  filters.class = '';
-  if (value && filters.college) {
-    await fetchClassesByCollegeAndGrade(filters.college, value);
-  } else {
-    classOptions.value = [];
-  }
-};
-
-// 编辑表单学院变化
-const handleEditCollegeChange = async (value: string) => {
-  editForm.grade = '';
-  editForm.class = '';
-  if (value) {
-    await fetchGradesByCollege(value);
-  } else {
-    gradeOptions.value = [];
-    classOptions.value = [];
-  }
-};
-
-// 编辑表单年级变化
-const handleEditGradeChange = async (value: string) => {
-  editForm.class = '';
-  if (value && editForm.college) {
-    await fetchClassesByCollegeAndGrade(editForm.college, value);
-  } else {
-    classOptions.value = [];
-  }
-};
-
-// 添加表单学院变化
-const handleAddCollegeChange = async (value: string) => {
-  addUserForm.grade = '';
-  addUserForm.class = '';
-  if (value) {
-    await fetchGradesByCollege(value);
-  } else {
-    gradeOptions.value = [];
-    classOptions.value = [];
-  }
-};
-
-// 添加表单年级变化
-const handleAddGradeChange = async (value: string) => {
-  addUserForm.class = '';
-  if (value && addUserForm.college) {
-    await fetchClassesByCollegeAndGrade(addUserForm.college, value);
-  } else {
-    classOptions.value = [];
-  }
-};
-
-// 文件上传变化
-const handleFileChange = (options: { fileList: UploadFileInfo[] }) => {
-  const firstFile = options.fileList[0];
-  if (firstFile?.file) {
-    importForm.file = firstFile.file as File;
-  } else {
-    importForm.file = null;
-  }
-};
-
-// 初始化加载学院列表
-onMounted(() => {
-  fetchColleges();
-});
+const getStatusText = (status: number) => (status === USER_STATUS.DISABLED ? '禁用' : '正常');
 
 const columns: DataTableColumns<UserItem> = [
-  {
-    type: 'selection'
-  },
+  { type: 'selection' },
   {
     title: 'UID',
     key: 'uid',
-    width: 140,
-    ellipsis: { tooltip: true }
+    width: 150,
+    ellipsis: { tooltip: true },
   },
   {
     title: '用户名',
     key: 'username',
     width: 140,
     ellipsis: { tooltip: true },
-    render: (row) => h('span', { style: 'font-weight: 500' }, row.username)
+    render: (row) => h('span', { style: 'font-weight: 500' }, row.username),
   },
   {
-    title: '邮箱',
-    key: 'email',
-    width: 200,
-    ellipsis: { tooltip: true }
+    title: '真实姓名',
+    key: 'realname',
+    width: 120,
+    ellipsis: { tooltip: true },
+    render: (row) => row.realname || '-',
+  },
+  {
+    title: '学院',
+    key: 'college',
+    width: 180,
+    ellipsis: { tooltip: true },
+    render: (row) => row.college || '-',
+  },
+  {
+    title: '年级',
+    key: 'grade',
+    width: 90,
+    ellipsis: { tooltip: true },
+    render: (row) => row.grade || '-',
   },
   {
     title: '班级',
-    key: 'class',
-    width: 120,
+    key: 'majorClass',
+    width: 140,
     ellipsis: { tooltip: true },
-    render: (row) => row.class || '-'
+    render: (row) => row.majorClass || '-',
   },
   {
     title: '角色',
-    key: 'role',
-    width: 100,
+    key: 'roles',
+    width: 150,
     render: (row) =>
       h(
         NTag,
-        { size: 'small', type: getRoleType(row.role), bordered: false },
-        () => getRoleLabel(row.role)
-      )
+        {
+          size: 'small',
+          type: row.primaryRole === 'ROOT' ? 'error' : row.primaryRole === 'ADMIN' ? 'warning' : 'default',
+          bordered: false,
+        },
+        () => roleText(row.roles),
+      ),
   },
   {
     title: '状态',
@@ -697,54 +568,18 @@ const columns: DataTableColumns<UserItem> = [
         NTag,
         {
           size: 'small',
-          type: row.status === 'normal' ? 'success' : 'error',
-          bordered: false
+          type: row.status === USER_STATUS.NORMAL ? 'success' : 'error',
+          bordered: false,
         },
-        () => (row.status === 'normal' ? '正常' : '禁用')
-      )
-  },
-  {
-    title: '成就数',
-    key: 'achievementCount',
-    width: 80,
-    align: 'center'
-  },
-  {
-    title: '最近登录',
-    key: 'lastLogin',
-    width: 160,
-    render: (row) => (row.lastLogin ? formatFullTime(row.lastLogin) : '-')
-  },
-  {
-    title: '注册时间',
-    key: 'registerTime',
-    width: 160,
-    render: (row) => formatFullTime(row.registerTime)
+        () => getStatusText(row.status),
+      ),
   },
   {
     title: '操作',
     key: 'actions',
-    width: 280,
+    width: 400,
     fixed: 'right',
     render(row) {
-      const moreOptions = [
-        {
-          label: '转移源码',
-          key: 'transfer',
-          icon: () => h(NIcon, { size: 16 }, () => h(SwapHorizontalOutline))
-        },
-        {
-          label: '添加成就',
-          key: 'achievement',
-          icon: () => h(NIcon, { size: 16 }, () => h(TrophyOutline))
-        },
-        {
-          label: '指定登录 IP',
-          key: 'ip',
-          icon: () => h(NIcon, { size: 16 }, () => h(LockClosedOutline))
-        }
-      ];
-
       return h(NSpace, { size: 'small' }, {
         default: () => [
           h(
@@ -753,9 +588,9 @@ const columns: DataTableColumns<UserItem> = [
               size: 'tiny',
               secondary: true,
               type: 'primary',
-              onClick: () => openEditModal(row)
+              onClick: () => openEditModal(row),
             },
-            { icon: () => h(CreateOutline), default: () => '编辑' }
+            { icon: () => h(CreateOutline), default: () => '编辑' },
           ),
           h(
             NButton,
@@ -763,9 +598,37 @@ const columns: DataTableColumns<UserItem> = [
               size: 'tiny',
               secondary: true,
               type: 'info',
-              onClick: () => openPasswordModal(row)
+              onClick: () => openPasswordModal(row),
             },
-            { icon: () => h(KeyOutline), default: () => '密码' }
+            { icon: () => h(KeyOutline), default: () => '密码' },
+          ),
+          h(
+            NButton,
+            {
+              size: 'tiny',
+              secondary: true,
+              onClick: () => openAchievementModal(row),
+            },
+            { icon: () => h(TrophyOutline), default: () => '成就' },
+          ),
+          h(
+            NButton,
+            {
+              size: 'tiny',
+              secondary: true,
+              onClick: () => openDetailModal(row),
+            },
+            { icon: () => h(EyeOutline), default: () => '详情' },
+          ),
+          h(
+            NButton,
+            {
+              size: 'tiny',
+              secondary: true,
+              loading: checking.value,
+              onClick: () => handleCheckUser(row.uid),
+            },
+            { icon: () => h(SearchOutline), default: () => '查验' },
           ),
           h(
             NButton,
@@ -773,40 +636,36 @@ const columns: DataTableColumns<UserItem> = [
               size: 'tiny',
               secondary: true,
               type: 'error',
-              onClick: () => handleDelete(row)
+              onClick: () => handleDelete(row),
             },
-            { icon: () => h(TrashOutline), default: () => '删除' }
+            { icon: () => h(TrashOutline), default: () => '删除' },
           ),
-          h(
-            NDropdown,
-            {
-              options: moreOptions,
-              onSelect: (key: string) => {
-                if (key === 'transfer') openTransferModal(row);
-                else if (key === 'achievement') openAchievementModal(row);
-                else if (key === 'ip') openIpModal(row);
-              }
-            },
-            {
-              default: () =>
-                h(
-                  NButton,
-                  { size: 'tiny', secondary: true },
-                  { icon: () => h(EllipsisHorizontalOutline), default: () => '更多' }
-                )
-            }
-          )
-        ]
+        ],
       });
-    }
-  }
+    },
+  },
 ];
+
+onMounted(async () => {
+  try {
+    await fetchColleges();
+  } catch (err) {
+    // composable 不吞错，这里显式提示真实的学院加载错误
+    message.error(err instanceof Error ? err.message : '加载学院列表失败');
+  }
+  void fetchUsers();
+});
 </script>
 
 <style scoped lang="less">
 .user-list-page {
   :deep(.n-data-table) {
     font-size: 13px;
+  }
+
+  .tip-text {
+    font-size: 12px;
+    color: #999;
   }
 }
 </style>

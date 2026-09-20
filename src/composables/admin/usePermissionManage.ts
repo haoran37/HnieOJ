@@ -1,16 +1,29 @@
 import { ref, reactive } from 'vue';
 import { useMessage, useDialog } from 'naive-ui';
-import { UserRole } from '@/stores/userStore';
+import {
+  batchRevokePermissions,
+  getPermissionUsers,
+  grantPermissions,
+  revokeUserPermission,
+  searchAdminUsers,
+  updateUserPermission,
+  type PermissionUserVo,
+  type UserSearchVo,
+} from '@/utils/api';
+
+// 后端 resolveManageableRoleId 只接受 admin/teacher/ta（大小写不敏感，RoleConstant 为小写）
+export type ManageableRole = 'TA' | 'TEACHER' | 'ADMIN';
 
 // 权限用户接口
 export interface PermissionUserItem {
   uid: string;
-  username: string; // 姓名
+  username: string;
   college: string;
-  majorClass: string; // 专业班级
+  majorClass: string;
   email: string;
   phone: string;
-  role: UserRole;
+  // 后端返回的全部真实角色（小写），不丢多角色
+  roles: string[];
 }
 
 // 搜索结果用户接口
@@ -19,7 +32,29 @@ export interface SearchUserItem {
   username: string;
   majorClass: string;
   college: string;
-  role: UserRole;
+  roles: string[];
+}
+
+export function toPermissionUserItem(vo: PermissionUserVo): PermissionUserItem {
+  return {
+    uid: vo.uid,
+    username: vo.username ?? '',
+    college: vo.college ?? '',
+    majorClass: vo.majorClass ?? '-',
+    email: vo.email ?? '',
+    phone: vo.phone ?? '',
+    roles: vo.roles ?? [],
+  };
+}
+
+export function toSearchUserItem(vo: UserSearchVo): SearchUserItem {
+  return {
+    uid: vo.uid,
+    username: vo.username ?? '',
+    majorClass: vo.majorClass ?? '-',
+    college: vo.college ?? '',
+    roles: vo.roles ?? [],
+  };
 }
 
 export function usePermissionManage() {
@@ -42,52 +77,30 @@ export function usePermissionManage() {
     pageSize: 10,
     itemCount: 0,
     onChange: (page: number) => {
+      // 翻页保留用户请求的页码
       searchPagination.page = page;
-      handleSearch();
-    }
+      void fetchSearchResults();
+    },
   });
   const selectedSearchUserIds = ref<string[]>([]);
-  const selectedPermission = ref<UserRole | null>(null);
+  const selectedPermission = ref<ManageableRole | null>(null);
 
   // 权限列表相关
-  const permissionUserList = ref<PermissionUserItem[]>([
-    {
-      uid: '202202050232',
-      username: '张老师',
-      college: '信息科学与工程学院',
-      majorClass: '-',
-      email: 'teacher01@hnie.edu.cn',
-      phone: '13800138000',
-      role: UserRole.TEACHER
-    },
-    {
-      uid: '202202050233',
-      username: '李管理员',
-      college: '信息科学与工程学院',
-      majorClass: '-',
-      email: 'admin01@hnie.edu.cn',
-      phone: '13900139000',
-      role: UserRole.ADMIN
-    },
-    {
-      uid: '202202050234',
-      username: '王助教',
-      college: '信息科学与工程学院',
-      majorClass: '计算机2202',
-      email: 'ta01@hnie.edu.cn',
-      phone: '13700137000',
-      role: UserRole.TA
-    }
-  ]);
-  
+  const permissionUserList = ref<PermissionUserItem[]>([]);
+
   const pagination = reactive({
     page: 1,
     pageSize: 10,
-    itemCount: permissionUserList.value.length,
+    itemCount: 0,
     onChange: (page: number) => {
       pagination.page = page;
-      fetchPermissionUsers();
-    }
+      void fetchPermissionUsers();
+    },
+    onUpdatePageSize: (pageSize: number) => {
+      pagination.pageSize = pageSize;
+      pagination.page = 1;
+      void fetchPermissionUsers();
+    },
   });
 
   const selectedUserIds = ref<string[]>([]);
@@ -96,77 +109,68 @@ export function usePermissionManage() {
   const editForm = reactive({
     uid: '',
     username: '',
-    role: null as UserRole | null
+    role: null as ManageableRole | null,
   });
 
-  // 权限选项
+  // 权限选项（请求值使用后端可识别的大写角色名）
   const roleOptions = [
-    { label: '助教 (TA)', value: UserRole.TA },
-    { label: '教师 (TEACHER)', value: UserRole.TEACHER },
-    { label: '管理员 (ADMIN)', value: UserRole.ADMIN }
+    { label: '助教 (TA)', value: 'TA' },
+    { label: '教师 (TEACHER)', value: 'TEACHER' },
+    { label: '管理员 (ADMIN)', value: 'ADMIN' },
   ];
 
   // 获取权限用户列表
   const fetchPermissionUsers = async () => {
     loading.value = true;
-    // TODO: 调用 GET /api/admin/permission/users 获取权限用户列表
-    console.log(`API: GET /api/admin/permission/users?page=${pagination.page}&pageSize=${pagination.pageSize}`);
-    
-    // 模拟延迟
-    setTimeout(() => {
+    try {
+      const data = await getPermissionUsers(pagination.page, pagination.pageSize);
+      permissionUserList.value = (data?.list ?? []).map(toPermissionUserItem);
+      pagination.itemCount = data?.total ?? 0;
+    } catch (err) {
+      permissionUserList.value = [];
+      pagination.itemCount = 0;
+      message.error(err instanceof Error ? err.message : '加载权限用户失败');
+    } finally {
       loading.value = false;
-    }, 500);
+    }
   };
 
-  // 搜索用户
-  const handleSearch = async () => {
-    if (!searchQuery.value) {
-      // message.warning('请输入UID或姓名');
-      // return;
-      // 允许空搜索显示所有（模拟）
+  // 搜索用户（后端要求 query 不能为空）；沿用当前页码，供翻页复用
+  const fetchSearchResults = async () => {
+    const query = searchQuery.value.trim();
+    if (!query) {
+      message.warning('请输入 UID 或姓名');
+      return;
     }
     searchLoading.value = true;
-    // TODO: 调用 GET /api/admin/users/search 搜索用户
-    console.log(`API: GET /api/admin/users/search?query=${searchQuery.value}&page=${searchPagination.page}&pageSize=${searchPagination.pageSize}`);
-
-    // 模拟数据
-    setTimeout(() => {
-      searchResultList.value = [
-        {
-          uid: '202202050235',
-          username: '赵学生',
-          majorClass: '软件2201',
-          college: '信息科学与工程学院',
-          role: UserRole.STUDENT
-        },
-        {
-          uid: '202202050236',
-          username: '钱学生',
-          majorClass: '计算机2201',
-          college: '信息科学与工程学院',
-          role: UserRole.STUDENT
-        },
-        {
-          uid: '202202050237',
-          username: '孙学生',
-          majorClass: '网络2201',
-          college: '信息科学与工程学院',
-          role: UserRole.STUDENT
-        }
-      ].filter(u => u.username.includes(searchQuery.value) || u.uid.includes(searchQuery.value));
-      searchPagination.itemCount = searchResultList.value.length;
+    try {
+      const data = await searchAdminUsers(query, searchPagination.page, searchPagination.pageSize);
+      searchResultList.value = (data?.list ?? []).map(toSearchUserItem);
+      searchPagination.itemCount = data?.total ?? 0;
+    } catch (err) {
+      searchResultList.value = [];
+      searchPagination.itemCount = 0;
+      message.error(err instanceof Error ? err.message : '搜索用户失败');
+    } finally {
       searchLoading.value = false;
-    }, 500);
+    }
   };
 
-  // 打开添加模态框
+  // 点击搜索 / 回车：回到第 1 页再查询
+  const handleSearch = () => {
+    searchPagination.page = 1;
+    return fetchSearchResults();
+  };
+
+  // 打开添加模态框（不自动搜索，避免空 query 触发后端 400）
   const openAddModal = () => {
     searchQuery.value = '';
     searchResultList.value = [];
+    searchPagination.page = 1;
+    searchPagination.itemCount = 0;
     selectedSearchUserIds.value = [];
     selectedPermission.value = null;
     showAddModal.value = true;
-    handleSearch(); // 初始加载一些数据
   };
 
   // 提交添加权限
@@ -181,40 +185,23 @@ export function usePermissionManage() {
     }
 
     submitting.value = true;
-    // TODO: 调用 POST /api/admin/permission/grant 批量赋予权限
-    console.log('API: POST /api/admin/permission/grant', {
-      uids: selectedSearchUserIds.value,
-      role: selectedPermission.value
-    });
-
-    setTimeout(() => {
-      // 模拟添加到列表
-      const newUsers = searchResultList.value
-        .filter(u => selectedSearchUserIds.value.includes(u.uid))
-        .map(u => ({
-          uid: u.uid,
-          username: u.username,
-          college: u.college,
-          majorClass: u.majorClass,
-          email: `${u.uid}@hnie.edu.cn`, // 模拟邮箱
-          phone: '13800000000', // 模拟手机
-          role: selectedPermission.value!
-        }));
-      
-      permissionUserList.value.push(...newUsers);
-      pagination.itemCount = permissionUserList.value.length;
-
+    try {
+      await grantPermissions([...selectedSearchUserIds.value], selectedPermission.value);
       message.success('权限添加成功');
-      submitting.value = false;
       showAddModal.value = false;
-    }, 500);
+      await fetchPermissionUsers();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '权限添加失败');
+    } finally {
+      submitting.value = false;
+    }
   };
 
   // 打开编辑模态框
   const openEditModal = (user: PermissionUserItem) => {
     editForm.uid = user.uid;
     editForm.username = user.username;
-    editForm.role = user.role;
+    editForm.role = pickManageableRole(user.roles);
     showEditModal.value = true;
   };
 
@@ -225,24 +212,16 @@ export function usePermissionManage() {
       return;
     }
     submitting.value = true;
-    // TODO: 调用 PUT /api/admin/permission/update 更新用户权限
-    console.log('API: PUT /api/admin/permission/update', {
-      uid: editForm.uid,
-      role: editForm.role
-    });
-
-    setTimeout(() => {
-      const index = permissionUserList.value.findIndex(u => u.uid === editForm.uid);
-      if (index !== -1 && editForm.role) {
-        const user = permissionUserList.value[index];
-        if (user) {
-          user.role = editForm.role;
-        }
-      }
+    try {
+      await updateUserPermission(editForm.uid, editForm.role);
       message.success('权限修改成功');
-      submitting.value = false;
       showEditModal.value = false;
-    }, 500);
+      await fetchPermissionUsers();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '权限修改失败');
+    } finally {
+      submitting.value = false;
+    }
   };
 
   // 删除权限（回归学生）
@@ -252,18 +231,18 @@ export function usePermissionManage() {
       content: `确定要删除用户 "${user.username}" (${user.uid}) 的权限吗？该用户将回归 STUDENT 身份。`,
       positiveText: '确定删除',
       negativeText: '取消',
-      onPositiveClick: () => {
+      onPositiveClick: async () => {
         loading.value = true;
-        // TODO: 调用 DELETE /api/admin/permission/revoke 撤销权限
-        console.log('API: DELETE /api/admin/permission/revoke', { uid: user.uid });
-
-        setTimeout(() => {
-          permissionUserList.value = permissionUserList.value.filter(u => u.uid !== user.uid);
-          pagination.itemCount = permissionUserList.value.length;
+        try {
+          await revokeUserPermission(user.uid);
           message.success('权限已删除，用户回归 STUDENT 身份');
+          await fetchPermissionUsers();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : '权限删除失败');
+        } finally {
           loading.value = false;
-        }, 500);
-      }
+        }
+      },
     });
   };
 
@@ -273,24 +252,25 @@ export function usePermissionManage() {
       message.warning('请先选择用户');
       return;
     }
+    const count = selectedUserIds.value.length;
     dialog.warning({
       title: '批量删除权限确认',
-      content: `确定要删除选中的 ${selectedUserIds.value.length} 个用户的权限吗？这些用户将回归 STUDENT 身份。`,
+      content: `确定要删除选中的 ${count} 个用户的权限吗？这些用户将回归 STUDENT 身份。`,
       positiveText: '确定删除',
       negativeText: '取消',
-      onPositiveClick: () => {
+      onPositiveClick: async () => {
         loading.value = true;
-        // TODO: 调用 DELETE /api/admin/permission/batch-revoke 批量撤销权限
-        console.log('API: DELETE /api/admin/permission/batch-revoke', { uids: selectedUserIds.value });
-
-        setTimeout(() => {
-          permissionUserList.value = permissionUserList.value.filter(u => !selectedUserIds.value.includes(u.uid));
-          pagination.itemCount = permissionUserList.value.length;
+        try {
+          await batchRevokePermissions([...selectedUserIds.value]);
           selectedUserIds.value = [];
-          message.success(`已删除 ${selectedUserIds.value.length} 个用户的权限`);
+          message.success(`已删除 ${count} 个用户的权限`);
+          await fetchPermissionUsers();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : '批量删除权限失败');
+        } finally {
           loading.value = false;
-        }, 500);
-      }
+        }
+      },
     });
   };
 
@@ -317,6 +297,19 @@ export function usePermissionManage() {
     openEditModal,
     handleEditSubmit,
     handleDelete,
-    handleBatchDelete
+    handleBatchDelete,
   };
+}
+
+/**
+ * 从后端角色列表中挑选当前可管理的角色用于编辑回显。
+ * 提交编辑会替换该用户既有的可管理角色（不是追加），因此编辑弹窗需明确提示。
+ */
+export function pickManageableRole(roles: readonly string[] | null | undefined): ManageableRole | null {
+  if (!roles) return null;
+  const upper = roles.map((role) => role.toUpperCase());
+  if (upper.includes('ADMIN')) return 'ADMIN';
+  if (upper.includes('TEACHER')) return 'TEACHER';
+  if (upper.includes('TA')) return 'TA';
+  return null;
 }

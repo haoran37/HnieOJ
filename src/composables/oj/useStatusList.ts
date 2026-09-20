@@ -1,111 +1,125 @@
 import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { formatFullTime } from '@/composables/useTime';
+import { getSubmissions } from '@/utils/api';
+import { submissionStatusText } from '@/types/submission';
 
-// 提交记录接口
+// 提交记录视图模型（字段由后端 SubmissionListItemVo 映射而来）
 export interface Submission {
-  id: string;          // Run ID
-  studentId: string;   // 学号
-  username: string;    // 用户名
-  problemId: string;   // 题目 ID
-  problemTitle: string;// 题目名称
-  status: string;      // 判题状态
-  language: string;    // 语言
-  time: string;        // 耗时 (如 15ms)
-  memory: string;      // 内存 (如 1464KB)
-  submitTime: string;  // 提交时间
-  contestId?: string;  // 比赛 ID (可选)
+  id: string;          // submissionId
+  studentId: string;   // uid
+  username: string;
+  problemId: string;   // 展示编号 problemCode
+  problemTitle: string;
+  status: string;      // statusText（后端已给中文/英文文案）
+  language: string;
+  time: string;        // 毫秒，形如 15 MS
+  memory: string;      // KB
+  submitTime: string;
+  contestId?: string;
+}
+
+export interface StatusFilters {
+  problem: string;
+  user: string;
+  language: string | null;
+  status: number | null;
 }
 
 export function useStatusList() {
   const route = useRoute();
 
   const loading = ref(false);
+  const error = ref<string | null>(null);
   const listData = ref<Submission[]>([]);
   const total = ref(0);
   const page = ref(1);
   const pageSize = ref(20);
 
   // 筛选表单
-  const filters = ref({
-    problem: '', // 题目ID或名称
-    user: '',    // 学号或用户名
-    language: null as string | null,
-    status: null as string | null
+  const filters = ref<StatusFilters>({
+    problem: (route.query.pid as string) || '',
+    user: '',
+    language: null,
+    status: null,
   });
 
-  // 获取 URL 中的比赛 ID
-  const contestId = ref(route.query.cid as string || '');
+  // 获取 URL 中的比赛 ID（前端使用 cid 查询参数）
+  const contestId = ref((route.query.cid as string) || '');
+
+  // 局部请求序号：分页/筛选/路由 query 连续变化时，旧响应不得覆盖新查询
+  let seq = 0;
 
   const fetchStatus = async () => {
+    const current = ++seq;
     loading.value = true;
-    
-    // 构造请求参数
-    const params = {
-      page: page.value,
-      size: pageSize.value,
-      ...filters.value,
-      cid: contestId.value
-    };
-
-    console.log('Fetching Status:', params);
-
-    // TODO: 替换真实api
-    setTimeout(() => {
-      // 模拟数据生成
-      listData.value = Array.from({ length: 20 }, (_, i) => {
-        const id = 8000 + i;
-        const statusPool = [
-          'Accepted', 'Wrong Answer', 'Time Limit Exceeded', 
-          'Memory Limit Exceeded', 'Compilation Error', 'Pending', 'Judging'
-        ];
-        
-        const status = statusPool[Math.floor(Math.random() * statusPool.length)] as string;
-        
-        const languages = ['C', 'C++', 'Java', 'Python3', 'Go'];
-        const language = languages[i % 3] as string;
-
-        return {
-          id: String(id),
-          studentId: `202212340${100 + i}`,
-          username: `user_${id}`,
-          problemId: String(1000 + (i % 5)),
-          problemTitle: i % 2 === 0 ? 'A+B Problem' : 'Matrix Multiplication',
-          status: status,
-          language: language,
-          time: status === 'Accepted' ? `${Math.floor(Math.random() * 500)} MS` : '--',
-          memory: status === 'Accepted' ? `${Math.floor(Math.random() * 10000)} KB` : '--',
-          submitTime: formatFullTime(new Date()),
-          contestId: contestId.value || undefined
-        };
+    error.value = null;
+    try {
+      const result = await getSubmissions({
+        page: page.value,
+        pageSize: pageSize.value,
+        problemCode: filters.value.problem.trim() || undefined,
+        language: filters.value.language || undefined,
+        status: filters.value.status ?? undefined,
+        uid: filters.value.user.trim() || undefined,
+        contestId: contestId.value || undefined,
       });
-      total.value = 1450;
-      loading.value = false;
-    }, 400);
+      if (current !== seq) return;
+      listData.value = (result?.list ?? []).map((item) => ({
+        id: item.submissionId,
+        studentId: item.uid ?? '',
+        username: item.username ?? '',
+        problemId: item.problemCode,
+        // 列表 VO 不含题目标题，用编号占位并保持可跳转
+        problemTitle: item.problemCode,
+        status: submissionStatusText(item.status, item.statusText),
+        language: item.language,
+        time: item.time !== null && item.time !== undefined ? `${item.time} MS` : '--',
+        memory: item.memory !== null && item.memory !== undefined ? `${item.memory} KB` : '--',
+        submitTime: formatFullTime(item.gmtCreate),
+        contestId: item.contestId ? String(item.contestId) : undefined,
+      }));
+      total.value = result?.total ?? 0;
+    } catch (err) {
+      if (current !== seq) return;
+      listData.value = [];
+      total.value = 0;
+      error.value = err instanceof Error ? err.message : '提交记录加载失败';
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
   const handlePageChange = (p: number) => {
     page.value = p;
-    fetchStatus();
+    void fetchStatus();
   };
 
   const handleSearch = () => {
     page.value = 1;
-    fetchStatus();
+    void fetchStatus();
   };
 
   const handleRefresh = () => {
-    fetchStatus();
+    void fetchStatus();
   };
 
-  // 监听路由参数变化 (从比赛切回普通列表)
+  // 监听路由参数变化 (从比赛切回普通列表；题目详情带 pid 进入时按题号过滤)
   watch(() => route.query.cid, (newCid) => {
     contestId.value = (newCid as string) || '';
+    page.value = 1;
+    handleRefresh();
+  });
+
+  watch(() => route.query.pid, (newPid) => {
+    filters.value.problem = (newPid as string) || '';
+    page.value = 1;
     handleRefresh();
   });
 
   return {
     loading,
+    error,
     listData,
     total,
     page,

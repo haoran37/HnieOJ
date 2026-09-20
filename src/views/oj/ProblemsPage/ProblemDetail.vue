@@ -1,12 +1,15 @@
 <template>
   <div class="problem-detail-container">
     <n-spin :show="loading">
+      <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">
+        {{ error }}
+      </n-alert>
       
       <n-card :bordered="false" class="header-card">
         <div class="header-content">
           <div class="title-section">
             <h1 class="problem-title">
-              <span class="pid">{{ problem.id }}</span>
+              <span class="pid">{{ problem.problemCode }}</span>
               {{ problem.title }}
             </h1>
           </div>
@@ -18,7 +21,7 @@
             </div>
             <div class="stat-item">
               <n-icon size="16" color="#666"><HardwareChipIcon /></n-icon>
-              <span>Memory Limit: <span class="highlight">{{ problem.memoryLimit }}KB</span></span>
+              <span>Memory Limit: <span class="highlight">{{ problem.memoryLimit }}MB</span></span>
             </div>
             <div class="stat-item">
               <n-icon size="16" color="#666"><BarChartIcon /></n-icon>
@@ -40,7 +43,7 @@
           <n-card :bordered="false" class="problem-card">
             
             <div v-if="isSubmitMode">
-              <ProblemSubmit />
+              <ProblemSubmit :problem-code="problem.problemCode" :contest-id="(route.query.cid as string) || undefined" />
             </div>
 
             <div v-else>
@@ -49,14 +52,14 @@
                 <v-md-preview :text="problem.description"></v-md-preview>
               </div>
 
-              <div class="section-block" v-if="problem.inputFormat">
+              <div class="section-block" v-if="problem.input">
                 <div class="section-title">输入格式</div>
-                <v-md-preview :text="problem.inputFormat"></v-md-preview>
+                <v-md-preview :text="problem.input"></v-md-preview>
               </div>
 
-              <div class="section-block" v-if="problem.outputFormat">
+              <div class="section-block" v-if="problem.output">
                 <div class="section-title">输出格式</div>
-                <v-md-preview :text="problem.outputFormat"></v-md-preview>
+                <v-md-preview :text="problem.output"></v-md-preview>
               </div>
 
               <div class="section-block" v-for="(sample, index) in problem.examples" :key="index">
@@ -94,8 +97,8 @@
               <div class="section-block" v-if="problem.source">
                 <div class="section-title">来源</div>
                   <div class="problem-tag">
-                    <n-tag v-for="tag in problem.source" :key="tag" size="medium" :bordered="false" type="default">
-                      {{ tag }}
+                    <n-tag size="medium" :bordered="false" type="default">
+                      {{ problem.source }}
                     </n-tag>
                   </div>
               </div>
@@ -115,7 +118,7 @@
                 </div>
                 <div class="info-row">
                   <span class="label">提交记录</span>
-                  <button class="value link link-btn" type="button" @click="$router.push(`/status?pid=${problem.id}`)">查看记录</button>
+                  <button class="value link link-btn" type="button" @click="$router.push(`/status?pid=${problem.problemCode}`)">查看记录</button>
                 </div>
                 <div class="info-row">
                   <span class="label">难度</span>
@@ -164,6 +167,9 @@
             <n-card :bordered="false" size="small" class="sidebar-card">
               <n-collapse arrow-placement="right">
                 <n-collapse-item title="相关讨论" name="1">
+                  <n-alert v-if="relatedError" type="warning" :bordered="false" size="small" style="margin-bottom: 8px">
+                    {{ relatedError }}
+                  </n-alert>
                   <div v-if="relatedDiscussions.length > 0">
                     <n-list hoverable clickable size="small" class="rec-list">
                       <n-list-item v-for="discuss in relatedDiscussions" :key="discuss.id">
@@ -185,17 +191,35 @@
             <n-card :bordered="false" size="small" class="sidebar-card">
               <n-collapse arrow-placement="right" :default-expanded-names="['2']">
                 <n-collapse-item title="推荐题目" name="2">
-                  <n-list hoverable clickable size="small" class="rec-list">
-                    <n-list-item v-for="rec in recommendedProblems" :key="rec.id">
-                      <div class="rec-item" @click="handleRecClick(rec.id)">
-                        <div class="status-icon">
-                          <component :is="renderStatusIcon(userStore.getProblemStatus(rec.id), 16)" />
-                        </div>
-                        <span class="rec-id">{{ rec.id }}</span>
-                        <span class="rec-title" :title="rec.title">{{ rec.title }}</span>
-                      </div>
-                    </n-list-item>
-                  </n-list>
+                  <n-spin :show="recLoading" size="small">
+                    <n-alert v-if="recError" type="warning" :bordered="false" size="small" style="margin-bottom: 8px">
+                      {{ recError }}
+                      <n-button size="tiny" secondary type="warning" style="margin-left: 8px"
+                        @click="fetchRecommendations(problem.problemCode)">
+                        重试
+                      </n-button>
+                    </n-alert>
+                    <n-empty
+                      v-else-if="recommendedProblems.length === 0 && !recLoading"
+                      description="暂无推荐"
+                      size="small"
+                    />
+                    <n-list v-else hoverable clickable size="small" class="rec-list">
+                      <n-list-item v-for="rec in recommendedProblems" :key="rec.problemCode">
+                        <a
+                          class="rec-item"
+                          :href="`/problem/${rec.problemCode}`"
+                          @click.prevent="handleRecClick(rec.problemCode)"
+                        >
+                          <div class="status-icon">
+                            <component :is="renderStatusIcon(userStore.getProblemStatus(rec.id), 16)" />
+                          </div>
+                          <span class="rec-id">{{ rec.problemCode }}</span>
+                          <span class="rec-title" :title="rec.title">{{ rec.title }}</span>
+                        </a>
+                      </n-list-item>
+                    </n-list>
+                  </n-spin>
                 </n-collapse-item>
               </n-collapse>
             </n-card>
@@ -222,6 +246,8 @@ import {
 } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
 import { renderStatusIcon } from '@/utils/statusUtils';
+import { getProblemDetail, getProblemRecommendations, getRelatedDiscussions } from '@/utils/api';
+import { difficultyLabel } from '@/types/problem';
 import ProblemSubmit from './components/ProblemSubmit.vue';
 
 interface ProblemSample {
@@ -230,7 +256,7 @@ interface ProblemSample {
 }
 
 interface Problem {
-  id: string;
+  problemCode: string;
   title: string;
   timeLimit: number;
   memoryLimit: number;
@@ -239,10 +265,10 @@ interface Problem {
   difficulty: string;
   uploader: string;
   tags: string[];
-  source: string[];
+  source: string;
   description: string;
-  inputFormat: string;
-  outputFormat: string;
+  input: string;
+  output: string;
   examples: ProblemSample[];
   hint: string;
 }
@@ -253,28 +279,34 @@ const message = useMessage();
 const userStore = useUserStore();
 
 const loading = ref(false);
+const error = ref<string | null>(null);
 const isSubmitMode = ref(false); // 是否处于提交模式
 
-const problem = ref<Problem>({
-  id: '',
+const emptyProblem = (): Problem => ({
+  problemCode: '',
   title: '',
   timeLimit: 0,
   memoryLimit: 0,
   accepted: 0,
   submitted: 0,
-  difficulty: '',
+  difficulty: '未评级',
   uploader: '',
   tags: [],
-  source: [],
+  source: '',
   description: '',
-  inputFormat: '',
-  outputFormat: '',
+  input: '',
+  output: '',
   examples: [],
-  hint: ''
+  hint: '',
 });
 
+const problem = ref<Problem>(emptyProblem());
+
 interface RecommendedProblem {
+  /** 内部数字 id，仅用于本地做题状态展示 */
   id: string;
+  /** 展示编号，用于导航与去重 */
+  problemCode: string;
   title: string;
 }
 
@@ -284,69 +316,89 @@ interface RelatedDiscussion {
 }
 
 const recommendedProblems = ref<RecommendedProblem[]>([]);
+const recLoading = ref(false);
+const recError = ref<string | null>(null);
 const relatedDiscussions = ref<RelatedDiscussion[]>([]);
+const relatedError = ref<string | null>(null);
 
-const fetchProblemDetail = async (pid: string) => {
+// 路由 ID 变更时旧响应必须作废，避免混入上一题的题面
+let detailSeq = 0;
+let relatedSeq = 0;
+let recSeq = 0;
+
+const fetchRecommendations = async (problemCode: string) => {
+  const seq = ++recSeq;
+  if (!problemCode) return;
+  recLoading.value = true;
+  recError.value = null;
+  // 切换题目时同步清空旧结果，避免上一题推荐留在当前题
+  recommendedProblems.value = [];
+  try {
+    const list = await getProblemRecommendations(problemCode, 5);
+    if (seq !== recSeq) return;
+    recommendedProblems.value = (list ?? []).map((item) => ({
+      id: String(item.id),
+      problemCode: item.problemCode,
+      title: item.title,
+    }));
+  } catch (err) {
+    if (seq !== recSeq) return;
+    recommendedProblems.value = [];
+    recError.value = err instanceof Error ? err.message : '推荐题目加载失败';
+  } finally {
+    if (seq === recSeq) recLoading.value = false;
+  }
+};
+
+const fetchRelatedDiscussions = async (problemCode: string) => {
+  const seq = ++relatedSeq;
+  relatedError.value = null;
+  try {
+    const list = await getRelatedDiscussions(problemCode, 5);
+    if (seq !== relatedSeq) return;
+    relatedDiscussions.value = (list ?? []).map((item) => ({ id: String(item.id), title: item.title }));
+  } catch (err) {
+    if (seq !== relatedSeq) return;
+    relatedDiscussions.value = [];
+    relatedError.value = err instanceof Error ? err.message : '相关讨论加载失败';
+  }
+};
+
+const fetchProblemDetail = async (problemCode: string) => {
+  const seq = ++detailSeq;
   loading.value = true;
-  
-  setTimeout(() => {
+  error.value = null;
+  try {
+    const detail = await getProblemDetail(problemCode);
+    if (seq !== detailSeq) return;
     problem.value = {
-      id: pid,
-      title: '奶牛的二叉搜索树',
-      timeLimit: 1000,
-      memoryLimit: 256,
-      accepted: 30,
-      submitted: 192,
-      difficulty: '困难',
-      uploader: 'VinstaG173',
-      tags: ['树', 'DP', '搜索', '组合数学'],
-      source: ['洛谷'],
-      description: `
-为了迎接新年，Farmer John 决定给他的奶牛们一个节点数为 $N$ 的二叉搜索树！
-
-为了生成这个二叉搜索树，Farmer John 从一个 $1 \\dots N$ 的排列 $a = \\{1, 2, \\dots, N\\}$ 开始。然后他运行如下的伪代码：
-
-\`\`\`cpp
-generate(l, r):
-  if l > r, return empty subtree;
-  x = argmin_{l <= i <= r} a_i; // index of min a_i in {a_l, ..., a_r}
-  return a BST with x as the root, 
-    generate(l, x-1) as the left subtree,
-    generate(x+1, r) as the right subtree;
-\`\`\`
-
-例如，排列 $\\{3, 2, 5, 1, 4\\}$ 将产生如下的二叉搜索树：
-
-![BST示例](https://cdn.luogu.com.cn/upload/image_hosting/gw6ursc0.png)
-      `,
-      inputFormat: `输入只有一行，包含三个整数 $N, K, M$。`,
-      outputFormat: `输出一行 $N$ 个整数，第 $i$ 个整数表示 $\\sum_a d_i(a) \\pmod M$。`,
-      examples: [
-        { input: "3 0 19260817", output: "1 2 3" },
-        { input: "3 1 144408983", output: "3 4 4" }
-      ],
-      hint: `
-**数据范围**
-
-对于全部数据，$1 \\le N \\le 300$， $0 \\le K \\le \\frac{N(N-1)}{2}$。
-      `
+      problemCode: detail.problemCode,
+      title: detail.title,
+      timeLimit: detail.timeLimit ?? 0,
+      memoryLimit: detail.memoryLimit ?? 0,
+      accepted: detail.acceptedCount ?? 0,
+      submitted: detail.submissionCount ?? 0,
+      difficulty: difficultyLabel(detail.difficulty),
+      uploader: detail.author ?? '',
+      // 后端题目详情 VO 暂未返回标签，详情页标签区保持为空
+      tags: [],
+      source: detail.source ?? '',
+      description: detail.description ?? '',
+      input: detail.input ?? '',
+      output: detail.output ?? '',
+      examples: (detail.examples ?? [])
+        .filter((item) => (item.input ?? '') !== '' || (item.output ?? '') !== '')
+        .map((item) => ({ input: item.input ?? '', output: item.output ?? '' })),
+      hint: detail.hint ?? '',
     };
-
-    recommendedProblems.value = [
-      { id: '1001', title: 'A+B Problem (High Precision)' }, 
-      { id: '1002', title: '矩阵乘法' },    
-      { id: '1005', title: '线段树模版' },
-      { id: '1007', title: '最长公共子序列' }   
-    ];
-
-    relatedDiscussions.value = [
-      { id: '1001', title: '这个题的数据范围是不是有问题？' },
-      { id: '1002', title: '求助，为什么第二个点过不去' },
-      { id: '1003', title: 'Python 3 AC代码分享' }
-    ];
-
-    loading.value = false;
-  }, 300);
+  } catch (err) {
+    if (seq !== detailSeq) return;
+    problem.value = emptyProblem();
+    relatedDiscussions.value = [];
+    error.value = err instanceof Error ? err.message : '题目详情加载失败';
+  } finally {
+    if (seq === detailSeq) loading.value = false;
+  }
 };
 
 // 兼容性复制函数
@@ -383,8 +435,8 @@ const fallbackCopyText = (text: string) => {
   document.body.removeChild(textArea);
 };
 
-const handleRecClick = (id: string) => {
-  router.push(`/problem/${id}`);
+const handleRecClick = (problemCode: string) => {
+  router.push(`/problem/${problemCode}`);
   isSubmitMode.value = false;
 };
 
@@ -393,7 +445,7 @@ const handleDiscussClick = (id: string) => {
 };
 
 const handleCreateDiscuss = () => {
-  router.push(`/discuss/add?problemId=${problem.value.id}`);
+  router.push(`/discuss/add?problemCode=${encodeURIComponent(problem.value.problemCode)}`);
 };
 
 // 切换提交模式
@@ -406,15 +458,25 @@ watch(
   () => route.params.id,
   (newId) => {
     if (newId) {
-      fetchProblemDetail(newId as string);
+      void fetchProblemDetail(newId as string);
+      void fetchRelatedDiscussions(newId as string);
+      void fetchRecommendations(newId as string);
       isSubmitMode.value = false;
     }
-  }
+  },
+  // 路由变更必须同步作废旧请求：抢在渲染/请求前清空上一题推荐并递增序号
+  { flush: 'sync' },
 );
 
 onMounted(() => {
-  const pid = (route.params.id as string) || 'P1001';
-  fetchProblemDetail(pid);
+  const pid = route.params.id as string;
+  if (!pid) {
+    error.value = '缺少题目编号';
+    return;
+  }
+  void fetchProblemDetail(pid);
+  void fetchRelatedDiscussions(pid);
+  void fetchRecommendations(pid);
 });
 </script>
 
@@ -622,6 +684,14 @@ onMounted(() => {
   cursor: pointer;
   padding: 4px 0;
   flex-wrap: wrap;
+  text-decoration: none;
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--oj-color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
   
   .status-icon {
     display: flex;

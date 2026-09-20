@@ -36,9 +36,6 @@
       <div class="footer-actions">
         <div class="upload-area">
           <n-upload
-            action="https://www.mocky.io/v2/5e4bafc63100007100d8b70f"
-            :headers="{ 'naive-info': 'hello!' }"
-            :data="{ 'naive-data': 'cool! naive!' }"
             :default-upload="false"
             :max="1"
             @change="handleFileChange"
@@ -75,13 +72,18 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMessage, type UploadFileInfo } from 'naive-ui';
 import { PaperPlaneOutline, FolderOpenOutline } from '@vicons/ionicons5';
+import { submitCode, submitCodeFile } from '@/utils/api';
 
 // 按需引入语言
 import { Codemirror } from 'vue-codemirror';
 import { cpp } from '@codemirror/lang-cpp';
 import { java } from '@codemirror/lang-java';
 import { python } from '@codemirror/lang-python';
-import { go } from '@codemirror/lang-go';
+
+const props = defineProps<{
+  problemCode: string;
+  contestId?: string;
+}>();
 
 const router = useRouter();
 const message = useMessage();
@@ -91,12 +93,13 @@ const language = ref('cpp');
 const code = ref('');
 const uploadedFile = ref<File | null>(null);
 
+// language 取值与判题机 specFor 支持的值一致：cpp / c / java / python
+// （go-judge 当前不支持 Go，故不提供该选项）
 const languageOptions = [
-  { label: 'C++ 17 (g++ 9.4.0)', value: 'cpp' },
-  { label: 'C (gcc 9.4.0)', value: 'c' },
-  { label: 'Java (OpenJDK 11)', value: 'java' },
-  { label: 'Python 3 (3.8.10)', value: 'python' },
-  { label: 'Go (1.18)', value: 'go' }
+  { label: 'C++ 17 (g++ -std=c++17)', value: 'cpp' },
+  { label: 'C (gcc -std=c11)', value: 'c' },
+  { label: 'Java (OpenJDK)', value: 'java' },
+  { label: 'Python 3', value: 'python' },
 ];
 
 const extensions = computed(() => {
@@ -106,7 +109,6 @@ const extensions = computed(() => {
     case 'c': exts.push(cpp()); break;
     case 'java': exts.push(java()); break;
     case 'python': exts.push(python()); break;
-    case 'go': exts.push(go()); break;
     default: exts.push(cpp());
   }
   return exts;
@@ -118,13 +120,18 @@ const handleFileChange = (data: { fileList: UploadFileInfo[] }) => {
   
   if (fileInfo?.file) {
     uploadedFile.value = fileInfo.file;
-    console.log('[Behavior] File selected:', uploadedFile.value.name);
   } else {
     uploadedFile.value = null;
   }
 };
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
+  if (submitting.value) return;
+  if (!props.problemCode) {
+    message.error('缺少题目编号，无法提交');
+    return;
+  }
+
   const isCodeEmpty = !code.value || !code.value.trim();
   const isFileEmpty = !uploadedFile.value;
 
@@ -134,20 +141,34 @@ const handleSubmit = () => {
   }
 
   submitting.value = true;
+  try {
+    const contestId = props.contestId?.trim() || undefined;
+    const result = isFileEmpty
+      ? await submitCode({
+          problemCode: props.problemCode,
+          language: language.value,
+          code: code.value,
+          contestId,
+        })
+      : await (async () => {
+          const form = new FormData();
+          form.append('problemCode', props.problemCode);
+          form.append('language', language.value);
+          if (contestId) form.append('contestId', contestId);
+          form.append('file', uploadedFile.value as File);
+          return submitCodeFile(form);
+        })();
 
-  console.log('--- [API Placeholder] Submitting Solution ---');
-  console.log('Language:', language.value);
-  if (!isCodeEmpty) {
-    console.log('Type: Code Text, Length:', code.value.length);
-    console.log('Code Content:', code.value);
-  }
-  if (!isFileEmpty) console.log('Type: File Upload, Name:', uploadedFile.value?.name);
-
-  setTimeout(() => {
-    submitting.value = false;
+    if (!result?.submissionId) {
+      throw new Error('提交失败：后端未返回 submissionId');
+    }
     message.success('Submitted successfully!');
-    router.push('/status'); //TODO: 带参
-  }, 1000);
+    router.push(`/status/${result.submissionId}`);
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '提交失败，请稍后重试');
+  } finally {
+    submitting.value = false;
+  }
 };
 </script>
 

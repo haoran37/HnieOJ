@@ -1,59 +1,90 @@
 import { ref } from 'vue';
+import { getTags, type TagVo } from '@/utils/api';
 
+export interface TagGroup {
+  title: string;
+  tags: string[];
+}
+
+export interface TagCategory {
+  id: string;
+  name: string;
+  groups: TagGroup[];
+}
+
+/** 来源标签的特殊分组 id：TagSelectModal 的 source 模式按此过滤 */
+export const SOURCE_CATEGORY_ID = 'source';
+export const SOURCE_CATEGORY_NAME = '来源';
+const UNCATEGORIZED_ID = 'uncategorized';
+const UNCATEGORIZED_NAME = '未分类';
+
+/**
+ * 把后端真实标签目录按 category 分组。
+ * - category=source（大小写不敏感）映射到现有的「来源」分组；
+ * - 其他按真实 category 分组；
+ * - category 为空的记录归入「未分类」；
+ * - 标签值始终为 name 字符串，不使用 id。
+ */
+export function toTagCategories(list: TagVo[] | null | undefined): TagCategory[] {
+  const categories: TagCategory[] = [];
+  const byId = new Map<string, TagCategory>();
+
+  for (const tag of list ?? []) {
+    const rawCategory = (tag.category ?? '').trim();
+    const isSource = rawCategory.toLowerCase() === SOURCE_CATEGORY_ID;
+    const id = isSource ? SOURCE_CATEGORY_ID : rawCategory || UNCATEGORIZED_ID;
+    const name = isSource ? SOURCE_CATEGORY_NAME : rawCategory || UNCATEGORIZED_NAME;
+
+    let category = byId.get(id);
+    if (!category) {
+      category = { id, name, groups: [{ title: name, tags: [] }] };
+      byId.set(id, category);
+      categories.push(category);
+    }
+    const group = category.groups[0];
+    if (!group) continue;
+    if (!group.tags.includes(tag.name)) {
+      group.tags.push(tag.name);
+    }
+  }
+
+  // 来源分组优先展示，其余保持后端返回顺序
+  categories.sort((a, b) => {
+    if (a.id === SOURCE_CATEGORY_ID) return -1;
+    if (b.id === SOURCE_CATEGORY_ID) return 1;
+    return 0;
+  });
+
+  return categories;
+}
+
+/**
+ * 标签目录：读取后端 GET /api/tags 的真实数据。
+ * 加载失败保留 error（由调用方展示重试），绝不当成“没有标签”的空目录。
+ */
 export function useTags() {
-  const tagData = ref<any[]>([]);
+  const tagData = ref<TagCategory[]>([]);
   const loading = ref(false);
-  const localHash = ref(localStorage.getItem('tag-data-hash') || '');
+  const error = ref<string | null>(null);
 
-  // 使用Hash判断Tag数据是否发生变化来决定是否请求全部Tag数据
+  let seq = 0;
+
   const fetchTags = async () => {
+    const current = ++seq;
     loading.value = true;
+    error.value = null;
     try {
-      // TODO: 获取后端 Hash
-      // const { hash: remoteHash } = await api.get('/tags/hash-check');
-      const remoteHash = "a1b2c3d4e5af6"; 
-
-      const cachedData = localStorage.getItem('tag-data-content');
-      
-      if (localHash.value === remoteHash && cachedData) {
-        tagData.value = JSON.parse(cachedData);
-        console.log('Hash 匹配，读取本地缓存');
-      } else {
-        console.log('Hash 不匹配，更新全量数据...');
-        // TODO: 替换为真实 API
-        // const res = await api.get('/tags/all');
-        
-        // 模拟数据
-        const fullData = [
-          {
-            id: 'algorithm',
-            name: '算法',
-            groups: [
-              { title: '语言入门', tags: ['顺序结构', '分支结构', '循环结构', '数组'] },
-              { title: '数据结构', tags: ['栈', '队列', '链表', '树', '图'] },
-            ]
-          },
-          {
-            id: 'source',
-            name: '来源',
-            groups: [
-              { title: '正式比赛', tags: ['2023校赛', 'ICPC区域赛'] },
-              { title: '外部题库', tags: ['Codeforces', 'LeetCode'] }
-            ]
-          }
-        ];
-
-        tagData.value = fullData;
-        localHash.value = remoteHash;
-        localStorage.setItem('tag-data-hash', remoteHash);
-        localStorage.setItem('tag-data-content', JSON.stringify(fullData));
-      }
-    } catch (error) {
-      console.error('标签数据校验失败:', error);
+      const list = await getTags();
+      if (current !== seq) return;
+      tagData.value = toTagCategories(list);
+    } catch (err) {
+      if (current !== seq) return;
+      tagData.value = [];
+      error.value = err instanceof Error ? err.message : '标签目录加载失败';
     } finally {
-      loading.value = false;
+      if (current === seq) loading.value = false;
     }
   };
 
-  return { tagData, loading, fetchTags };
+  return { tagData, loading, error, fetchTags };
 }

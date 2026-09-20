@@ -1,6 +1,21 @@
 <template>
   <div class="status-detail-layout">
     <n-spin :show="loading">
+      <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">
+        {{ error }}
+        <n-button text type="primary" style="margin-left: 8px" @click="init">重试</n-button>
+      </n-alert>
+      <n-alert v-if="pollError" type="warning" :bordered="false" style="margin-bottom: 12px">
+        轮询中断：{{ pollError }}
+        <n-button text type="primary" style="margin-left: 8px" @click="retry">手动刷新</n-button>
+      </n-alert>
+      <n-alert v-if="exhausted" type="warning" :bordered="false" style="margin-bottom: 12px">
+        评测耗时较长，已停止自动刷新。
+        <n-button text type="primary" style="margin-left: 8px" @click="retry">继续刷新</n-button>
+      </n-alert>
+      <n-alert v-if="casesError" type="warning" :bordered="false" style="margin-bottom: 12px">
+        测试点信息加载失败：{{ casesError }}
+      </n-alert>
       
       <div class="page-header" :style="{ borderLeftColor: statusColor }">
         <h1 class="title">#{{ detail?.id }} 记录详情</h1>
@@ -71,9 +86,10 @@
             <div class="info-list">
               <div class="info-item">
                 <span class="label">递交者</span>
-                <router-link :to="`/user/${detail?.author}`" class="link">
+                <router-link v-if="authorLink" :to="`/user/${authorLink}`" class="link">
                   {{ detail?.author }}
                 </router-link>
+                <span v-else class="value">-</span>
               </div>
               <div class="info-item">
                 <span class="label">语言</span>
@@ -117,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { RefreshOutline as RefreshIcon } from '@vicons/ionicons5';
@@ -129,7 +145,17 @@ const router = useRouter();
 const message = useMessage();
 const userStore = useUserStore();
 
-const { loading, detail, fetchStatusDetail, rejudge } = useStatusDetail();
+const {
+  loading,
+  error,
+  detail,
+  pollError,
+  casesError,
+  exhausted,
+  fetchStatusDetail,
+  retry,
+  rejudge,
+} = useStatusDetail();
 
 // === 路由与Tab联动 ===
 const currentTab = computed(() => route.name as string);
@@ -137,7 +163,9 @@ const handleTabChange = (val: string) => {
   router.push({ name: val, params: { id: detail.value?.id } });
 };
 
-//TODO: 复用 statusColumns.ts 中的 statusConfig?
+// 提交者跳转必须使用 uid 路由 (/user/:uid)，没有 uid 时才退回展示名
+const authorLink = computed(() => detail.value?.authorId || detail.value?.author || '');
+
 const statusType = computed(() => detail.value?.status === 'Accepted' ? 'success' : 'error');
 const statusColor = computed(() => detail.value?.status === 'Accepted' ? '#18a058' : '#d03050');
 
@@ -148,9 +176,15 @@ if (detail.value?.id) {
 };
 
 // === 初始化与重定向 ===
+// 每次 init 自增；异步返回后若已不是最新一次（或组件已卸载），不得再写状态/跳转
+let initSeq = 0;
 const init = async () => {
   const rid = route.params.id as string;
+  const seq = ++initSeq;
   await fetchStatusDetail(rid);
+
+  // 旧请求（或组件已卸载）不得影响当前路由
+  if (seq !== initSeq || route.params.id !== rid) return;
 
   // 如果当前在父路由 /status/:id，根据权限决定默认去向
   if (route.name === 'StatusDetail' || route.path === `/status/${rid}`) {
@@ -166,6 +200,20 @@ const init = async () => {
 };
 
 onMounted(init);
+
+onUnmounted(() => {
+  initSeq += 1;
+});
+
+// 路由 ID 变更时重新拉取，避免混入上一条提交的结果
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      void init();
+    }
+  }
+);
 </script>
 
 <style scoped lang="less">

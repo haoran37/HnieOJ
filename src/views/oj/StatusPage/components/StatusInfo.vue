@@ -75,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useMessage } from 'naive-ui';
 import { 
   CheckmarkCircle, CloseCircle, AlertCircle, 
@@ -84,13 +85,15 @@ import {
   DocumentTextOutline as DocumentIcon
 } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
+import { getProblemDetail, downloadProblemTestCase, downloadProblemTestdata } from '@/utils/api';
+import { saveBlob } from '@/utils/download';
 import type { StatusDetail } from '@/composables/oj/useStatusDetail';
 
-defineProps<{ detail: StatusDetail }>();
+const props = defineProps<{ detail: StatusDetail }>();
 const userStore = useUserStore();
 const message = useMessage();
+const downloading = ref(false);
 
-//TODO: 复用 statusColumns.ts 中的 statusConfig?
 const getStatusClass = (status: string) => {
   if (status === 'Accepted') return 'is-ac';
   if (status === 'Wrong Answer') return 'is-wa';
@@ -105,14 +108,42 @@ const getIcon = (status: string) => {
   return AlertCircle;
 };
 
-const downloadData = (pid: number) => {
-  message.success(`开始下载测试点 #${pid} 数据`);
-  //TODO: 实现逻辑
+// 测试数据下载接口使用内部数字 problem.id，提交详情只给展示编号 problemCode，
+// 因此先按编号取题目详情拿到内部 ID。
+const resolveProblemInternalId = async (): Promise<number> => {
+  const code = props.detail?.problemId;
+  if (!code) throw new Error('缺少题目标识，无法下载测试数据');
+  const problem = await getProblemDetail(code);
+  if (!problem?.id) throw new Error('无法解析题目内部 ID');
+  return problem.id;
 };
 
-const downloadAllData = () => {
-  message.success(`开始打包下载全部测试点数据`);
-  //TODO: 实现逻辑
+const downloadData = async (caseNo: number) => {
+  if (downloading.value) return;
+  downloading.value = true;
+  try {
+    const problemId = await resolveProblemInternalId();
+    const blob = await downloadProblemTestCase(problemId, caseNo);
+    saveBlob(blob, `${props.detail.problemId}-case-${caseNo}.zip`);
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '测试点下载失败');
+  } finally {
+    downloading.value = false;
+  }
+};
+
+const downloadAllData = async () => {
+  if (downloading.value) return;
+  downloading.value = true;
+  try {
+    const problemId = await resolveProblemInternalId();
+    const blob = await downloadProblemTestdata(problemId);
+    saveBlob(blob, `${props.detail.problemId}-testdata.zip`);
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '测试数据打包下载失败');
+  } finally {
+    downloading.value = false;
+  }
 };
 </script>
 

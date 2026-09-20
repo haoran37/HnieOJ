@@ -10,7 +10,7 @@
         <n-input 
           :value="modelValue" 
           @update:value="$emit('update:modelValue', $event)"
-          placeholder="请输入题目PID" 
+          :placeholder="placeholder ?? '请输入题目内部数字ID'"
           @keyup.enter="$emit('add')" 
         />
         <n-button type="primary" @click="$emit('add')" :loading="loading">
@@ -22,21 +22,41 @@
 
     <div class="problem-list-wrapper">
       <div class="custom-table-header">
-        <div class="col pid">PID</div>
+        <div class="col display">展示编号</div>
+        <div class="col pid">内部ID</div>
         <div class="col title">题目名称</div>
-        <div class="col difficulty">难度</div>
         <div class="col actions">操作</div>
       </div>
       <transition-group name="list" tag="div" class="custom-table-body">
         <div v-for="(problem, index) in problems" :key="problem.problemId" class="custom-table-row">
+          <div class="col display">
+            <n-input-number
+              v-if="displayIdMode === 'number'"
+              size="small"
+              :min="1"
+              :value="toNumber(problem.displayId)"
+              :show-button="false"
+              style="width: 90px"
+              @update:value="(value) => $emit('updateDisplayId', index, value)"
+            />
+            <n-input
+              v-else
+              size="small"
+              :value="String(problem.displayId ?? '')"
+              placeholder="A"
+              style="width: 90px"
+              @update:value="(value: string) => $emit('updateDisplayId', index, value)"
+            />
+          </div>
           <div class="col pid">{{ problem.problemId }}</div>
           <div class="col title">
-            <a :href="`/problem/${problem.problemId}`" target="_blank" class="problem-link">{{ problem.title }}</a>
-          </div>
-          <div class="col difficulty">
-            <n-tag :type="getDifficultyType(problem.difficulty)" size="small">
-              {{ getDifficultyLabel(problem.difficulty) }}
-            </n-tag>
+            <a
+              v-if="problem.problemCode"
+              :href="`/problem/${problem.problemCode}`"
+              target="_blank"
+              class="problem-link"
+            >{{ problem.displayTitle || problem.problemCode }}</a>
+            <span v-else>{{ problem.displayTitle || `题目 ${problem.problemId}` }}</span>
           </div>
           <div class="col actions">
             <n-space>
@@ -60,14 +80,31 @@
 
 <script setup lang="ts">
 import { AddOutline, ArrowUpOutline, ArrowDownOutline, TrashOutline } from '@vicons/ionicons5';
-import { NButton, NSpace, NTag, NIcon, NInput, NInputGroup, NFormItem } from 'naive-ui';
+import { NButton, NSpace, NIcon, NInput, NInputNumber, NInputGroup, NFormItem } from 'naive-ui';
 
-defineProps<{
-  problems: any[];
-  loading: boolean;
-  modelValue: string;
-  showLabel?: boolean;
-}>();
+/** 编排行：problemId 始终为内部数字 ID；displayId 视场景为 A/B 字符串或 Integer */
+export interface ConfigProblemRow {
+  problemId: number;
+  problemCode?: string;
+  displayId: string | number | null;
+  displayTitle?: string;
+}
+
+withDefaults(
+  defineProps<{
+    problems: ConfigProblemRow[];
+    loading: boolean;
+    modelValue: string;
+    showLabel?: boolean;
+    /** letter: 比赛/作业 A/B；number: 题单 Integer>=1 */
+    displayIdMode?: 'letter' | 'number';
+    placeholder?: string;
+  }>(),
+  {
+    displayIdMode: 'letter',
+    placeholder: '请输入题目内部数字ID',
+  },
+);
 
 defineEmits<{
   (e: 'update:modelValue', value: string): void;
@@ -75,16 +112,12 @@ defineEmits<{
   (e: 'remove', index: number): void;
   (e: 'moveUp', index: number): void;
   (e: 'moveDown', index: number): void;
+  (e: 'updateDisplayId', index: number, value: string | number | null): void;
 }>();
 
-const getDifficultyType = (diff: string) => {
-  const map: Record<string, string> = { Low: 'success', Mid: 'warning', High: 'error' };
-  return (map[diff] || 'default') as any;
-};
-
-const getDifficultyLabel = (diff: string) => {
-  const map: Record<string, string> = { Low: '简单', Mid: '中等', High: '困难' };
-  return map[diff] || '未知';
+const toNumber = (value: string | number | null): number | null => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 </script>
 
@@ -115,9 +148,9 @@ const getDifficultyLabel = (diff: string) => {
   .col {
     padding: 0 8px;
     
+    &.display { width: 110px; }
     &.pid { width: 100px; color: #000; }
     &.title { flex: 1; min-width: 200px; }
-    &.difficulty { width: 100px; }
     &.actions { width: 150px; }
   }
 

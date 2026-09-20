@@ -47,6 +47,8 @@
       </div>
     </n-card>
 
+    <n-alert v-if="error" type="error" :bordered="false">{{ error }}</n-alert>
+
     <div class="table-wrapper">
       <n-card :bordered="false" content-style="padding: 0;">
         <n-data-table
@@ -87,29 +89,29 @@ import { useStatusList } from '@/composables/oj/useStatusList';
 import { createStatusColumns } from '@/utils/statusColumns';
 
 const { 
-  loading, listData, total, page, pageSize, filters, 
+  loading, error, listData, total, page, pageSize, filters,
   fetchStatus, handlePageChange, handleSearch, handleRefresh 
 } = useStatusList();
 
 const router = useRouter();
 const columns = createStatusColumns(router);
 
-// 静态选项
+// 语言筛选与提交时写入的 language 取值一致（判题机支持 cpp/c/java/python）
 const langOptions = [
-  { label: 'C', value: 'C' },
-  { label: 'C++', value: 'CPP' },
-  { label: 'Java', value: 'Java' },
-  { label: 'Python3', value: 'Python3' },
-  { label: 'Go', value: 'Go' }
+  { label: 'C++', value: 'cpp' },
+  { label: 'C', value: 'c' },
+  { label: 'Java', value: 'java' },
+  { label: 'Python3', value: 'python' }
 ];
 
+// 状态筛选使用后端 SubmissionStatusConstant 数字值
 const statusOptions = [
-  { label: 'Accepted', value: 'Accepted' },
-  { label: 'Wrong Answer', value: 'Wrong Answer' },
-  { label: 'Time Limit Exceeded', value: 'Time Limit Exceeded' },
-  { label: 'Memory Limit Exceeded', value: 'Memory Limit Exceeded' },
-  { label: 'Compilation Error', value: 'Compilation Error' },
-  { label: 'Runtime Error', value: 'Runtime Error' }
+  { label: 'Accepted', value: 0 },
+  { label: 'Wrong Answer', value: 3 },
+  { label: 'Time Limit Exceeded', value: 4 },
+  { label: 'Memory Limit Exceeded', value: 5 },
+  { label: 'Compile Error', value: 2 },
+  { label: 'Runtime Error', value: 1 }
 ];
 
 onMounted(() => {

@@ -7,10 +7,10 @@
             <span class="filter-label">筛选条件</span>
             <n-dropdown
               :options="difficultyOptions"
-              @select="(_: string | number, option: DropdownOption) => localSearch.difficulty = String(option.label)"
+              @select="(_: string | number, option: DropdownOption) => localSearch.difficulty = option.key === null ? null : Number(option.key)"
             >
               <n-button size="small" quaternary>
-                {{ localSearch.difficulty || '题目难度' }}
+                {{ difficultyLabel(localSearch.difficulty) === '未评级' ? '题目难度' : difficultyLabel(localSearch.difficulty) }}
                 <template #icon>
                   <n-icon><ChevronDown /></n-icon>
                 </template>
@@ -32,50 +32,42 @@
               placeholder="算法、标题或题目编号"
               clearable
             />
-            <n-checkbox v-model:checked="localSearch.searchInContent">搜索题面</n-checkbox>
           </div>
         </div>
 
-        <div class="filter-row selected-tags-row">
-          <div class="tags-left">
-            <span class="filter-label">已选择</span>
-            <div class="tag-container">
-              <template v-if="localSearch.tags.length > 0 || localSearch.source.length > 0">
-                <n-tag
-                  v-for="source in localSearch.source"
-                  :key="source"
-                  closable
-                  size="small"
-                  type="info"
-                  @close="removeSource(source)"
-                >
-                  {{ source }}
-                </n-tag>
-                <n-tag
-                  v-for="tag in localSearch.tags"
-                  :key="tag"
-                  closable
-                  size="small"
-                  type="primary"
-                  @close="removeTag(tag)"
-                >
-                  {{ tag }}
-                </n-tag>
-                <n-button text type="primary" size="tiny" class="clear-btn" @click="clearAll">
-                  清空筛选
-                </n-button>
-              </template>
-              <span v-else class="placeholder-text">暂无，先在上方选择筛选条件</span>
+          <div class="filter-row selected-tags-row">
+            <div class="tags-left">
+              <span class="filter-label">已选择</span>
+              <div class="tag-container">
+                <template v-if="localSearch.tags.length > 0">
+                  <n-tag
+                    v-for="tag in localSearch.tags"
+                    :key="tag"
+                    closable
+                    size="small"
+                    type="primary"
+                    @close="removeTag(tag)"
+                  >
+                    {{ tag }}
+                  </n-tag>
+                  <n-button text type="primary" size="tiny" class="clear-btn" @click="clearAll">
+                    清空筛选
+                  </n-button>
+                </template>
+                <span v-else class="placeholder-text">暂无，先在上方选择筛选条件</span>
+              </div>
             </div>
+            <n-button type="info" size="small" @click="triggerSearch">
+              <template #icon><n-icon><SearchIcon /></n-icon></template>
+              搜索
+            </n-button>
           </div>
-          <n-button type="info" size="small" @click="triggerSearch">
-            <template #icon><n-icon><SearchIcon /></n-icon></template>
-            搜索
-          </n-button>
-        </div>
 
-        <div class="divider" />
-        <div class="result-info">共计 <span class="count">{{ total }}</span> 条结果</div>
+          <div class="divider" />
+          <div class="result-info">共计 <span class="count">{{ total }}</span> 条结果</div>
+          <n-alert v-if="error" type="error" :bordered="false" style="margin-top: 8px">
+            {{ error }}
+          </n-alert>
       </n-card>
     </div>
 
@@ -109,7 +101,6 @@
 
     <TagSelectModal
       v-model:show="showTagModal"
-      v-model:source="localSearch.source"
       v-model:tags="localSearch.tags"
       mode="all"
     />
@@ -127,45 +118,38 @@ import { useTags } from '@/composables/useTags'
 import { createColumns } from '@/utils/problemColumns'
 import TagSelectModal from '@/components/TagSelectModal.vue'
 import type { ProblemRow, ProblemSearchParams } from '@/types/problem'
+import { difficultyLabel } from '@/types/problem'
 
 const router = useRouter()
 const userStore = useUserStore()
-const { tableData, loading, total, page, pageSize, updateSearch, handlePageChange, fetchProblems } = useProblemsList()
+const { tableData, loading, error, total, page, pageSize, updateSearch, handlePageChange, fetchProblems } = useProblemsList()
 const { loading: tagLoading, fetchTags } = useTags()
 
 const showTagModal = ref(false)
 const columns = createColumns(
-  (id) => userStore.getProblemStatus(id),
-  (id) => router.push(`/problem/${id}`),
+  (problemCode) => userStore.getProblemStatus(problemCode),
+  (problemCode) => router.push(`/problem/${problemCode}`),
 )
 
 const localSearch = reactive<ProblemSearchParams>({
-  source: [],
-  difficulty: '',
+  difficulty: null,
   keyword: '',
-  searchInContent: false,
   tags: [],
 })
 
 const difficultyOptions = [
-  { label: '入门', key: '1' },
-  { label: '简单', key: '2' },
-  { label: '中等', key: '3' },
-  { label: '困难', key: '4' },
+  { label: '简单', key: '0' },
+  { label: '中等', key: '1' },
+  { label: '困难', key: '2' },
 ]
 
 const removeTag = (tag: string) => {
   localSearch.tags = localSearch.tags.filter((item) => item !== tag)
 }
 
-const removeSource = (source: string) => {
-  localSearch.source = localSearch.source.filter((item) => item !== source)
-}
-
 const clearAll = () => {
   localSearch.tags = []
-  localSearch.source = []
-  localSearch.difficulty = ''
+  localSearch.difficulty = null
   localSearch.keyword = ''
 }
 

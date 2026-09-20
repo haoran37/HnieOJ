@@ -2,7 +2,13 @@
   <n-modal :show="show" @update:show="$emit('update:show', $event)" preset="card" style="width: 850px"
     :title="title" :auto-focus="false">
     <n-spin :show="loading">
-      <n-tabs type="line" animated>
+      <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">
+        {{ error }}
+        <n-button size="tiny" secondary type="error" style="margin-left: 8px" @click="fetchTags">
+          重试
+        </n-button>
+      </n-alert>
+      <n-tabs v-else-if="filteredTagData.length > 0" type="line" animated>
         <n-tab-pane v-for="cat in filteredTagData" :key="cat.id" :name="cat.id" :tab="cat.name">
           <n-scrollbar style="max-height: 450px">
             <div class="tag-modal-scroll-content">
@@ -19,6 +25,11 @@
           </n-scrollbar>
         </n-tab-pane>
       </n-tabs>
+      <n-empty
+        v-else-if="!loading"
+        description="标签目录为空"
+        style="padding: 32px 0"
+      />
     </n-spin>
     <template #footer>
       <div style="text-align: right">
@@ -43,7 +54,7 @@ const props = defineProps<{
 
 const emit = defineEmits(['update:show', 'update:modelValue', 'update:source', 'update:tags', 'confirm']);
 
-const { tagData, loading, fetchTags } = useTags();
+const { tagData, loading, error, fetchTags } = useTags();
 
 // 本地选中的标签
 const localSelected = ref<string[]>([]);

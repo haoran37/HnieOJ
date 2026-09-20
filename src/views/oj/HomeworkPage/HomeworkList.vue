@@ -9,15 +9,18 @@
         <span class="title">作业查询 / Homework Query</span>
       </div>
 
+      <n-alert type="info" :bordered="false" style="margin-bottom: 16px">
+        作业列表接口当前仅支持关键词检索；学院 / 年级 / 班级 / 教师筛选暂未开放。
+      </n-alert>
+
       <n-grid :x-gap="24" :y-gap="24" cols="1 s:2 m:3 l:5" responsive="screen">
         <n-grid-item>
           <div class="filter-item">
             <span class="label">所属学院 (College)</span>
-            <n-select 
-              v-model:value="selections.college.value" 
-              :options="options.colleges.value" 
-              placeholder="请选择学院" 
-              clearable
+            <n-select
+              disabled
+              placeholder="暂未开放"
+              :options="[]"
             />
           </div>
         </n-grid-item>
@@ -25,13 +28,10 @@
         <n-grid-item>
           <div class="filter-item">
             <span class="label">年级 (Grade)</span>
-            <n-select 
-              v-model:value="selections.grade.value" 
-              :options="options.grades.value" 
-              placeholder="请选择年级" 
-              :disabled="!selections.college.value"
-              :loading="filterLoading && !options.grades.value.length"
-              clearable
+            <n-select
+              disabled
+              placeholder="暂未开放"
+              :options="[]"
             />
           </div>
         </n-grid-item>
@@ -39,12 +39,10 @@
         <n-grid-item>
           <div class="filter-item">
             <span class="label">行政班级 (Class)</span>
-            <n-select 
-              v-model:value="selections.class_.value" 
-              :options="options.classes.value" 
-              placeholder="请选择班级" 
-              :disabled="!selections.grade.value"
-              clearable
+            <n-select
+              disabled
+              placeholder="暂未开放"
+              :options="[]"
             />
           </div>
         </n-grid-item>
@@ -52,12 +50,10 @@
         <n-grid-item>
           <div class="filter-item">
             <span class="label">任课教师 (Teacher)</span>
-            <n-select 
-              v-model:value="selections.teacher.value" 
-              :options="options.teachers.value" 
-              placeholder="请选择教师" 
-              :disabled="!selections.class_.value"
-              clearable
+            <n-select
+              disabled
+              placeholder="暂未开放"
+              :options="[]"
             />
           </div>
         </n-grid-item>
@@ -83,6 +79,9 @@
     </n-card>
 
     <div class="list-section">
+      <n-alert v-if="listError" type="error" :bordered="false" style="margin-bottom: 12px">
+        {{ listError }}
+      </n-alert>
       <n-spin :show="listLoading">
         <div class="homework-grid">
           <template v-if="listData.length > 0">
@@ -90,13 +89,10 @@
               v-for="item in listData"
               :key="item.id"
               :title="item.title"
-              :tags="item.tags"
               :source="item.source"
               :begin-time="item.beginTime"
               :end-time="item.endTime"
-              :participant-count="item.participantCount"
-              :show-follow="false"
-              :highlight-source="true"
+              :problem-count="item.problemCount"
               @click="handleItemClick(item.id)"
             />
           </template>
@@ -113,7 +109,7 @@
           v-model:page="page"
           :page-count="Math.ceil(total / 10)"
           size="large"
-          @update:page="handleSearch"
+          @update:page="handlePageChange"
         />
       </div>
     </div>
@@ -126,40 +122,31 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search as SearchIcon } from '@vicons/ionicons5';
 import ContestItem from '@/components/ContestItem.vue';
-import { useHomeworkFilters } from '@/composables/oj/useHomeworkFilters';
 import { useHomeworkList } from '@/composables/oj/useHomeworkList';
 
 const router = useRouter();
 const searchKeyword = ref('');
 
-// 筛选逻辑
-const { 
-  selections, 
-  options, 
-  fetchColleges, 
-  loading: filterLoading 
-} = useHomeworkFilters();
-
 // 列表逻辑
 const { 
-  loading: listLoading, 
+  loading: listLoading,
+  error: listError,
   listData, 
   total, 
   page, 
   fetchHomeworks 
 } = useHomeworkList();
 
-// 处理查询
+// 处理查询：后端作业列表接口只支持 keyword 过滤，
+// 学院/年级/班级/教师筛选当前接口不支持，界面已禁用并明确提示，不发送空参数。
 const handleSearch = () => {
-  const params = {
-    collegeId: selections.college.value,
-    gradeId: selections.grade.value,
-    classId: selections.class_.value,
-    teacherId: selections.teacher.value,
-    keyword: searchKeyword.value,
-    page: page.value
-  };
-  fetchHomeworks(params);
+  page.value = 1;
+  void fetchHomeworks({ keyword: searchKeyword.value });
+};
+
+const handlePageChange = (p: number) => {
+  page.value = p;
+  void fetchHomeworks({ keyword: searchKeyword.value });
 };
 
 const handleItemClick = (id: string) => {
@@ -167,13 +154,11 @@ const handleItemClick = (id: string) => {
 };
 
 const resetFilters = () => {
-  selections.college.value = null;
   searchKeyword.value = '';
   handleSearch();
 };
 
 onMounted(() => {
-  fetchColleges();
   handleSearch();
 });
 </script>

@@ -1,43 +1,64 @@
 import { ref } from 'vue';
+import { getHomeworks } from '@/utils/api';
+
+export interface HomeworkItem {
+  id: string;
+  title: string;
+  source: string;
+  author: string;
+  beginTime: string;
+  endTime: string;
+  problemCount: number;
+  classCount: number;
+  status: number | null;
+}
 
 export function useHomeworkList() {
   const loading = ref(false);
-  const listData = ref<any[]>([]);
+  const error = ref<string | null>(null);
+  const listData = ref<HomeworkItem[]>([]);
   const total = ref(0);
   const page = ref(1);
+  const pageSize = ref(10);
 
-  const fetchHomeworks = async (params: any) => {
+  let seq = 0;
+
+  const fetchHomeworks = async (params: { keyword?: string } = {}) => {
+    const current = ++seq;
     loading.value = true;
-    console.log("Searching Homework with:", params);
-
-    //TODO: 替换真实api
-    setTimeout(() => {
-      // 模拟返回数据
-      listData.value = Array.from({ length: 10 }, (_, i) => {
-        const id = 5000 + i;
-        //TODO: 应由前端拼接构造
-        const sourceStr = `信息科学与工程学院 · 计算机2202 · 某某某`;
-        
-        return {
-          id: String(id),
-          title: i % 2 === 0 ? `[作业] 数据结构第 ${i+1} 章练习题` : `[实验] 操作系统实验报告 ${i}`,
-          tags: ['必做', '截止: 12-31', '平时分'],
-          source: sourceStr,
-          beginTime: new Date(Date.now() - 86400000).toISOString(), // 昨天
-          endTime: new Date(Date.now() + 86400000 * 3).toISOString(), // 3天后
-          participantCount: 45 + i, // 参与人数
-        };
-      });
-      total.value = 56;
-      loading.value = false;
-    }, 600);
+    error.value = null;
+    try {
+      const result = await getHomeworks(page.value, pageSize.value, params.keyword);
+      if (current !== seq) return;
+      listData.value = (result?.list ?? []).map((vo) => ({
+        id: String(vo.id),
+        title: vo.title,
+        source: vo.source ?? '',
+        author: vo.author ?? '',
+        beginTime: vo.startTime ?? '',
+        endTime: vo.endTime ?? '',
+        problemCount: vo.problemCount ?? 0,
+        classCount: vo.classCount ?? 0,
+        status: vo.status ?? null,
+      }));
+      total.value = result?.total ?? 0;
+    } catch (err) {
+      if (current !== seq) return;
+      listData.value = [];
+      total.value = 0;
+      error.value = err instanceof Error ? err.message : '作业列表加载失败';
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
   return {
     loading,
+    error,
     listData,
     total,
     page,
-    fetchHomeworks
+    pageSize,
+    fetchHomeworks,
   };
 }

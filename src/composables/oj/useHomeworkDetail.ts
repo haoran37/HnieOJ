@@ -1,59 +1,73 @@
 import { ref } from 'vue';
+import { getHomeworkDetail, type HomeworkProblemVo } from '@/utils/api';
 
 export interface HomeworkDetail {
   id: string;
   title: string;
-  courseName: string; 
+  source: string;
+  author: string;
+  description: string;
   beginTime: string;
   deadline: string;
-  status: 'active' | 'ended';
-  description: string;
-  // 仅教师可见
-  stats: {
-    studentCount: number;
-    submittedCount: number;
-    averageScore: number;
+  status: number | null;
+  classIds: number[];
+  problems: HomeworkProblemVo[];
+  gmtCreate: string;
+  gmtModified: string;
+}
+
+function emptyDetail(): HomeworkDetail {
+  return {
+    id: '',
+    title: '',
+    source: '',
+    author: '',
+    description: '',
+    beginTime: '',
+    deadline: '',
+    status: null,
+    classIds: [],
+    problems: [],
+    gmtCreate: '',
+    gmtModified: '',
   };
 }
 
 export function useHomeworkDetail() {
   const loading = ref(false);
-  const detail = ref<HomeworkDetail>({
-    id: '',
-    title: '',
-    courseName: '',
-    beginTime: '',
-    deadline: '',
-    status: 'active',
-    description: '',
-    stats: { studentCount: 0, submittedCount: 0, averageScore: 0 }
-  });
+  const error = ref<string | null>(null);
+  const detail = ref<HomeworkDetail>(emptyDetail());
 
-  //TODO: 替换真实api
+  let seq = 0;
   const fetchHomeworkDetail = async (hid: string) => {
+    const current = ++seq;
     loading.value = true;
-    setTimeout(() => {
-      const now = new Date();
-      const start = new Date(now.getTime() + 3600 * 1);
-      const end = new Date(now.getTime() + 3600 * 10);
-
+    error.value = null;
+    try {
+      const vo = await getHomeworkDetail(hid);
+      if (current !== seq) return;
       detail.value = {
-        id: hid,
-        title: '第三周作业：数组与链表基础',
-        courseName: '2025秋-数据结构与算法(2班)',
-        beginTime: start.toISOString(),
-        deadline: end.toISOString(),
-        status: 'active',
-        description: `### 作业要求\n1. 请独立完成所有题目。\n2. 截止日期前可多次提交，**IOI赛制**取最高分。`,
-        stats: {
-          studentCount: 45,
-          submittedCount: 38,
-          averageScore: 86.5
-        }
+        id: String(vo.id),
+        title: vo.title,
+        source: vo.source ?? '',
+        author: vo.author ?? '',
+        description: vo.description ?? '',
+        beginTime: vo.startTime ?? '',
+        deadline: vo.endTime ?? '',
+        status: vo.status ?? null,
+        classIds: vo.classIds ?? [],
+        problems: vo.problems ?? [],
+        gmtCreate: vo.gmtCreate ?? '',
+        gmtModified: vo.gmtModified ?? '',
       };
-      loading.value = false;
-    }, 400);
+    } catch (err) {
+      if (current !== seq) return;
+      detail.value = emptyDetail();
+      error.value = err instanceof Error ? err.message : '作业详情加载失败';
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
-  return { loading, detail, fetchHomeworkDetail };
+  return { loading, error, detail, fetchHomeworkDetail };
 }

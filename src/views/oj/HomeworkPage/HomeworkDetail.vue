@@ -1,11 +1,12 @@
 <template>
   <div class="homework-detail-container">
     <n-spin :show="loading">
+      <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">{{ error }}</n-alert>
       
       <div class="course-header-card">
         <div class="header-main-content">
           <div class="card-left">
-            <div class="course-tag">{{ detail.courseName }}</div>
+            <div class="course-tag">{{ detail.source || '作业' }}</div>
             <h1 class="homework-title">
               <n-icon class="book-icon"><BookIcon /></n-icon>
               {{ detail.title }}
@@ -31,13 +32,13 @@
           
           <div class="card-right-stats" v-if="userStore.isTeacher">
             <div class="stat-box">
-              <div class="stat-num">{{ detail.stats.submittedCount }}<span class="slash">/</span>{{ detail.stats.studentCount }}</div>
-              <div class="stat-label">提交人数</div>
+              <div class="stat-num">{{ detail.problems.length }}</div>
+              <div class="stat-label">题目数</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-box">
-              <div class="stat-num highlight">{{ detail.stats.averageScore }}</div>
-              <div class="stat-label">平均分</div>
+              <div class="stat-num highlight">{{ detail.classIds.length }}</div>
+              <div class="stat-label">班级数</div>
             </div>
           </div>
         </div>
@@ -80,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NTag, NProgress } from 'naive-ui';
 import { BookOutline as BookIcon } from '@vicons/ionicons5';
@@ -92,7 +93,7 @@ const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
 
-const { loading, detail, fetchHomeworkDetail } = useHomeworkDetail();
+const { loading, error, detail, fetchHomeworkDetail } = useHomeworkDetail();
 
 const { contestStatus, now } = useStatusTime(
   () => detail.value.beginTime,
@@ -143,6 +144,14 @@ const progressColor = computed(() => {
   if (progressPercentage.value > 80) return '#f0a020';
   return '#18a058';
 });
+
+// 同一路由记录换 homeworkId 时组件会被复用，必须按新参数重取
+watch(
+  () => route.params.homeworkId,
+  (hid) => {
+    if (hid) void fetchHomeworkDetail(String(hid));
+  },
+);
 
 onMounted(() => {
   const hid = route.params.homeworkId as string;

@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.3",
-    "@types/node": "^24.10.4",
+    "@types/node": "^26.6.1",
     "@types/prismjs": "^1.26.5",
     "@vitejs/plugin-vue": "^6.0.3",
     "@vue/eslint-config-typescript": "^14.6.0",

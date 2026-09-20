@@ -2,15 +2,18 @@
   <div class="system-config-page">
     <n-card :bordered="false" title="系统全局配置">
       <template #header-extra>
-        <n-button type="primary" :loading="loading" @click="saveConfig">
-          <template #icon>
-            <n-icon>
-              <SaveOutline />
-            </n-icon>
-          </template>
-          保存配置
-        </n-button>
+        <n-space align="center">
+          <span v-if="gmtModified" class="tip-text">上次更新：{{ formatFullTime(gmtModified) }}</span>
+          <n-button type="primary" :loading="loading" @click="saveConfig">
+            <template #icon>
+              <n-icon><SaveOutline /></n-icon>
+            </template>
+            保存配置
+          </n-button>
+        </n-space>
       </template>
+
+      <n-alert v-if="error" type="error" :bordered="false" class="mb-4">{{ error }}</n-alert>
 
       <n-tabs type="segment" animated>
         <!-- 站点基础设置 -->
@@ -28,14 +31,20 @@
                 <n-input v-model:value="config.icpCode" placeholder="例如：湘ICP备..." />
               </n-form-item>
 
-              <n-divider title-placement="left">状态控制</n-divider>
+              <n-divider title-placement="left">注册控制</n-divider>
+              <n-alert type="warning" :bordered="false" class="mb-3">
+                注册开关与注册模式会被保存，但当前注册流程尚未使用这两项设置，保存后暂不影响实际注册。
+              </n-alert>
               <n-form-item label="允许注册" path="allowRegister">
                 <n-space vertical align="start">
                   <n-space align="center">
                     <n-switch v-model:value="config.allowRegister" />
                     <n-select v-if="config.allowRegister" v-model:value="config.registerMode"
-                      :options="registerModeOptions" style="width: 160px" size="small" />
+                      :options="registerModeOptions" style="width: 220px" size="small" />
                   </n-space>
+                  <div v-if="config.allowRegister" class="tip-text">
+                    可选注册模式：OPEN / EMAIL_SUFFIX / INVITE_CODE。邀请码注册入口尚未开放，当前仅保存该项设置。
+                  </div>
                   <n-dynamic-tags v-if="config.allowRegister && config.registerMode === 'EMAIL_SUFFIX'"
                     v-model:value="config.allowedEmailSuffixes" />
                   <div v-if="config.allowRegister && config.registerMode === 'EMAIL_SUFFIX'" class="tip-text">
@@ -43,33 +52,6 @@
                   </div>
                 </n-space>
               </n-form-item>
-              <n-form-item label="仅内网访问" path="intranetAccessOnly">
-                <n-switch v-model:value="config.intranetAccessOnly">
-                  <template #checked>开启</template>
-                  <template #unchecked>关闭</template>
-                </n-switch>
-              </n-form-item>
-              <n-form-item label="维护模式" path="maintenanceMode">
-                <n-switch v-model:value="config.maintenanceMode">
-                  <template #checked>维护中</template>
-                  <template #unchecked>正常运行</template>
-                </n-switch>
-                <div class="tip-text ml-2">开启后，用户访问将看到统一维护页面</div>
-              </n-form-item>
-
-              <n-divider title-placement="left">比赛模式</n-divider>
-              <n-form-item label="开启比赛模式" path="contestMode">
-                <n-switch v-model:value="config.contestMode"
-                  @update:value="(val: boolean) => !val && (config.contestId = '')" />
-              </n-form-item>
-              <n-collapse-transition :show="config.contestMode">
-                <n-form-item label="关联比赛 ID" path="contestId" required
-                  :validation-status="contestIdValidation.status" :feedback="contestIdValidation.message">
-                  <n-input v-model:value="config.contestId" placeholder="请输入比赛 ID" style="width: 200px"
-                    @blur="checkContestId" @input="() => { contestIdValidation.status = undefined; contestIdValidation.message = '' }" :loading="contestIdValidation.loading" />
-                  <div class="tip-text ml-2">开启后仅该比赛及相关功能可用</div>
-                </n-form-item>
-              </n-collapse-transition>
             </n-form>
           </div>
         </n-tab-pane>
@@ -78,7 +60,7 @@
         <n-tab-pane name="smtp" tab="SMTP设置">
           <div class="tab-content">
             <n-alert type="info" show-icon class="mb-4">
-              配置邮件服务用于发送注册验证码、密码重置邮件及系统通知。
+              配置邮件服务用于发送注册验证码、密码重置邮件及系统通知。密码仅保存不回显。
             </n-alert>
             <n-form label-placement="left" label-width="120" :model="config">
               <n-grid :cols="2" :x-gap="24">
@@ -96,97 +78,44 @@
                 </n-form-item-gi>
                 <n-form-item-gi label="邮箱密码" path="smtpPassword">
                   <n-input type="password" show-password-on="click" v-model:value="config.smtpPassword"
-                    placeholder="密码或授权码" />
-                </n-form-item-gi>
-                <n-form-item-gi label="安全协议" path="smtpSecurity">
-                  <n-radio-group v-model:value="config.smtpSecurity">
-                    <n-space>
-                      <n-radio v-for="opt in smtpSecurityOptions" :key="opt.value" :value="opt.value">
-                        {{ opt.label }}
-                      </n-radio>
-                    </n-space>
-                  </n-radio-group>
+                    placeholder="留空表示不修改" />
                 </n-form-item-gi>
               </n-grid>
-
-              <n-divider />
-              <n-form-item label="测试邮件">
-                <n-input-group>
-                  <n-input v-model:value="testEmailRecipient" placeholder="请输入接收测试邮件的邮箱" style="width: 300px" />
-                  <n-button type="primary" :loading="sendingEmail" @click="sendTestEmail">
-                    <template #icon>
-                      <n-icon>
-                        <MailOutline />
-                      </n-icon>
-                    </template>
-                    发送测试
-                  </n-button>
-                </n-input-group>
-              </n-form-item>
             </n-form>
           </div>
         </n-tab-pane>
 
-        <!-- 评测资源管理 -->
+        <!-- 远程评测账号 -->
         <n-tab-pane name="judge" tab="评测配置">
           <div class="tab-content">
-            <n-form label-placement="left" label-width="120" :model="config">
-              <n-divider title-placement="left">判题机 (Judger) 全局配置</n-divider>
-              <n-form-item label="Judge Token">
-                <n-input-group>
-                  <n-input v-model:value="config.judgeToken" readonly placeholder="用于判题机连接的 Token" />
-                  <n-button @click="copyToken">
-                    <template #icon>
-                      <n-icon>
-                        <CopyOutline />
-                      </n-icon>
-                    </template>
-                    复制
-                  </n-button>
-                  <n-button type="warning" ghost @click="regenerateToken">
-                    <template #icon>
-                      <n-icon>
-                        <RefreshOutline />
-                      </n-icon>
-                    </template>
-                    重新生成
-                  </n-button>
-                </n-input-group>
-              </n-form-item>
-              <n-grid :cols="2" :x-gap="24">
-                <n-form-item-gi label="默认时间限制">
-                  <n-input-number v-model:value="config.defaultTimeLimit" :min="100" :step="100">
-                    <template #suffix>ms</template>
-                  </n-input-number>
-                </n-form-item-gi>
-                <n-form-item-gi label="默认空间限制">
-                  <n-input-number v-model:value="config.defaultMemoryLimit" :min="16" :step="16">
-                    <template #suffix>MB</template>
-                  </n-input-number>
-                </n-form-item-gi>
-              </n-grid>
-
-              <n-divider title-placement="left">远程评测账号 (Remote Judge)</n-divider>
-              <n-grid :cols="2" :x-gap="16" :y-gap="16">
-                <n-grid-item v-for="platform in platformOptions" :key="platform.value">
-                  <n-card size="small" :title="platform.label">
-                    <template #header-extra>
-                      <n-button size="tiny" secondary type="primary" @click="openAccountModal('add', platform.value)">
-                        <template #icon>
-                          <n-icon>
-                            <AddOutline />
-                          </n-icon>
-                        </template>
-                        添加
-                      </n-button>
-                    </template>
-                    <n-data-table :columns="columns"
-                      :data="config.remoteJudgeAccounts.filter(acc => acc.platform === platform.value)"
-                      :row-key="(row: RemoteJudgeAccount) => row.id" size="small" :bordered="false" />
-                  </n-card>
-                </n-grid-item>
-              </n-grid>
-            </n-form>
+            <n-alert type="info" show-icon class="mb-4">
+              判题节点凭证（逐节点签发）请在「系统管理 → 服务管理」中操作，不再使用共享主 Token。
+            </n-alert>
+            <n-divider title-placement="left">远程评测账号 (Remote Judge)</n-divider>
+            <div class="account-toolbar">
+              <n-button type="primary" size="small" :disabled="accountSaving" @click="openCreateAccountModal">
+                <template #icon><n-icon><AddOutline /></n-icon></template>
+                新建账号
+              </n-button>
+            </div>
+            <n-alert v-if="accountsError" type="error" :bordered="false" class="mb-2">
+              {{ accountsError }}
+              <n-button size="tiny" secondary type="error" style="margin-left: 8px" @click="fetchRemoteJudgeAccounts">
+                重试
+              </n-button>
+            </n-alert>
+            <div class="tip-text mb-2">密码只写不读：编辑时密码始终为空，留空表示保留原密码，新密码原样保存。</div>
+            <n-data-table
+              :columns="accountColumns"
+              :data="remoteJudgeAccounts"
+              :loading="accountsLoading"
+              :row-key="(row: RemoteJudgeAccount) => String(row.id)"
+              size="small"
+              :bordered="false"
+            />
+            <div v-if="!accountsLoading && !accountsError && remoteJudgeAccounts.length === 0" class="tip-text empty-tip">
+              暂无远程评测账号，可点击「新建账号」添加。
+            </div>
           </div>
         </n-tab-pane>
 
@@ -201,56 +130,69 @@
                 </n-input-number>
                 <div class="tip-text ml-2">限制同一用户连续提交代码的最小时间间隔</div>
               </n-form-item>
-
-              <n-divider title-placement="left">存储配置</n-divider>
-              <n-form-item label="上传文件大小限制" path="maxUploadSize">
-                <n-input-number v-model:value="config.maxUploadSize" :min="1">
-                  <template #suffix>MB</template>
-                </n-input-number>
-              </n-form-item>
-              <n-form-item label="存储驱动" path="storageDriver">
-                <n-radio-group v-model:value="config.storageDriver">
-                  <n-space>
-                    <n-radio v-for="opt in storageDriverOptions" :key="opt.value" :value="opt.value">
-                      {{ opt.label }}
-                    </n-radio>
-                  </n-space>
-                </n-radio-group>
-              </n-form-item>
-              <n-alert v-if="config.storageDriver !== 'LOCAL'" type="warning" class="mt-2">
-                选择 OSS/OBS 后，请确保已在服务端正确配置相应的 AccessKey 和 SecretKey。
-              </n-alert>
             </n-form>
           </div>
         </n-tab-pane>
       </n-tabs>
     </n-card>
 
-    <!-- 远程评测账号弹窗 -->
-    <n-modal v-model:show="showAccountModal" preset="card" :title="accountFormType === 'add' ? '添加远程账号' : '编辑远程账号'"
-      style="width: 500px">
-      <n-form label-placement="left" label-width="80" :model="accountFormModel">
-        <n-form-item label="OJ 平台" required>
-          <n-input :value="accountFormModel.platform" readonly disabled />
+    <n-modal
+      :show="showAccountModal"
+      @update:show="handleAccountModalShowChange"
+      preset="card"
+      :title="accountModalMode === 'create' ? '新建远程评测账号' : '编辑远程评测账号'"
+      style="width: 520px"
+      :mask-closable="false"
+    >
+      <n-form :model="accountForm" label-placement="left" label-width="90">
+        <n-form-item label="OJ" required>
+          <n-input
+            v-model:value="accountForm.oj"
+            :maxlength="ACCOUNT_OJ_MAX"
+            placeholder="如 codeforces"
+            :disabled="accountSaving"
+          />
         </n-form-item>
-        <n-form-item label="用户名" required>
-          <n-input v-model:value="accountFormModel.username" />
+        <n-form-item label="账号" required>
+          <n-input
+            v-model:value="accountForm.username"
+            :maxlength="ACCOUNT_USERNAME_MAX"
+            :disabled="accountSaving"
+          />
         </n-form-item>
-        <n-form-item label="密码" :required="accountFormType === 'add'">
-          <n-input type="password" show-password-on="click" v-model:value="accountFormModel.password"
-            :placeholder="accountFormType === 'add' ? '请输入密码' : '如不修改请留空'" />
+        <n-form-item label="密码" :required="accountModalMode === 'create'">
+          <n-input
+            v-model:value="accountForm.password"
+            type="password"
+            show-password-on="click"
+            :maxlength="ACCOUNT_PASSWORD_MAX"
+            :placeholder="accountModalMode === 'create' ? '新增必填' : '留空表示不修改'"
+            :disabled="accountSaving"
+          />
         </n-form-item>
-        <n-form-item label="并发限制">
-          <n-input-number v-model:value="accountFormModel.maxConcurrency" :min="1" />
+        <n-form-item label="状态" required>
+          <n-radio-group v-model:value="accountForm.status" :disabled="accountSaving">
+            <n-radio-button :value="1">正常</n-radio-button>
+            <n-radio-button :value="0">禁用</n-radio-button>
+          </n-radio-group>
         </n-form-item>
-        <n-form-item label="启用状态">
-          <n-switch v-model:value="accountFormModel.status" />
+        <n-form-item label="最大并发" required>
+          <n-input-number
+            v-model:value="accountForm.maxConcurrency"
+            :min="ACCOUNT_CONCURRENCY_MIN"
+            :max="ACCOUNT_CONCURRENCY_MAX"
+            :precision="0"
+            :disabled="accountSaving"
+          />
         </n-form-item>
       </n-form>
+
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showAccountModal = false">取消</n-button>
-          <n-button type="primary" :loading="loading" @click="handleAccountSubmit">确定</n-button>
+          <n-button :disabled="accountSaving" @click="closeAccountModal">取消</n-button>
+          <n-button type="primary" :loading="accountSaving" :disabled="accountSaving" @click="handleAccountSubmit">
+            提交
+          </n-button>
         </n-space>
       </template>
     </n-modal>
@@ -259,61 +201,83 @@
 
 <script setup lang="ts">
 import { h } from 'vue';
-import {
-  NButton, NIcon, NTag, NSpace, type DataTableColumns
-} from 'naive-ui';
-import {
-  SaveOutline, MailOutline, CopyOutline, RefreshOutline,
-  AddOutline, CreateOutline, TrashOutline
-} from '@vicons/ionicons5';
+import { NButton, NPopconfirm, NSpace, NTag, type DataTableColumns } from 'naive-ui';
+import { AddOutline, SaveOutline } from '@vicons/ionicons5';
 import { useSystemConfig, type RemoteJudgeAccount } from '@/composables/admin/useSystemConfig';
 
 const {
-  config, loading, sendingEmail, testEmailRecipient,
-  showAccountModal, accountFormType, accountFormModel,
-  contestIdValidation,
-  registerModeOptions, smtpSecurityOptions, storageDriverOptions, platformOptions,
-  saveConfig, checkContestId, sendTestEmail,
-  openAccountModal, handleAccountSubmit, deleteAccount,
-  regenerateToken, copyToken
+  config,
+  remoteJudgeAccounts,
+  accountsLoading,
+  accountsError,
+  accountSaving,
+  showAccountModal,
+  accountModalMode,
+  accountForm,
+  loading,
+  error,
+  gmtModified,
+  registerModeOptions,
+  fetchRemoteJudgeAccounts,
+  openCreateAccountModal,
+  openEditAccountModal,
+  closeAccountModal,
+  handleAccountModalShowChange,
+  handleAccountSubmit,
+  handleDeleteAccount,
+  saveConfig,
+  formatFullTime,
+  ACCOUNT_OJ_MAX,
+  ACCOUNT_USERNAME_MAX,
+  ACCOUNT_PASSWORD_MAX,
+  ACCOUNT_CONCURRENCY_MIN,
+  ACCOUNT_CONCURRENCY_MAX,
 } = useSystemConfig();
 
-const columns: DataTableColumns<RemoteJudgeAccount> = [
-  { title: '用户名', key: 'username' },
-  { title: '并发', key: 'maxConcurrency', width: 70 },
+const accountStatusText = (status: number) => {
+  if (status === 0) return '禁用';
+  if (status === 1) return '正常';
+  return String(status);
+};
+
+const accountColumns: DataTableColumns<RemoteJudgeAccount> = [
+  { title: 'OJ', key: 'oj', width: 140 },
+  { title: '用户名', key: 'username', minWidth: 140, ellipsis: { tooltip: true } },
   {
     title: '状态',
     key: 'status',
-    width: 70,
+    width: 90,
     render(row: RemoteJudgeAccount) {
-      return h(NTag, { type: row.status ? 'success' : 'error', bordered: false, size: 'small' },
-        { default: () => row.status ? '启用' : '禁用' }
-      );
-    }
+      return h(NTag, { type: row.status === 1 ? 'success' : 'default', bordered: false, size: 'small' },
+        { default: () => accountStatusText(row.status) });
+    },
+  },
+  { title: '最大并发', key: 'maxConcurrency', width: 100 },
+  {
+    title: '创建时间',
+    key: 'gmtCreate',
+    width: 180,
+    render: (row: RemoteJudgeAccount) => formatFullTime(row.gmtCreate),
   },
   {
     title: '操作',
     key: 'actions',
-    width: 100,
+    width: 150,
+    fixed: 'right',
     render(row: RemoteJudgeAccount) {
-      return h(NSpace, { size: 'small' }, {
+      return h(NSpace, { align: 'center' }, {
         default: () => [
-          h(NButton, {
-            size: 'tiny',
-            type: 'primary',
-            secondary: true,
-            onClick: () => openAccountModal('edit', row.platform, row)
-          }, { icon: () => h(CreateOutline) }),
-          h(NButton, {
-            size: 'tiny',
-            type: 'error',
-            secondary: true,
-            onClick: () => deleteAccount(row)
-          }, { icon: () => h(TrashOutline) })
-        ]
+          h(NButton, { size: 'tiny', secondary: true, type: 'primary', disabled: accountSaving.value, onClick: () => openEditAccountModal(row) },
+            { default: () => '编辑' }),
+          h(NPopconfirm, { onPositiveClick: () => handleDeleteAccount(row) }, {
+            trigger: () => h(NButton, { size: 'tiny', secondary: true, type: 'error' },
+              { default: () => '删除' }),
+            default: () => '确定删除该远程评测账号吗？',
+          }),
+        ],
       });
-    }
-  }
+    },
+  },
 ];
 </script>
 
@@ -335,15 +299,26 @@ const columns: DataTableColumns<RemoteJudgeAccount> = [
   margin-left: 8px;
 }
 
+.account-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.empty-tip {
+  text-align: center;
+  padding: 16px 0 4px;
+}
+
 .mb-2 {
   margin-bottom: 8px;
 }
 
-.mb-4 {
-  margin-bottom: 16px;
+.mb-3 {
+  margin-bottom: 12px;
 }
 
-.mt-2 {
-  margin-top: 8px;
+.mb-4 {
+  margin-bottom: 16px;
 }
 </style>

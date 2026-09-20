@@ -1,105 +1,58 @@
 import { ref, onMounted, onUnmounted } from 'vue';
+import { getSystemTime } from '@/utils/api';
+import { formatFullTime } from '@/composables/useTime';
 
-export interface ContestModeInfo {
-  title: string;
-  subtitle: string;
-  startTime: string; // ISO String
-  serverNode: string;
-  latency: string;
+/**
+ * 系统时间格式化：统一使用本地时区，避免 UTC 日期与本地时间混用导致跨零点日期错误。
+ * 后端 unixTimestamp 为毫秒 epoch，原样传入 Date，不做单位换算。
+ */
+export function formatSystemTime(timestampMs: number | null | undefined): string | null {
+  if (timestampMs === null || timestampMs === undefined) return null;
+  return formatFullTime(new Date(timestampMs));
 }
 
+/**
+ * 比赛模式（独立大屏）：
+ * 后端没有 /api/special/contest-mode 等独立开关/赛事信息接口，本页不得伪造赛事名称、
+ * 倒计时或节点时延。仅展示真实的服务端时间，其余能力明确“暂未开放”。
+ */
 export function useContestMode() {
-  const contestInfo = ref<ContestModeInfo>({
-    title: 'Loading...',
-    subtitle: '',
-    startTime: new Date().toISOString(),
-    serverNode: 'Unknown',
-    latency: '--'
-  });
-  
   const loading = ref(false);
-  const timeRemaining = ref({
-    hours: '00',
-    minutes: '00',
-    seconds: '00'
-  });
-  const systemTime = ref('');
-  
+  const available = false;
+  const unavailableMessage = '比赛模式暂未开放';
+  const systemTime = ref('--');
+
   let timerInterval: number | null = null;
-  let timeInterval: number | null = null;
 
-  // Mock API Call
-  const fetchContestInfo = async () => {
-    loading.value = true;
-    console.log('GET /api/special/contest-mode'); // Placeholder for RESTful API call
-    
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        // Mock Response
-        const targetDate = new Date();
-        targetDate.setHours(targetDate.getHours() + 24); // 24 hours from now
-        
-        contestInfo.value = {
-          title: '湖南工程学院程序设计大赛',
-          subtitle: 'Hunan Institute of Engineering 2022-2023 Programming Contest',
-          startTime: targetDate.toISOString(),
-          serverNode: 'CN_HN_04',
-          latency: '24ms'
-        };
-        loading.value = false;
-        resolve();
-      }, 500);
-    });
-  };
-
-  const updateCountdown = () => {
-    const now = new Date();
-    const target = new Date(contestInfo.value.startTime);
-    const diff = target.getTime() - now.getTime();
-
-    if (diff <= 0) {
-      timeRemaining.value = { hours: '00', minutes: '00', seconds: '00' };
-      return;
+  const updateSystemTime = async () => {
+    try {
+      const time = await getSystemTime();
+      if (time?.unixTimestamp) {
+        systemTime.value = formatSystemTime(time.unixTimestamp) ?? '--';
+        return;
+      }
+      systemTime.value = time?.serverTime ?? '--';
+    } catch {
+      systemTime.value = '--';
     }
-
-    const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const s = Math.floor((diff % (1000 * 60)) / 1000);
-
-    const pad = (num: number) => num.toString().padStart(2, '0');
-    
-    timeRemaining.value = {
-      hours: pad(h),
-      minutes: pad(m),
-      seconds: pad(s)
-    };
   };
 
-  const updateSystemTime = () => {
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toTimeString().split(' ')[0];
-    systemTime.value = `${dateStr} ${timeStr}`;
-  };
-
-  onMounted(async () => {
-    await fetchContestInfo();
-    updateCountdown();
-    updateSystemTime();
-    
-    timerInterval = setInterval(updateCountdown, 1000) as unknown as number;
-    timeInterval = setInterval(updateSystemTime, 1000) as unknown as number;
+  onMounted(() => {
+    loading.value = true;
+    void updateSystemTime().finally(() => {
+      loading.value = false;
+    });
+    timerInterval = setInterval(updateSystemTime, 1000) as unknown as number;
   });
 
   onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval);
-    if (timeInterval) clearInterval(timeInterval);
   });
 
   return {
-    contestInfo,
     loading,
-    timeRemaining,
-    systemTime
+    available,
+    unavailableMessage,
+    systemTime,
   };
 }

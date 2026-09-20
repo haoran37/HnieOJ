@@ -1,188 +1,113 @@
-import { computed, ref } from 'vue'
-import { sleep } from '@/utils/mock'
+import { ref } from 'vue'
+import {
+  getAdminContests,
+  getAdminHomeworks,
+  getAdminProblemList,
+  getAdminTrainings,
+  getSubmissions,
+  getUsers,
+} from '@/utils/api'
 
-type JudgeResult = 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' | 'SE'
-type AlertType = 'warning' | 'error'
-
-interface DistributionItem {
-  value: number
-  name: JudgeResult
+/** 仪表盘可用总量：全部来自对应列表接口的 total（非当前页长度） */
+export interface DashboardTotals {
+  totalUsers: number | null
+  totalProblems: number | null
+  totalTrainings: number | null
+  totalContests: number | null
+  totalHomeworks: number | null
+  totalSubmissions: number | null
 }
 
-interface AlertItem {
-  type: AlertType
-  title: string
-  content: string
+export type DashboardMetric = keyof DashboardTotals
+
+/** 单项统计的展示状态：加载中 / 真实数值（含 0）/ 读取失败 / 后端确实无此能力 */
+export type DashboardMetricState = 'loading' | 'value' | 'error' | 'unavailable'
+
+const emptyTotals = (): DashboardTotals => ({
+  totalUsers: null,
+  totalProblems: null,
+  totalTrainings: null,
+  totalContests: null,
+  totalHomeworks: null,
+  totalSubmissions: null,
+})
+
+const emptyFailed = (): Record<DashboardMetric, boolean> => ({
+  totalUsers: false,
+  totalProblems: false,
+  totalTrainings: false,
+  totalContests: false,
+  totalHomeworks: false,
+  totalSubmissions: false,
+})
+
+/**
+ * 状态映射（纯函数，便于回归）：
+ * - loading 优先，刷新期间不展示旧值；
+ * - 有真实数值（含 0）→ value；
+ * - 空值且该接口失败 → error（不得显示“暂未开放”，也不得沿用旧成功值）；
+ * - 空值且未失败 → unavailable（后端确实无该能力时保留的“暂未开放”）。
+ */
+export const dashboardMetricState = (
+  value: number | null,
+  failed: boolean,
+  loading: boolean,
+): DashboardMetricState => {
+  if (loading) return 'loading'
+  if (value !== null) return 'value'
+  return failed ? 'error' : 'unavailable'
 }
 
 export const useDashboard = () => {
   const loading = ref(false)
+  const error = ref<string | null>(null)
+  const totals = ref<DashboardTotals>(emptyTotals())
+  const failed = ref<Record<DashboardMetric, boolean>>(emptyFailed())
 
-  const coreMetrics = ref({
-    totalUsers: 12053,
-    dau: 842,
-    totalProblems: 3500,
-    totalTrainings: 128,
-    totalSubmissions: 450921,
-    todaySubmissions: 2301,
-  })
+  // 后端没有历史趋势/判题分布/热点统计等接口，页面必须明确“暂未开放”，不得用随机统计
+  const trendAvailable = false
+  const healthAvailable = false
+  const contentAvailable = false
 
-  const healthMetrics = ref({
-    judgeSuccessRate: 0.982,
-    avgJudgeTime24h: 320,
-    avgJudgeTime7d: 280,
-    distribution: [
-      { value: 1200, name: 'AC' },
-      { value: 600, name: 'WA' },
-      { value: 300, name: 'TLE' },
-      { value: 100, name: 'MLE' },
-      { value: 50, name: 'RE' },
-      { value: 51, name: 'CE' },
-      { value: 0, name: 'SE' },
-    ] as DistributionItem[],
-  })
-
-  const contentMetrics = ref({
-    hotProblems: [
-      { id: '1001', title: 'A+B Problem', count: 120, trend: '+15%' },
-      { id: '1024', title: '快速排序', count: 98, trend: '+8%' },
-      { id: '2048', title: '动态规划入门', count: 85, trend: '+12%' },
-      { id: '3033', title: '线段树模板', count: 72, trend: '+5%' },
-      { id: '1005', title: '矩阵乘法', count: 60, trend: '-2%' },
-    ],
-    coldProblems: [
-      { id: '9999', title: '极其复杂的计算几何', daysCreated: 365 },
-      { id: '8888', title: '构造难题示例', daysCreated: 120 },
-    ],
-    activeTrainings: [
-      { id: '1', title: 'C++ 基础语法训练', activeUsers: 305 },
-      { id: '2', title: '图论进阶', activeUsers: 120 },
-      { id: '3', title: '蓝桥杯突击', activeUsers: 98 },
-    ],
-  })
-
-  const trendOption = computed(() => ({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['新增用户', '提交次数'], bottom: 0 },
-    grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-      axisLine: { lineStyle: { color: '#999' } },
-    },
-    yAxis: [
-      {
-        type: 'value',
-        name: '新增用户',
-        position: 'left',
-        axisLine: { show: true, lineStyle: { color: '#2080f0' } },
-        splitLine: { lineStyle: { type: 'dashed', color: '#eee' } },
-      },
-      {
-        type: 'value',
-        name: '提交次数',
-        position: 'right',
-        alignTicks: true,
-        axisLine: { show: true, lineStyle: { color: '#18a058' } },
-        splitLine: { show: false },
-      },
-    ],
-    series: [
-      {
-        name: '新增用户',
-        type: 'line',
-        smooth: true,
-        data: [120, 132, 101, 134, 90, 230, 210],
-        itemStyle: { color: '#2080f0' },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(32, 128, 240, 0.3)' },
-              { offset: 1, color: 'rgba(32, 128, 240, 0.01)' },
-            ],
-          },
-        },
-        yAxisIndex: 0,
-      },
-      {
-        name: '提交次数',
-        type: 'line',
-        smooth: true,
-        data: [2200, 1820, 1910, 2340, 2900, 3300, 3100],
-        itemStyle: { color: '#18a058' },
-        yAxisIndex: 1,
-      },
-    ],
-  }))
-
-  const pieOption = computed(() => ({
-    tooltip: { trigger: 'item' },
-    legend: { top: 'middle', left: 'right', orient: 'vertical' },
-    series: [
-      {
-        name: '提交结果',
-        type: 'pie',
-        radius: ['55%', '80%'],
-        center: ['38%', '50%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 5,
-          borderColor: '#fff',
-          borderWidth: 2,
-        },
-        label: { show: false, position: 'center' },
-        emphasis: {
-          label: { show: true, fontSize: 18, fontWeight: 'bold' },
-        },
-        data: healthMetrics.value.distribution,
-      },
-    ],
-  }))
-
-  const alerts = computed<AlertItem[]>(() => {
-    const list: AlertItem[] = []
-    const waCount = healthMetrics.value.distribution.find((item) => item.name === 'WA')?.value ?? 0
-    const totalToday = coreMetrics.value.todaySubmissions
-
-    if (totalToday > 0 && waCount / totalToday > 0.2) {
-      list.push({
-        type: 'warning',
-        title: '高错误率预警',
-        content: `今日 WA 比例达到 ${((waCount / totalToday) * 100).toFixed(1)}%，请检查测试点配置。`,
-      })
-    }
-
-    const seCount = healthMetrics.value.distribution.find((item) => item.name === 'SE')?.value ?? 0
-    if (seCount > 0) {
-      list.push({
-        type: 'error',
-        title: '判题机异常',
-        content: `检测到 ${seCount} 次系统错误（SE），请尽快检查运行环境。`,
-      })
-    }
-
-    if (healthMetrics.value.avgJudgeTime24h > 1000) {
-      list.push({
-        type: 'warning',
-        title: '评测拥堵',
-        content: '最近 24 小时平均判题时长超过 1 秒，可能存在队列积压。',
-      })
-    }
-
-    return list
-  })
+  // 已接入的 6 个真实 total 接口，任一失败都不能伪造成“暂未开放”
+  const metricLoaders: Array<{
+    key: DashboardMetric
+    label: string
+    load: () => PromiseLike<{ total?: number } | null>
+  }> = [
+    { key: 'totalUsers', label: '用户', load: () => getUsers({ page: 1, pageSize: 1 }) },
+    { key: 'totalProblems', label: '题目', load: () => getAdminProblemList({ page: 1, pageSize: 1 }) },
+    { key: 'totalTrainings', label: '题单', load: () => getAdminTrainings({ page: 1, pageSize: 1 }) },
+    { key: 'totalContests', label: '比赛', load: () => getAdminContests({ page: 1, pageSize: 1 }) },
+    { key: 'totalHomeworks', label: '作业', load: () => getAdminHomeworks({ page: 1, pageSize: 1 }) },
+    { key: 'totalSubmissions', label: '提交', load: () => getSubmissions({ page: 1, pageSize: 1 }) },
+  ]
 
   const fetchData = async () => {
     loading.value = true
+    error.value = null
     try {
-      // TODO: Replace with real API request.
-      await sleep(600)
+      const results = await Promise.allSettled(metricLoaders.map((metric) => metric.load()))
+      const nextTotals = emptyTotals()
+      const nextFailed = emptyFailed()
+      const failedLabels: string[] = []
+      results.forEach((result, index) => {
+        const metric = metricLoaders[index]
+        if (!metric) return
+        if (result.status === 'fulfilled') {
+          // 真实 total（0 也是有效值）
+          nextTotals[metric.key] = result.value?.total ?? 0
+        } else {
+          nextFailed[metric.key] = true
+          failedLabels.push(metric.label)
+        }
+      })
+      // 整体覆盖：失败项保持 null，绝不沿用旧成功值冒充新状态
+      totals.value = nextTotals
+      failed.value = nextFailed
+      if (failedLabels.length > 0) {
+        error.value = `${failedLabels.join('、')}数据加载失败，请重试`
+      }
     } finally {
       loading.value = false
     }
@@ -190,12 +115,12 @@ export const useDashboard = () => {
 
   return {
     loading,
-    coreMetrics,
-    healthMetrics,
-    contentMetrics,
-    trendOption,
-    pieOption,
-    alerts,
+    error,
+    totals,
+    failed,
+    trendAvailable,
+    healthAvailable,
+    contentAvailable,
     fetchData,
   }
 }

@@ -1,363 +1,370 @@
 import { ref, reactive, onMounted } from 'vue';
-import { useMessage, useDialog } from 'naive-ui';
+import { useMessage } from 'naive-ui';
+import {
+  createRemoteJudgeAccount,
+  deleteRemoteJudgeAccount,
+  getAdminSystemConfig,
+  getRemoteJudgeAccounts,
+  saveAdminSystemConfig,
+  updateRemoteJudgeAccount,
+  type AdminSystemConfigSaveRequest,
+  type AdminSystemConfigVo,
+  type RemoteJudgeAccountCreateRequest,
+  type RemoteJudgeAccountUpdateRequest,
+  type RemoteJudgeAccountVo,
+} from '@/utils/api';
+import { formatFullTime } from '@/composables/useTime';
 
-export interface RemoteJudgeAccount {
-  id: string;
-  platform: string;
-  username: string;
-  password?: string; // Optional for display
-  maxConcurrency: number;
-  status: boolean;
-}
+// 后端 SystemConfigConstant.REGISTER_MODE_SET 的合法取值（区分大小写，必须原样提交）
+export const REGISTER_MODES = ['OPEN', 'EMAIL_SUFFIX', 'INVITE_CODE'] as const;
+export type RegisterMode = (typeof REGISTER_MODES)[number];
 
+// 对应后端 SystemConfigVo / SystemConfigSaveRequest
 export interface SystemConfig {
-  // Website Settings
   websiteName: string;
   logoUrl: string;
   icpCode: string;
   allowRegister: boolean;
-  registerMode: 'PUBLIC' | 'EMAIL_SUFFIX';
-  allowedEmailSuffixes: string[]; // For EMAIL_SUFFIX mode
-  maintenanceMode: boolean;
-  intranetAccessOnly: boolean;
-  contestMode: boolean;
-  contestId: string;
+  // 原样保存后端返回值，不做任何隐式转换
+  registerMode: string;
+  allowedEmailSuffixes: string[];
 
-  // SMTP Settings
   smtpHost: string;
   smtpPort: number;
   smtpEmail: string;
   smtpNickname: string;
+  // smtpPassword 只写不读（后端 VO 不返回），留空表示不修改
   smtpPassword: string;
-  smtpSecurity: 'NONE' | 'SSL' | 'TLS';
 
-  // Judge Settings
-  judgeToken: string;
-  defaultTimeLimit: number;
-  defaultMemoryLimit: number;
-  remoteJudgeAccounts: RemoteJudgeAccount[];
-
-  // Advanced Settings
   submissionInterval: number;
-  maxUploadSize: number;
-  storageDriver: 'LOCAL' | 'OSS' | 'OBS';
+}
+
+/** 对应后端 RemoteJudgeAccountVo（无 password） */
+export type RemoteJudgeAccount = RemoteJudgeAccountVo;
+
+// 远程评测账号字段上限（与后端 DTO 校验一致）
+export const ACCOUNT_OJ_MAX = 20;
+export const ACCOUNT_USERNAME_MAX = 100;
+export const ACCOUNT_PASSWORD_MAX = 255;
+export const ACCOUNT_CONCURRENCY_MIN = 1;
+export const ACCOUNT_CONCURRENCY_MAX = 100;
+
+export interface RemoteJudgeAccountForm {
+  id: number;
+  oj: string;
+  username: string;
+  /** 只写不读：编辑永远初始为空，从不回显/缓存后端密码 */
+  password: string;
+  status: number;
+  maxConcurrency: number;
+}
+
+const createDefaultConfig = (): SystemConfig => ({
+  websiteName: '',
+  logoUrl: '',
+  icpCode: '',
+  allowRegister: true,
+  registerMode: 'OPEN',
+  allowedEmailSuffixes: [],
+  smtpHost: '',
+  smtpPort: 465,
+  smtpEmail: '',
+  smtpNickname: '',
+  smtpPassword: '',
+  submissionInterval: 5,
+});
+
+const createDefaultAccountForm = (): RemoteJudgeAccountForm => ({
+  id: 0,
+  oj: '',
+  username: '',
+  password: '',
+  status: 1,
+  maxConcurrency: 1,
+});
+
+/** 后端 VO -> 表单。registerMode 原样保留（绝不把 OPEN/INVITE_CODE 静默改写成其它值） */
+export function toSystemConfig(data: Partial<AdminSystemConfigVo> | null | undefined): SystemConfig {
+  const fallback = createDefaultConfig();
+  if (!data) return fallback;
+  return {
+    websiteName: data.websiteName ?? '',
+    logoUrl: data.logoUrl ?? '',
+    icpCode: data.icpCode ?? '',
+    allowRegister: data.allowRegister ?? true,
+    registerMode: data.registerMode ?? fallback.registerMode,
+    allowedEmailSuffixes: data.allowedEmailSuffixes ?? [],
+    smtpHost: data.smtpHost ?? '',
+    smtpPort: data.smtpPort ?? 465,
+    smtpEmail: data.smtpEmail ?? '',
+    smtpNickname: data.smtpNickname ?? '',
+    // 后端不回显密码，始终置空，避免把旧值当新值提交
+    smtpPassword: '',
+    submissionInterval: data.submissionInterval ?? 5,
+  };
+}
+
+/** 表单 -> 后端 SaveRequest；smtpPassword 为空时整键省略，后端 resolveSmtpPassword 保留旧值 */
+export function toSaveRequest(config: SystemConfig): AdminSystemConfigSaveRequest {
+  const request: AdminSystemConfigSaveRequest = {
+    websiteName: config.websiteName,
+    logoUrl: config.logoUrl,
+    icpCode: config.icpCode,
+    allowRegister: config.allowRegister,
+    registerMode: config.registerMode,
+    allowedEmailSuffixes: config.allowedEmailSuffixes,
+    smtpHost: config.smtpHost,
+    smtpPort: config.smtpPort,
+    smtpEmail: config.smtpEmail,
+    smtpNickname: config.smtpNickname,
+    submissionInterval: config.submissionInterval,
+  };
+  const password = config.smtpPassword.trim();
+  if (password) {
+    request.smtpPassword = password;
+  }
+  return request;
 }
 
 export function useSystemConfig() {
   const message = useMessage();
-  const dialog = useDialog();
   const loading = ref(false);
-  const sendingEmail = ref(false);
-  
-  // Test Email State
-  const testEmailRecipient = ref('');
+  const error = ref<string | null>(null);
+  const gmtModified = ref<string | null>(null);
 
-  // Remote Judge Account Modal State
+  const config = reactive<SystemConfig>(createDefaultConfig());
+  const remoteJudgeAccounts = ref<RemoteJudgeAccount[]>([]);
+
+  const accountsLoading = ref(false);
+  const accountsError = ref<string | null>(null);
+  const accountSaving = ref(false);
   const showAccountModal = ref(false);
-  const accountFormType = ref<'add' | 'edit'>('add');
-  const accountFormModel = reactive({
-    id: '',
-    platform: '',
-    username: '',
-    password: '',
-    maxConcurrency: 1,
-    status: true
-  });
+  const accountModalMode = ref<'create' | 'edit'>('create');
+  const accountForm = reactive<RemoteJudgeAccountForm>(createDefaultAccountForm());
 
-  // Contest ID Validation State
-  const contestIdValidation = reactive({
-    status: undefined as 'success' | 'error' | 'warning' | undefined,
-    message: '',
-    loading: false
-  });
+  let accountsSeq = 0;
 
-  // Config State
-  const config = reactive<SystemConfig>({
-    websiteName: '',
-    logoUrl: '',
-    icpCode: '',
-    allowRegister: true,
-    registerMode: 'PUBLIC',
-    allowedEmailSuffixes: [],
-    maintenanceMode: false,
-    intranetAccessOnly: false,
-    contestMode: false,
-    contestId: '',
-
-    smtpHost: '',
-    smtpPort: 465,
-    smtpEmail: '',
-    smtpNickname: 'HnieOJ',
-    smtpPassword: '',
-    smtpSecurity: 'SSL',
-
-    judgeToken: '',
-    defaultTimeLimit: 1000,
-    defaultMemoryLimit: 256,
-    remoteJudgeAccounts: [],
-
-    submissionInterval: 5,
-    maxUploadSize: 10,
-    storageDriver: 'LOCAL'
-  });
-
-  // Options
   const registerModeOptions = [
-    { label: '公开注册', value: 'PUBLIC' },
-    { label: '邮箱后缀限制', value: 'EMAIL_SUFFIX' }
+    { label: '公开注册 (OPEN)', value: 'OPEN' },
+    { label: '邮箱后缀限制 (EMAIL_SUFFIX)', value: 'EMAIL_SUFFIX' },
+    { label: '邀请码 (INVITE_CODE)', value: 'INVITE_CODE' },
   ];
 
-  const smtpSecurityOptions = [
-    { label: '无', value: 'NONE' },
-    { label: 'SSL', value: 'SSL' },
-    { label: 'TLS', value: 'TLS' }
-  ];
-
-  const storageDriverOptions = [
-    { label: '本地存储', value: 'LOCAL' },
-    { label: '阿里云 OSS', value: 'OSS' },
-    { label: '华为云 OBS', value: 'OBS' }
-  ];
-
-  const platformOptions = [
-    { label: 'Codeforces', value: 'Codeforces' },
-    { label: 'AtCoder', value: 'AtCoder' },
-    { label: 'Vjudge', value: 'Vjudge' },
-    { label: 'POJ', value: 'POJ' }
-  ];
-
-  // Mock API: Fetch Config
   const fetchConfig = async () => {
     loading.value = true;
+    error.value = null;
     try {
-      console.log('API: Fetching system config...');
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Mock Data
-      Object.assign(config, {
-        websiteName: 'HnieOJ Online Judge',
-        logoUrl: 'https://example.com/logo.png',
-        icpCode: '湘ICP备12345678号',
-        allowRegister: true,
-        registerMode: 'PUBLIC',
-        allowedEmailSuffixes: ['@hnie.edu.cn', '@stu.hnie.edu.cn'],
-        maintenanceMode: false,
-        intranetAccessOnly: false,
-        contestMode: false,
-        contestId: '',
-
-        smtpHost: 'smtp.exmail.qq.com',
-        smtpPort: 465,
-        smtpEmail: 'no-reply@hnie.edu.cn',
-        smtpNickname: 'HnieOJ Admin',
-        smtpPassword: 'password_placeholder',
-        smtpSecurity: 'SSL',
-
-        judgeToken: 'd83j9d2-j92d-92jd-92jd-92jd92jd92jd',
-        defaultTimeLimit: 1000,
-        defaultMemoryLimit: 256,
-        remoteJudgeAccounts: [
-          { id: '1', platform: 'Codeforces', username: 'bot01', maxConcurrency: 1, status: true },
-          { id: '2', platform: 'AtCoder', username: 'bot02', maxConcurrency: 2, status: false }
-        ],
-
-        submissionInterval: 10,
-        maxUploadSize: 50,
-        storageDriver: 'LOCAL'
-      });
-    } catch (_error) {
-      message.error('加载配置失败');
+      const data = await getAdminSystemConfig();
+      Object.assign(config, toSystemConfig(data));
+      gmtModified.value = data?.gmtModified ?? null;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '加载系统配置失败';
     } finally {
       loading.value = false;
     }
   };
 
-  // Mock API: Save Config
-  const saveConfig = async () => {
-    loading.value = true;
+  const fetchRemoteJudgeAccounts = async () => {
+    const seq = ++accountsSeq;
+    accountsLoading.value = true;
+    accountsError.value = null;
     try {
-      console.log('API: Saving system config...', JSON.parse(JSON.stringify(config)));
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      message.success('配置保存成功');
-    } catch (_error) {
-      message.error('保存配置失败');
+      const list = await getRemoteJudgeAccounts();
+      if (seq !== accountsSeq) return;
+      remoteJudgeAccounts.value = list ?? [];
+    } catch (err) {
+      if (seq !== accountsSeq) return;
+      // 列表加载失败不得伪装成“没有账号”：保留旧数据并明确报错供重试
+      accountsError.value = err instanceof Error ? err.message : '远程评测账号加载失败';
     } finally {
-      loading.value = false;
+      if (seq === accountsSeq) accountsLoading.value = false;
     }
   };
 
-  // Mock API: Check Contest ID
-  const checkContestId = async () => {
-    if (!config.contestId) {
-      contestIdValidation.status = undefined;
-      contestIdValidation.message = '';
-      return;
-    }
-    contestIdValidation.loading = true;
-    try {
-      console.log(`API: Checking contest ID ${config.contestId}...`);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      if (config.contestId === '1001') {
-        contestIdValidation.status = 'success';
-        contestIdValidation.message = '有效比赛: HnieOJ 2024 程序设计竞赛';
-      } else {
-        contestIdValidation.status = 'error';
-        contestIdValidation.message = '比赛不存在或无效';
-      }
-    } catch (_error) {
-      contestIdValidation.status = 'error';
-      contestIdValidation.message = '验证请求失败';
-    } finally {
-      contestIdValidation.loading = false;
-    }
+  const resetAccountForm = () => {
+    Object.assign(accountForm, createDefaultAccountForm());
   };
 
-  // Mock API: Send Test Email
-  const sendTestEmail = async () => {
-    if (!testEmailRecipient.value) {
-      message.warning('请输入接收邮箱');
-      return;
-    }
-    sendingEmail.value = true;
-    try {
-      console.log(`API: Sending test email to ${testEmailRecipient.value}...`);
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      message.success('测试邮件发送成功');
-    } catch (_error) {
-      message.error('测试邮件发送失败');
-    } finally {
-      sendingEmail.value = false;
-    }
-  };
-
-  // Remote Judge Account Actions
-  const openAccountModal = (type: 'add' | 'edit', platform?: string, row?: RemoteJudgeAccount) => {
-    accountFormType.value = type;
-    if (type === 'edit' && row) {
-      Object.assign(accountFormModel, { ...row, password: '' });
-    } else {
-      Object.assign(accountFormModel, {
-        id: '',
-        platform: platform || 'Codeforces',
-        username: '',
-        password: '',
-        maxConcurrency: 1,
-        status: true
-      });
-    }
+  const openCreateAccountModal = () => {
+    // 保存进行中禁止切换到新建，避免在途请求结果写入另一份表单
+    if (accountSaving.value) return;
+    accountModalMode.value = 'create';
+    resetAccountForm();
     showAccountModal.value = true;
   };
 
+  const openEditAccountModal = (row: RemoteJudgeAccount) => {
+    if (accountSaving.value) return;
+    accountModalMode.value = 'edit';
+    accountForm.id = row.id;
+    accountForm.oj = row.oj ?? '';
+    accountForm.username = row.username ?? '';
+    // 密码永远初始为空；留空即保留原密码
+    accountForm.password = '';
+    accountForm.status = row.status === 0 ? 0 : 1;
+    accountForm.maxConcurrency = row.maxConcurrency ?? 1;
+    showAccountModal.value = true;
+  };
+
+  // 正常关闭：清空只写不读的密码，避免下次打开回显或误提交
+  const closeAccountModal = () => {
+    if (accountSaving.value) return;
+    accountForm.password = '';
+    showAccountModal.value = false;
+  };
+
+  // Naive UI 右上关闭与 Esc 都走 update:show，保存期间必须被忽略
+  const handleAccountModalShowChange = (value: boolean) => {
+    if (value) {
+      showAccountModal.value = true;
+      return;
+    }
+    closeAccountModal();
+  };
+
   const handleAccountSubmit = async () => {
-    if (!accountFormModel.username) {
-      message.warning('请填写用户名');
+    if (accountSaving.value) return;
+
+    const mode = accountModalMode.value;
+    const id = accountForm.id;
+    const oj = accountForm.oj.trim();
+    const username = accountForm.username.trim();
+    const password = accountForm.password;
+    const status = accountForm.status;
+    const maxConcurrency = accountForm.maxConcurrency;
+
+    if (!oj) {
+      message.warning('请输入 OJ 名称');
+      return;
+    }
+    if (oj.length > ACCOUNT_OJ_MAX) {
+      message.warning(`OJ 名称不能超过 ${ACCOUNT_OJ_MAX} 个字符`);
+      return;
+    }
+    if (!username) {
+      message.warning('请输入账号');
+      return;
+    }
+    if (username.length > ACCOUNT_USERNAME_MAX) {
+      message.warning(`账号不能超过 ${ACCOUNT_USERNAME_MAX} 个字符`);
+      return;
+    }
+    if (mode === 'create' && password.trim() === '') {
+      message.warning('新增账号必须填写密码');
+      return;
+    }
+    if (password.length > ACCOUNT_PASSWORD_MAX) {
+      message.warning(`密码不能超过 ${ACCOUNT_PASSWORD_MAX} 个字符`);
+      return;
+    }
+    if (status !== 0 && status !== 1) {
+      message.warning('状态只能为 0（禁用）或 1（正常）');
+      return;
+    }
+    if (
+      !Number.isInteger(maxConcurrency) ||
+      maxConcurrency < ACCOUNT_CONCURRENCY_MIN ||
+      maxConcurrency > ACCOUNT_CONCURRENCY_MAX
+    ) {
+      message.warning(`最大并发必须是 ${ACCOUNT_CONCURRENCY_MIN}..${ACCOUNT_CONCURRENCY_MAX} 的整数`);
       return;
     }
 
-    if (accountFormType.value === 'add' && !accountFormModel.password) {
-      message.warning('请填写密码');
-      return;
+    // 在 await 前捕获 id 与 payload 快照，保存期间切换编辑不会串号
+    const common = { oj, username, status, maxConcurrency };
+    const createPayload: RemoteJudgeAccountCreateRequest = { ...common, password };
+    const updatePayload: RemoteJudgeAccountUpdateRequest = { ...common };
+    if (password !== '') {
+      // 非空密码原样提交，不做 trim；留空则整键省略，后端保留原密码
+      updatePayload.password = password;
     }
 
-    loading.value = true;
+    accountSaving.value = true;
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      if (accountFormType.value === 'add') {
-        console.log('API: POST remote judge account...', accountFormModel);
-        config.remoteJudgeAccounts.push({
-          ...accountFormModel,
-          id: Date.now().toString()
-        });
-        message.success('添加成功');
+      if (mode === 'create') {
+        await createRemoteJudgeAccount(createPayload);
+        message.success('账号已创建');
       } else {
-        console.log('API: PUT remote judge account...', accountFormModel);
-        const index = config.remoteJudgeAccounts.findIndex(a => a.id === accountFormModel.id);
-        if (index !== -1) {
-          config.remoteJudgeAccounts[index] = { ...accountFormModel };
-          message.success('更新成功');
-        }
+        await updateRemoteJudgeAccount(id, updatePayload);
+        message.success('账号已保存');
       }
       showAccountModal.value = false;
+      // 成功后清空密码，绝不缓存到下一次打开；失败路径保留输入
+      accountForm.password = '';
+      // 创建/编辑后重新读取真实列表
+      await fetchRemoteJudgeAccounts();
+    } catch (err) {
+      // 失败保留表单输入（含密码），不关闭弹窗
+      message.error(err instanceof Error ? err.message : '保存远程评测账号失败');
     } finally {
-      loading.value = false;
+      accountSaving.value = false;
     }
   };
 
-  const deleteAccount = (row: RemoteJudgeAccount) => {
-    dialog.warning({
-      title: '确认删除',
-      content: `确定要删除 ${row.platform} 账号 ${row.username} 吗？`,
-      positiveText: '确定',
-      negativeText: '取消',
-      onPositiveClick: async () => {
-        loading.value = true;
-        try {
-          console.log(`API: Deleting account ${row.id}...`);
-          await new Promise(resolve => setTimeout(resolve, 300));
-          config.remoteJudgeAccounts = config.remoteJudgeAccounts.filter(a => a.id !== row.id);
-          message.success('删除成功');
-        } finally {
-          loading.value = false;
-        }
-      }
-    });
+  const handleDeleteAccount = async (row: RemoteJudgeAccount) => {
+    try {
+      await deleteRemoteJudgeAccount(row.id);
+      message.success('账号已删除');
+      // 删除后重新读取列表，确认真实状态
+      await fetchRemoteJudgeAccounts();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '删除远程评测账号失败');
+    }
   };
 
-  // Judger Token Actions
-  const regenerateToken = () => {
-    dialog.warning({
-      title: '重置 Token',
-      content: '重置 Token 后，所有判题机需更新配置才能正常工作，确定继续吗？',
-      positiveText: '确定',
-      negativeText: '取消',
-      onPositiveClick: async () => {
-        loading.value = true;
-        try {
-          console.log('API: Regenerating token...');
-          await new Promise(resolve => setTimeout(resolve, 500));
-          config.judgeToken = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-          message.success('Token 已重置');
-        } finally {
-          loading.value = false;
-        }
-      }
-    });
-  };
-
-  const copyToken = () => {
-    if (config.judgeToken) {
-      navigator.clipboard.writeText(config.judgeToken);
-      message.success('Token 已复制到剪贴板');
+  const saveConfig = async () => {
+    if (!REGISTER_MODES.includes(config.registerMode as RegisterMode)) {
+      message.error(
+        `registerMode 仅支持 ${REGISTER_MODES.join(' / ')}，当前值「${config.registerMode}」无法保存`,
+      );
+      return;
+    }
+    loading.value = true;
+    error.value = null;
+    try {
+      await saveAdminSystemConfig(toSaveRequest(config));
+      message.success('配置保存成功');
+      // 保存成功后重新读取后端数据，确认真正落库
+      await fetchConfig();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '保存配置失败');
+    } finally {
+      loading.value = false;
     }
   };
 
   onMounted(() => {
-    fetchConfig();
+    void fetchConfig();
+    void fetchRemoteJudgeAccounts();
   });
 
   return {
     config,
-    loading,
-    sendingEmail,
-    testEmailRecipient,
+    remoteJudgeAccounts,
+    accountsLoading,
+    accountsError,
+    accountSaving,
     showAccountModal,
-    accountFormType,
-    accountFormModel,
-    contestIdValidation,
+    accountModalMode,
+    accountForm,
+    loading,
+    error,
+    gmtModified,
     registerModeOptions,
-    smtpSecurityOptions,
-    storageDriverOptions,
-    platformOptions,
     fetchConfig,
-    saveConfig,
-    checkContestId,
-    sendTestEmail,
-    openAccountModal,
+    fetchRemoteJudgeAccounts,
+    openCreateAccountModal,
+    openEditAccountModal,
+    closeAccountModal,
+    handleAccountModalShowChange,
     handleAccountSubmit,
-    deleteAccount,
-    regenerateToken,
-    copyToken
+    handleDeleteAccount,
+    saveConfig,
+    formatFullTime,
+    ACCOUNT_OJ_MAX,
+    ACCOUNT_USERNAME_MAX,
+    ACCOUNT_PASSWORD_MAX,
+    ACCOUNT_CONCURRENCY_MIN,
+    ACCOUNT_CONCURRENCY_MAX,
   };
 }

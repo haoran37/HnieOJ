@@ -1,23 +1,28 @@
 import { ref, reactive } from 'vue';
 import { useMessage } from 'naive-ui';
 import { formatFullTime } from '@/composables/useTime';
+import { get, post } from '@/utils/api';
+import { submissionStatusText } from '@/types/submission';
+import type { PageVo } from '@/types/problem';
 
-// 重判任务接口
+// 后端 RejudgeTaskVo / RejudgeTaskDetailVo 的前端视图模型
 export interface RejudgeTask {
   id: number;
-  problemId: string;
-  problemTitle: string;
-  submitter: string; // 提交重判任务的管理员
+  problemId: string;    // problemCode（展示编号）
+  problemTitle: string; // 后端未返回标题，用编号占位
+  contestId: number | null;
+  submitter: string;    // adminId
   submitTime: string;
-  totalCount: number; // 需要重判的总数
-  processedCount: number; // 已处理数量
-  range: string; // 时间范围
-  status: 'pending' | 'processing' | 'finished' | 'error';
-  result: string; // 简要结果描述，如 "未变化" 或 "变化: x"
-  changeCount: number; // 变化数量
+  totalCount: number;
+  processedCount: number;
+  failedCount: number;
+  range: string;
+  status: 'pending' | 'processing' | 'finished' | 'failed';
+  result: string;
+  // 后端未返回“变化数”，不能用 processedCount 冒充；null 表示暂无该统计
+  changeCount: number | null;
 }
 
-// 重判详情接口
 export interface RejudgeDetail {
   runId: string;
   uid: string;
@@ -27,11 +32,85 @@ export interface RejudgeDetail {
   language: string;
 }
 
+interface RejudgeTaskVo {
+  id: number;
+  problemCode: string | null;
+  contestId: number | null;
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  status: string;
+  totalCount: number | null;
+  processedCount: number | null;
+  failedCount: number | null;
+  lastError: string | null;
+  adminId: string | null;
+  gmtCreate: string | null;
+}
+
+interface RejudgeTaskDetailVo {
+  runId: string | null;
+  submissionId: string | null;
+  uid: string | null;
+  username: string | null;
+  originalStatus: string | null;
+  currentStatus: string | null;
+  originalStatusCode: number | null;
+  currentStatusCode: number | null;
+  language: string | null;
+}
+
+function statusLabel(status: string | null): RejudgeTask['status'] {
+  if (status === 'finished') return 'finished';
+  if (status === 'failed') return 'failed';
+  if (status === 'processing') return 'processing';
+  return 'pending';
+}
+
+// 后端 RejudgeTaskRequest.rangeStart/rangeEnd 为 LocalDateTime（无时区），
+// 必须保留用户选择的本地墙上时间，不能用 toISOString() 转成 UTC 剪切时区。
+export function toLocalDateTime(ms: number): string {
+  const date = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
+
+function toRejudgeTask(vo: RejudgeTaskVo): RejudgeTask {
+  const status = statusLabel(vo.status);
+  const failed = vo.failedCount ?? 0;
+  const range =
+    vo.rangeStart || vo.rangeEnd
+      ? `${vo.rangeStart ? formatFullTime(vo.rangeStart) : '不限'} ~ ${vo.rangeEnd ? formatFullTime(vo.rangeEnd) : '不限'}`
+      : '全部时间';
+  let result = '重判中...';
+  if (status === 'finished') result = failed > 0 ? `完成（失败 ${failed}）` : '完成';
+  if (status === 'failed') result = vo.lastError || '任务失败';
+  if (status === 'pending') result = '等待中';
+  return {
+    id: vo.id,
+    problemId: vo.problemCode ?? '',
+    problemTitle: vo.problemCode ?? '',
+    contestId: vo.contestId ?? null,
+    submitter: vo.adminId ?? '',
+    submitTime: formatFullTime(vo.gmtCreate),
+    totalCount: vo.totalCount ?? 0,
+    processedCount: vo.processedCount ?? 0,
+    failedCount: failed,
+    range,
+    status,
+    result,
+    // 后端未直接提供变化数，置空表示“暂无统计”，不伪造为 processedCount
+    changeCount: null,
+  };
+}
+
 export function useRejudge() {
   const message = useMessage();
 
-  // 列表相关
   const loading = ref(false);
+  const error = ref<string | null>(null);
   const rejudgeList = ref<RejudgeTask[]>([]);
   const pagination = reactive({
     page: 1,
@@ -41,131 +120,109 @@ export function useRejudge() {
     pageSizes: [10, 20, 50],
     onChange: (page: number) => {
       pagination.page = page;
-      fetchRejudgeList();
+      void fetchRejudgeList();
     },
     onUpdatePageSize: (pageSize: number) => {
       pagination.pageSize = pageSize;
       pagination.page = 1;
-      fetchRejudgeList();
+      void fetchRejudgeList();
     }
   });
 
-  // 添加重判模态框相关
+  // 添加重判模态框
   const showAddModal = ref(false);
   const addForm = reactive({
-    problemId: '',
+    problemCode: '',
     startTime: null as number | null,
     endTime: null as number | null,
     rangeType: 'all' // 'all' | 'custom'
   });
 
-  // 详情模态框相关
+  // 详情模态框
   const showDetailModal = ref(false);
   const detailLoading = ref(false);
   const currentDetailList = ref<RejudgeDetail[]>([]);
   const currentTask = ref<RejudgeTask | null>(null);
 
-  // 获取重判列表
-  const fetchRejudgeList = () => {
+  const fetchRejudgeList = async () => {
     loading.value = true;
-    console.log('API Request: GET /api/admin/rejudge/list', {
-      page: pagination.page,
-      size: pagination.pageSize
-    });
-
-    // Mock Data
-    setTimeout(() => {
-      const mockData: RejudgeTask[] = Array.from({ length: pagination.pageSize }, (_, i) => {
-        const id = (pagination.page - 1) * pagination.pageSize + i + 1;
-        const isFinished = i > 2;
-        const total = Math.floor(Math.random() * 100) + 10;
-        const processed = isFinished ? total : Math.floor(Math.random() * total);
-        const changeCount = isFinished ? (Math.random() > 0.7 ? Math.floor(Math.random() * 10) + 1 : 0) : 0;
-        
-        return {
-          id,
-          problemId: `100${id % 10}`,
-          problemTitle: `Problem Title ${id}`,
-          submitter: 'admin',
-          submitTime: formatFullTime(new Date(Date.now() - id * 3600000)),
-          totalCount: total,
-          processedCount: processed,
-          range: 'All Time',
-          status: isFinished ? 'finished' : 'processing',
-          result: isFinished ? (changeCount > 0 ? `变化: ${changeCount}` : '未变化') : '重判中...',
-          changeCount
-        };
+    error.value = null;
+    try {
+      const result = await get<PageVo<RejudgeTaskVo>>('/api/admin/submissions/rejudge-tasks', {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
       });
-
-      rejudgeList.value = mockData;
-      pagination.itemCount = 50;
+      rejudgeList.value = (result?.list ?? []).map(toRejudgeTask);
+      pagination.itemCount = result?.total ?? 0;
+    } catch (err) {
+      rejudgeList.value = [];
+      pagination.itemCount = 0;
+      error.value = err instanceof Error ? err.message : '重判任务加载失败';
+    } finally {
       loading.value = false;
-    }, 500);
+    }
   };
 
-  // 提交添加重判
-  const handleAddRejudge = () => {
-    if (!addForm.problemId) {
-      message.warning('请输入题目ID');
+  const handleAddRejudge = async () => {
+    if (!addForm.problemCode.trim()) {
+      message.warning('请输入题目编号（problemCode）');
+      return;
+    }
+    if (addForm.rangeType === 'custom' && (!addForm.startTime || !addForm.endTime)) {
+      message.warning('请选择时间范围');
       return;
     }
 
-    console.log('API Request: POST /api/admin/rejudge', {
-      problemId: addForm.problemId,
-      range: addForm.rangeType === 'all' ? 'all' : { start: addForm.startTime, end: addForm.endTime }
-    });
-
-    message.success('重判任务已添加');
-    showAddModal.value = false;
-    // 重置表单
-    addForm.problemId = '';
-    addForm.rangeType = 'all';
-    addForm.startTime = null;
-    addForm.endTime = null;
-    
-    fetchRejudgeList();
+    loading.value = true;
+    try {
+      await post('/api/admin/submissions/rejudge-tasks', {
+        problemCode: addForm.problemCode.trim(),
+        rangeStart: addForm.rangeType === 'custom' && addForm.startTime ? toLocalDateTime(addForm.startTime) : undefined,
+        rangeEnd: addForm.rangeType === 'custom' && addForm.endTime ? toLocalDateTime(addForm.endTime) : undefined,
+      });
+      message.success('重判任务已创建');
+      showAddModal.value = false;
+      addForm.problemCode = '';
+      addForm.rangeType = 'all';
+      addForm.startTime = null;
+      addForm.endTime = null;
+      await fetchRejudgeList();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '创建重判任务失败');
+    } finally {
+      loading.value = false;
+    }
   };
 
-  // 查看详情
-  const handleShowDetails = (task: RejudgeTask) => {
-    if (task.changeCount === 0) return;
-    
+  const handleShowDetails = async (task: RejudgeTask) => {
     currentTask.value = task;
     showDetailModal.value = true;
-    fetchRejudgeDetails(task.id);
+    await fetchRejudgeDetails(task.id);
   };
 
-  // 获取详情数据
-  const fetchRejudgeDetails = (taskId: number) => {
+  const fetchRejudgeDetails = async (taskId: number) => {
     detailLoading.value = true;
-    console.log(`API Request: GET /api/admin/rejudge/${taskId}/details`);
-
-    // Mock Data
-    setTimeout(() => {
-      const count = currentTask.value?.changeCount || 5;
-      currentDetailList.value = Array.from({ length: count }, (_, i) => {
-        const statusPool = ['Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error'];
-        const original = statusPool[Math.floor(Math.random() * statusPool.length)] || 'Accepted';
-        let current = statusPool[Math.floor(Math.random() * statusPool.length)] || 'Wrong Answer';
-        while (current === original) {
-          current = statusPool[Math.floor(Math.random() * statusPool.length)] || 'Wrong Answer';
-        }
-
-        return {
-          runId: `${80000 + i}`,
-          uid: `202300${i}`,
-          username: `User_${i}`,
-          originalStatus: original,
-          currentStatus: current,
-          language: ['C++', 'Java', 'Python'][i % 3] || 'C++'
-        };
-      });
+    try {
+      const list = await get<RejudgeTaskDetailVo[]>(`/api/admin/rejudge/${taskId}/details`);
+      currentDetailList.value = (list ?? []).map((item) => ({
+        runId: item.runId || item.submissionId || '',
+        uid: item.uid ?? '',
+        username: item.username ?? '',
+        originalStatus: submissionStatusText(item.originalStatusCode, item.originalStatus),
+        currentStatus: submissionStatusText(item.currentStatusCode, item.currentStatus),
+        language: item.language ?? '',
+      }));
+    } catch (err) {
+      currentDetailList.value = [];
+      message.error(err instanceof Error ? err.message : '重判详情加载失败');
+    } finally {
       detailLoading.value = false;
-    }, 400);
+    }
   };
 
   return {
     loading,
+    error,
     rejudgeList,
     pagination,
     showAddModal,

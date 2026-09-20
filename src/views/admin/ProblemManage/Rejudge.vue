@@ -7,6 +7,8 @@
       </n-button>
     </div>
 
+    <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">{{ error }}</n-alert>
+
     <n-data-table
       remote
       :columns="columns"
@@ -20,8 +22,8 @@
 
     <n-modal v-model:show="showAddModal" preset="dialog" title="添加重判任务">
       <n-form label-placement="left" label-width="80">
-        <n-form-item label="题目ID">
-          <n-input v-model:value="addForm.problemId" placeholder="请输入题目ID" />
+        <n-form-item label="题目编号">
+          <n-input v-model:value="addForm.problemCode" placeholder="请输入展示编号，如 P1000" />
         </n-form-item>
         <n-form-item label="时间范围">
           <n-radio-group v-model:value="addForm.rangeType">
@@ -77,6 +79,7 @@ import { statusConfig } from '@/utils/statusColumns';
 const router = useRouter();
 const {
   loading,
+  error,
   rejudgeList,
   pagination,
   showAddModal,
@@ -136,7 +139,7 @@ const columns = [
         ? Math.floor((row.processedCount / row.totalCount) * 100) 
         : 0;
       
-      const status = row.status === 'finished' ? 'success' : (row.status === 'error' ? 'error' : 'warning');
+      const status = row.status === 'finished' ? 'success' : (row.status === 'failed' ? 'error' : 'warning');
       
       return h(NProgress, {
         type: 'line',
@@ -153,11 +156,25 @@ const columns = [
     width: 150,
     render(row: RejudgeTask) {
       if (row.status !== 'finished') return row.result;
-      
+
+      if (row.changeCount === null) {
+        // 后端未提供变化数：不伪造，仅提供真实的逐条详情入口
+        return h(
+          NButton,
+          {
+            text: true,
+            type: 'info',
+            style: { textDecoration: 'underline' },
+            onClick: () => handleShowDetails(row)
+          },
+          { default: () => row.result }
+        );
+      }
+
       if (row.changeCount === 0) {
         return h('span', { style: { color: '#18a058' } }, '未变化');
       }
-      
+
       return h(
         NButton,
         {

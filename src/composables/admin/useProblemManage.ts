@@ -1,20 +1,35 @@
-import { ref, reactive, h, watch } from 'vue';
+import { ref, reactive, h } from 'vue';
 import { useRouter } from 'vue-router';
-import { NButton, NTag, NSpace, useMessage, NPopconfirm } from 'naive-ui';
-import { formatFullTime } from '@/composables/useTime'
+import { NButton, NTag, NSpace, NSelect, useMessage, NPopconfirm } from 'naive-ui';
+import { formatFullTime } from '@/composables/useTime';
+import {
+  deleteAdminProblem,
+  getAdminProblemList,
+  updateAdminProblemAuth,
+  type AdminProblemListVo,
+} from '@/utils/api';
+
+const DIFFICULTY_LABELS: Record<number, { text: string; type: 'success' | 'warning' | 'error' | 'default' }> = {
+  0: { text: '简单', type: 'success' },
+  1: { text: '中等', type: 'warning' },
+  2: { text: '困难', type: 'error' },
+};
+
+const AUTH_OPTIONS = [
+  { label: '公开', value: 1 },
+  { label: '私有', value: 2 },
+  // 后端 PUT /api/admin/problem/auth 仅支持 1/2，赛用(3)需在编辑页调整
+  { label: '赛用（仅编辑页可改）', value: 3, disabled: true },
+];
 
 export function useProblemManage() {
   const router = useRouter();
   const message = useMessage();
 
-  const showImportModal = ref(false);
-  const showExportModal = ref(false);
-  const showRemoteModal = ref(false);
-  const searchKeyword = ref('');
   const loading = ref(false);
-
-  // 模拟数据
-  const tableData = ref<any[]>([]);
+  const searchKeyword = ref('');
+  const authFilter = ref<number | null>(null);
+  const tableData = ref<AdminProblemListVo[]>([]);
 
   const pagination = reactive({
     page: 1,
@@ -22,52 +37,42 @@ export function useProblemManage() {
     itemCount: 0,
     showSizePicker: true,
     pageSizes: [10, 20, 50],
-    onChange: (page: number) => {
-      pagination.page = page;
-      fetchProblems();
-    },
-    onUpdatePageSize: (pageSize: number) => {
-      pagination.pageSize = pageSize;
-      pagination.page = 1;
-      fetchProblems();
-    }
   });
 
-  const fetchProblems = () => {
-    loading.value = true;
-    console.log('API Request: GET /api/admin/problem/list', {
-      page: pagination.page,
-      limit: pagination.pageSize,
-      keyword: searchKeyword.value
-    });
+  // 列表请求序号：筛选/翻页快速变化时，只接受最后一次响应，旧响应不得覆盖新状态
+  let fetchSeq = 0;
 
-    // 模拟 API 延迟
-    setTimeout(() => {
-      const mockData = Array.from({ length: pagination.pageSize }, (_, i) => {
-        const id = (pagination.page - 1) * pagination.pageSize + i + 1;
-        const types = ['default', 'spj', 'interactive', 'remote'];
-        const auths = [1, 2, 3];
-        return {
-          id: id,
-          problemId: `100${id}`,
-          title: `Problem ${id}`,
-          author: 'admin',
-          createTime: formatFullTime('2023-01-01 12:00:00'),
-          type: types[i % 4],
-          auth: auths[i % 3]
-        };
+  const fetchProblems = async () => {
+    const seq = ++fetchSeq;
+    loading.value = true;
+    try {
+      const data = await getAdminProblemList({
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        keyword: searchKeyword.value,
+        auth: authFilter.value,
       });
-      
-      tableData.value = mockData;
-      pagination.itemCount = 100; // 假设总共有100条数据
-      loading.value = false;
-    }, 500);
+      if (seq !== fetchSeq) return;
+      tableData.value = data.list ?? [];
+      pagination.itemCount = data.total ?? 0;
+    } catch (error) {
+      if (seq !== fetchSeq) return;
+      tableData.value = [];
+      pagination.itemCount = 0;
+      message.error(error instanceof Error ? error.message : '题目列表加载失败');
+    } finally {
+      if (seq === fetchSeq) loading.value = false;
+    }
   };
 
-  // 初始化加载
-  fetchProblems();
-
   const handleSearch = () => {
+    pagination.page = 1;
+    fetchProblems();
+  };
+
+  const handleReset = () => {
+    searchKeyword.value = '';
+    authFilter.value = null;
     pagination.page = 1;
     fetchProblems();
   };
@@ -77,72 +82,114 @@ export function useProblemManage() {
     fetchProblems();
   };
 
-  const handleDelete = (row: any) => {
-    console.log('API Request: DELETE /api/admin/problem', { id: row.id });
-    message.success(`删除题目 ${row.title} 成功`);
+  const handlePageSizeChange = (pageSize: number) => {
+    pagination.pageSize = pageSize;
+    pagination.page = 1;
     fetchProblems();
   };
 
-  const handleExportSingle = (row: any) => {
-    console.log('API Request: POST /api/admin/problem/export', { ids: [row.id] });
-    message.success(`导出题目 ${row.title}`);
+  const handleDelete = async (row: AdminProblemListVo) => {
+    try {
+      await deleteAdminProblem(row.id);
+      message.success(`已删除题目 ${row.problemCode}`);
+      // 删除后回到第一页重新读取，避免当前页残留/空页
+      pagination.page = 1;
+      await fetchProblems();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '删除题目失败');
+    }
+  };
+
+  const handleAuthChange = async (row: AdminProblemListVo, auth: number) => {
+    const previous = row.auth ?? 1;
+    try {
+      await updateAdminProblemAuth(row.id, auth);
+      row.auth = auth;
+      message.success('可见范围已更新');
+    } catch (error) {
+      // 失败时保持原值，不伪造成功
+      row.auth = previous;
+      message.error(error instanceof Error ? error.message : '可见范围更新失败');
+    }
   };
 
   const columns = [
     {
       title: 'PID',
-      key: 'problemId',
-      width: 100,
-      render(row: any) {
+      key: 'problemCode',
+      width: 140,
+      render(row: AdminProblemListVo) {
         return h(
           'a',
           {
-            href: `/problem/${row.problemId}`,
+            href: `/problem/${row.problemCode}`,
             target: '_blank',
             style: 'color: #007BFF; text-decoration: none;'
           },
-          row.problemId
+          row.problemCode
         );
       }
     },
     { title: '标题', key: 'title', minWidth: 200 },
-    { title: '创建者', key: 'author', width: 120 },
-    { title: '创建时间', key: 'createTime', width: 180 },
+    { title: '创建者', key: 'author', width: 120, render: (row: AdminProblemListVo) => row.author ?? '-' },
     {
-      title: '类型',
-      key: 'type',
-      width: 120,
-      render(row: any) {
-        const typeMap: Record<string, { text: string; type: 'info' | 'warning' | 'success' | 'error' | 'default' }> = {
-          default: { text: '普通判题', type: 'info' },
-          spj: { text: '特殊判题', type: 'warning' },
-          interactive: { text: '交互判题', type: 'success' },
-          remote: { text: '远程判题', type: 'error' }
-        };
-        const config = typeMap[row.type] || { text: row.type, type: 'default' };
+      title: '难度',
+      key: 'difficulty',
+      width: 90,
+      render(row: AdminProblemListVo) {
+        const config = row.difficulty === null || row.difficulty === undefined
+          ? { text: '未评级', type: 'default' as const }
+          : DIFFICULTY_LABELS[row.difficulty] ?? { text: '未评级', type: 'default' as const };
         return h(NTag, { type: config.type, size: 'small' }, { default: () => config.text });
       }
     },
     {
-      title: '状态',
-      key: 'auth',
-      width: 100,
-      render(row: any) {
-        const statusMap: Record<number, { text: string; type: 'success' | 'warning' | 'error' | 'default' }> = {
-          1: { text: '公开', type: 'success' },
-          2: { text: '私有', type: 'warning' },
-          3: { text: '赛用', type: 'error' }
-        };
-        const status = statusMap[row.auth] || { text: '未知', type: 'default' };
-        return h(NTag, { type: status.type, size: 'small' }, { default: () => status.text });
+      title: '类型',
+      key: 'type',
+      width: 90,
+      render(row: AdminProblemListVo) {
+        const isOi = row.type === 1;
+        return h(NTag, { type: isOi ? 'warning' : 'info', size: 'small' }, { default: () => (isOi ? 'OI' : 'ACM') });
       }
+    },
+    {
+      title: '标签',
+      key: 'tags',
+      minWidth: 160,
+      render(row: AdminProblemListVo) {
+        const tags = row.tags ?? [];
+        if (tags.length === 0) return '-';
+        return h(NSpace, { size: 4 }, {
+          default: () => tags.map((tag) => h(NTag, { size: 'small', bordered: false }, { default: () => tag }))
+        });
+      }
+    },
+    {
+      title: '可见范围',
+      key: 'auth',
+      width: 190,
+      render(row: AdminProblemListVo) {
+        return h(NSelect, {
+          size: 'small',
+          value: row.auth ?? 1,
+          options: AUTH_OPTIONS,
+          consistentMenuWidth: false,
+          onUpdateValue: (value: number) => handleAuthChange(row, value),
+        });
+      }
+    },
+    {
+      title: '创建时间',
+      key: 'createTime',
+      width: 180,
+      render: (row: AdminProblemListVo) => formatFullTime(row.createTime)
     },
     {
       title: '操作',
       key: 'actions',
-      width: 200,
+      width: 160,
       fixed: 'right',
-      render(row: any) {
+      render(row: AdminProblemListVo) {
         return h(NSpace, {}, {
           default: () => [
             h(
@@ -153,15 +200,6 @@ export function useProblemManage() {
                 onClick: () => router.push({ name: 'AdminProblemEdit', params: { id: row.id } })
               },
               { default: () => '编辑' }
-            ),
-            h(
-              NButton,
-              {
-                size: 'small',
-                type: 'warning',
-                onClick: () => handleExportSingle(row)
-              },
-              { default: () => '导出' }
             ),
             h(
               NPopconfirm,
@@ -177,7 +215,7 @@ export function useProblemManage() {
                   },
                   { default: () => '删除' }
                 ),
-                default: () => '确定删除该题目吗？'
+                default: () => `确定删除题目 ${row.problemCode} 吗？`
               }
             )
           ]
@@ -186,93 +224,22 @@ export function useProblemManage() {
     }
   ];
 
-  // 导出相关
-  const exportSearchKeyword = ref('');
-  const exportTableData = ref<any[]>([]); 
-  const exportColumns = [
-    { type: 'selection' },
-    { title: 'PID', key: 'problemId' },
-    { title: '标题', key: 'title' }
-  ];
-  const selectedExportRows = ref([]);
-
-  // 监听导出模态框打开，自动加载数据
-  watch(showExportModal, (val) => {
-    if (val) {
-      exportSearchKeyword.value = '';
-      exportTableData.value = tableData.value; // 初始显示当前页数据，或者调用 API 获取
-    }
-  });
-
-  const handleExportSearch = () => {
-    console.log('API Request: GET /api/admin/problem/list (Export)', {
-      keyword: exportSearchKeyword.value
-    });
-    // 模拟搜索结果
-    exportTableData.value = tableData.value; 
-  };
-
-  const handleExportSelection = (keys: any) => {
-    selectedExportRows.value = keys;
-  };
-
-  const handleExport = () => {
-    if (selectedExportRows.value.length === 0) {
-      message.warning('请选择要导出的题目');
-      return;
-    }
-    console.log('API Request: POST /api/admin/problem/export', { ids: selectedExportRows.value });
-    message.success(`导出 ${selectedExportRows.value.length} 个题目`);
-    showExportModal.value = false;
-  };
-
-  // 远程OJ相关
-  const remoteOJ = ref(null);
-  const remoteProblemId = ref('');
-  const remoteOJOptions = [
-    { label: 'HDU', value: 'HDU' },
-    { label: 'Codeforces', value: 'Codeforces' },
-    { label: 'POJ', value: 'POJ' },
-    { label: 'GYM', value: 'GYM' },
-    { label: 'AtCoder', value: 'AtCoder' },
-    { label: 'SPOJ', value: 'SPOJ' },
-    { label: 'Libre', value: 'Libre' }
-  ];
-
-  const handleAddRemoteProblem = () => {
-    if (!remoteOJ.value || !remoteProblemId.value) {
-      message.warning('请填写完整信息');
-      return;
-    }
-    console.log('API Request: POST /api/admin/problem/remote', {
-      oj: remoteOJ.value,
-      problemId: remoteProblemId.value
-    });
-    message.success(`添加远程题目 ${remoteOJ.value}-${remoteProblemId.value}`);
-    showRemoteModal.value = false;
-    fetchProblems();
-  };
+  // 初始化加载第一页（与旧行为一致）
+  void fetchProblems();
 
   return {
-    showImportModal,
-    showExportModal,
-    showRemoteModal,
-    searchKeyword,
     loading,
+    searchKeyword,
+    authFilter,
     tableData,
     pagination,
     columns,
+    fetchProblems,
     handleSearch,
+    handleReset,
     handlePageChange,
-    exportSearchKeyword,
-    exportTableData,
-    exportColumns,
-    handleExportSearch,
-    handleExportSelection,
-    handleExport,
-    remoteOJ,
-    remoteProblemId,
-    remoteOJOptions,
-    handleAddRemoteProblem
+    handlePageSizeChange,
+    handleDelete,
+    handleAuthChange,
   };
 }

@@ -1,179 +1,203 @@
-import { ref, watch, nextTick } from 'vue';
+import { reactive, ref } from 'vue';
 import { useMessage } from 'naive-ui';
+import {
+  createAdminTag,
+  deleteAdminTag,
+  getTags,
+  updateAdminTag,
+  type TagVo,
+} from '@/utils/api';
 
-export interface TagGroup {
-  _id: string; // Frontend only ID for animation
-  title: string;
-  tags: string[];
+export const TAG_NAME_MAX = 50;
+export const TAG_COLOR_MAX = 20;
+export const TAG_CATEGORY_MAX = 50;
+
+export interface TagForm {
+  id: number;
+  name: string;
+  color: string;
+  category: string;
 }
 
+/**
+ * 标签全局管理：对后端真实标签目录做 CRUD。
+ *
+ * - 列表来自 GET /api/tags（API 无分页，本地分页且 itemCount 为真实条数，不伪造 total）；
+ * - 创建/编辑 POST/PUT /api/admin/tags，删除 DELETE /api/admin/tags/{id}；
+ * - 名称必填且 trim 后 ≤50，color ≤20，category ≤50；编辑允许清空可选值；
+ * - 删除被题目引用的标签由后端返回“仍被引用”业务错误，原样提示，不伪造成功。
+ */
 export function useTagManage() {
   const message = useMessage();
+
   const loading = ref(false);
-  const tagGroups = ref<TagGroup[]>([]);
-  const jsonString = ref('');
-  const jsonError = ref<string | null>(null);
-  
-  // Flag to prevent circular updates
-  let isUpdatingFromJson = false;
+  const saving = ref(false);
+  const error = ref<string | null>(null);
+  const tags = ref<TagVo[]>([]);
 
-  // Mock API: Fetch Tags
-  const fetchTagGroups = async () => {
+  const showModal = ref(false);
+  const modalMode = ref<'create' | 'edit'>('create');
+
+  const formModel = reactive<TagForm>({ id: 0, name: '', color: '', category: '' });
+
+  const pagination = reactive({
+    page: 1,
+    pageSize: 10,
+    itemCount: 0,
+    showSizePicker: true,
+    pageSizes: [10, 20, 50],
+  });
+
+  // API 无分页：本地分页，itemCount 始终为真实目录条数
+  let fetchSeq = 0;
+
+  const fetchTags = async () => {
+    const seq = ++fetchSeq;
     loading.value = true;
-    console.log('API Request: GET /api/admin/tags');
+    error.value = null;
     try {
-      // Mock delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Mock data
-      const rawData = [
-        { title: '语言入门', tags: ['顺序结构', '分支结构', '循环结构', '数组'] },
-        { title: '数据结构', tags: ['栈', '队列', '链表', '树', '图'] },
-        { title: '算法基础', tags: ['模拟', '枚举', '递归', '贪心', '二分'] }
-      ];
-      
-      // Add frontend IDs
-      tagGroups.value = rawData.map(item => ({
-        ...item,
-        _id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
-      }));
-      
-      // Initial sync (exclude _id)
-      jsonString.value = JSON.stringify(rawData, null, 2);
-    } catch (e) {
-      console.error(e);
-      message.error('获取标签数据失败');
+      const list = await getTags();
+      if (seq !== fetchSeq) return;
+      tags.value = list ?? [];
+      pagination.itemCount = tags.value.length;
+      const maxPage = Math.max(1, Math.ceil(tags.value.length / pagination.pageSize));
+      if (pagination.page > maxPage) pagination.page = maxPage;
+    } catch (err) {
+      if (seq !== fetchSeq) return;
+      // 加载失败不得当成空目录：清空列表并保留错误，页面据此展示重试
+      tags.value = [];
+      pagination.itemCount = 0;
+      error.value = err instanceof Error ? err.message : '标签目录加载失败';
     } finally {
-      loading.value = false;
+      if (seq === fetchSeq) loading.value = false;
     }
   };
 
-  // Mock API: Save Tags
-  const saveTagGroups = async () => {
-    if (jsonError.value) {
-      message.error('请先修复 JSON 格式错误');
+  const resetForm = () => {
+    formModel.id = 0;
+    formModel.name = '';
+    formModel.color = '';
+    formModel.category = '';
+  };
+
+  const openCreateModal = () => {
+    // 保存进行中禁止切换到新建，避免在途请求结果写入新表单
+    if (saving.value) return;
+    modalMode.value = 'create';
+    resetForm();
+    showModal.value = true;
+  };
+
+  const openEditModal = (row: TagVo) => {
+    if (saving.value) return;
+    modalMode.value = 'edit';
+    formModel.id = row.id;
+    formModel.name = row.name ?? '';
+    formModel.color = row.color ?? '';
+    formModel.category = row.category ?? '';
+    showModal.value = true;
+  };
+
+  // 正常关闭：保存期间必须被忽略，避免在途保存结果关掉后切换记录
+  const closeModal = () => {
+    if (saving.value) return;
+    showModal.value = false;
+  };
+
+  // Naive UI 右上关闭与 Esc 都走 update:show，保存期间必须被忽略
+  const handleModalShowChange = (value: boolean) => {
+    if (value) {
+      showModal.value = true;
       return;
     }
-    
-    loading.value = true;
-    // Strip _id before sending
-    const payload = tagGroups.value.map((group) => {
-      const { _id: _omitId, ...rest } = group;
-      return rest;
-    });
-    console.log('API Request: PUT /api/admin/tags', payload);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      message.success('保存成功');
-    } catch (e) {
-      console.error(e);
-      message.error('保存失败');
-    } finally {
-      loading.value = false;
+    closeModal();
+  };
+
+  const handleSubmit = async () => {
+    if (saving.value) return;
+
+    const name = formModel.name.trim();
+    const color = formModel.color.trim();
+    const category = formModel.category.trim();
+
+    if (!name) {
+      message.warning('请输入标签名称');
+      return;
     }
-  };
-
-  // UI Operations
-  const addTagGroup = () => {
-    tagGroups.value.push({ 
-      _id: Date.now().toString(), 
-      title: '新分类', 
-      tags: [] 
-    });
-  };
-
-  const removeTagGroup = (index: number) => {
-    tagGroups.value.splice(index, 1);
-  };
-
-  const moveTagGroup = (index: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && index > 0) {
-      const item = tagGroups.value.splice(index, 1)[0];
-      if (item) tagGroups.value.splice(index - 1, 0, item);
-    } else if (direction === 'down' && index < tagGroups.value.length - 1) {
-      const item = tagGroups.value.splice(index, 1)[0];
-      if (item) tagGroups.value.splice(index + 1, 0, item);
+    if (name.length > TAG_NAME_MAX) {
+      message.warning(`标签名称不能超过 ${TAG_NAME_MAX} 个字符`);
+      return;
     }
-  };
+    if (color.length > TAG_COLOR_MAX) {
+      message.warning(`颜色值不能超过 ${TAG_COLOR_MAX} 个字符`);
+      return;
+    }
+    if (category.length > TAG_CATEGORY_MAX) {
+      message.warning(`分类不能超过 ${TAG_CATEGORY_MAX} 个字符`);
+      return;
+    }
 
-  // JSON Handling
-  const handleJsonInput = (value: string) => {
-    jsonString.value = value;
+    // 保存期间捕获模式与 id，避免切换记录后把结果写到别的标签上
+    const mode = modalMode.value;
+    const id = formModel.id;
+    const payload = { name, color, category };
+
+    saving.value = true;
     try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        // Validate structure
-        const isValid = parsed.every(item => 
-          typeof item === 'object' && 
-          item !== null && 
-          'title' in item && 
-          Array.isArray(item.tags)
-        );
-        
-        if (isValid) {
-          isUpdatingFromJson = true;
-          // Preserve existing IDs if possible, or generate new ones
-          // This helps maintain animation stability if user edits JSON but keeps structure
-          tagGroups.value = parsed.map((item: any, index: number) => {
-            const existing = tagGroups.value[index];
-            return {
-              ...item,
-              _id: existing ? existing._id : (Date.now().toString() + Math.random().toString(36).substr(2, 9))
-            };
-          });
-          jsonError.value = null;
-          nextTick(() => {
-            isUpdatingFromJson = false;
-          });
-        } else {
-          jsonError.value = '数据格式错误：应为包含 title 和 tags 数组的对象列表';
-        }
+      if (mode === 'create') {
+        await createAdminTag(payload);
+        message.success('标签已创建');
       } else {
-        jsonError.value = '数据格式错误：根节点应为数组';
+        await updateAdminTag(id, payload);
+        message.success('标签已保存');
       }
-    } catch (e) {
-      jsonError.value = 'JSON 解析错误: ' + (e as Error).message;
+      showModal.value = false;
+      await fetchTags();
+    } catch (err) {
+      // 失败保留表单，由用户修正后重试
+      message.error(err instanceof Error ? err.message : '保存标签失败');
+    } finally {
+      saving.value = false;
     }
   };
 
-  const exportJson = () => {
-    if (jsonError.value) {
-      message.warning('当前 JSON 格式有误，无法导出');
-      return;
+  const handleDelete = async (row: TagVo) => {
+    try {
+      await deleteAdminTag(row.id);
+      message.success('标签已删除');
+      await fetchTags();
+    } catch (err) {
+      // 后端“仍被题目引用”等业务错误原样展示，不伪造删除成功
+      message.error(err instanceof Error ? err.message : '删除标签失败');
     }
-    // Copy to clipboard or download
-    navigator.clipboard.writeText(jsonString.value).then(() => {
-      message.success('配置已复制到剪贴板');
-    }).catch(() => {
-      message.error('复制失败');
-    });
-    console.log('Export Data:', jsonString.value);
   };
 
-  // Watch for UI changes to update JSON
-  watch(tagGroups, (newVal) => {
-    if (!isUpdatingFromJson) {
-      // Strip _id before stringifying
-      const cleanData = newVal.map((group) => {
-        const { _id: _omitId, ...rest } = group;
-        return rest;
-      });
-      jsonString.value = JSON.stringify(cleanData, null, 2);
-      jsonError.value = null;
-    }
-  }, { deep: true });
+  const handlePageChange = (page: number) => {
+    pagination.page = page;
+  };
+
+  const handlePageSizeChange = (pageSize: number) => {
+    pagination.pageSize = pageSize;
+    pagination.page = 1;
+  };
 
   return {
     loading,
-    tagGroups,
-    jsonString,
-    jsonError,
-    fetchTagGroups,
-    saveTagGroups,
-    addTagGroup,
-    removeTagGroup,
-    moveTagGroup,
-    handleJsonInput,
-    exportJson
+    saving,
+    error,
+    tags,
+    showModal,
+    modalMode,
+    formModel,
+    pagination,
+    fetchTags,
+    openCreateModal,
+    openEditModal,
+    closeModal,
+    handleModalShowChange,
+    handleSubmit,
+    handleDelete,
+    handlePageChange,
+    handlePageSizeChange,
   };
 }

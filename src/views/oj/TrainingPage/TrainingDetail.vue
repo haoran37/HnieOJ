@@ -1,6 +1,7 @@
 <template>
   <div class="training-detail-container">
     <n-spin :show="loading">
+      <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">{{ error }}</n-alert>
       
       <n-card :bordered="false" class="header-card">
         <div class="header-content">
@@ -18,27 +19,8 @@
             </div>
             <div class="divider"></div>
             <div class="stat-item">
-              <span class="value">{{ detail.favoriteCount }}</span>
-              <span class="label">收藏人数</span>
-            </div>
-            
-            <div class="action-item">
-              <n-tooltip trigger="hover">
-                <template #trigger>
-                  <n-button 
-                    circle 
-                    secondary 
-                    :type="detail.isFavorite ? 'warning' : 'default'"
-                    @click="handleToggleFavorite"
-                    class="fav-btn"
-                  >
-                    <template #icon>
-                      <n-icon :component="detail.isFavorite ? StarFilled : StarOutline" />
-                    </template>
-                  </n-button>
-                </template>
-                {{ detail.isFavorite ? '取消收藏' : '收藏题单' }}
-              </n-tooltip>
+              <span class="value">{{ detail.type === 'OFFICIAL' ? '官方' : '用户' }}</span>
+              <span class="label">题单类型</span>
             </div>
           </div>
         </div>
@@ -67,19 +49,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useNotification } from 'naive-ui';
-import { StarOutline, Star as StarFilled } from '@vicons/ionicons5';
-import { useUserStore } from '@/stores/userStore';
 import { useTrainingDetail } from '@/composables/oj/useTrainingDetail';
 
 const route = useRoute();
 const router = useRouter();
-const notification = useNotification();
-const userStore = useUserStore();
 
-const { loading, detail, fetchTrainingDetail } = useTrainingDetail();
+const { loading, error, detail, fetchTrainingDetail } = useTrainingDetail();
 
 const currentTab = computed(() => route.name as string);
 
@@ -87,25 +64,13 @@ const handleTabChange = (val: string) => {
   router.push({ name: val, params: { trainingId: detail.value.id } });
 };
 
-const handleToggleFavorite = () => {
-  if (!userStore.isEmailBound) {
-    notification.error({
-      content: '操作失败',
-      meta: '您尚未绑定邮箱，无法收藏。请前往个人中心设置。',
-      duration: 3000
-    });
-    return;
-  }
-  
-  detail.value.isFavorite = !detail.value.isFavorite;
-  if (detail.value.isFavorite) {
-    detail.value.favoriteCount++;
-    notification.success({ content: '收藏成功', duration: 2000 });
-  } else {
-    detail.value.favoriteCount--;
-    notification.info({ content: '已取消收藏', duration: 2000 });
-  }
-};
+// 同一路由记录换 trainingId 时组件会被复用，必须按新参数重取，避免展示上一题单
+watch(
+  () => route.params.trainingId,
+  (tid) => {
+    if (tid) void fetchTrainingDetail(String(tid));
+  },
+);
 
 onMounted(() => {
   const tid = route.params.trainingId as string;

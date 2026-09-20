@@ -28,24 +28,13 @@
               </n-tag>
             </div>
 
-            <div class="info-row rating-row">
-              <span class="label">题单评分</span>
-              <n-rate readonly :value="detail.rating" allow-half size="small" />
-            </div>
-
-            <div class="info-row vertical">
-              <div class="progress-label">
-                <span class="label">我的进度</span>
-                <span class="value">{{ detail.userProgress }}%</span>
-              </div>
-              <n-progress 
-                type="line" 
-                :percentage="detail.userProgress" 
-                :color="detail.userProgress === 100 ? '#18a058' : '#2080f0'"
-                :show-indicator="false"
-                height="8"
-                border-radius="4"
-              />
+            <div v-if="detail.categories.length > 0" class="info-row">
+              <span class="label">分类</span>
+              <span class="value">
+                <n-tag v-for="c in detail.categories" :key="c" size="small" :bordered="false" style="margin-left: 4px">
+                  {{ c }}
+                </n-tag>
+              </span>
             </div>
 
           </n-space>

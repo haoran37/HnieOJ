@@ -1,50 +1,68 @@
 import { ref } from 'vue';
+import { checkProblem, getTrainingProblems } from '@/utils/api';
+
+export interface TrainingProblemRow {
+  id: number; // 内部 problemId
+  displayId: number; // 后端 displayId（Integer>=1）
+  problemCode: string; // 经 checkProblem 解析的展示编号
+  title: string;
+}
 
 export function useTrainingProblems() {
   const loading = ref(false);
-  const tableData = ref<any[]>([]);
+  const error = ref<string | null>(null);
+  const tableData = ref<TrainingProblemRow[]>([]);
   const total = ref(0);
   const page = ref(1);
   const pageSize = ref(20);
 
-  //TODO: 替换真实api
-  const fetchProblemsInTraining = async (trainingId: string) => {
-    loading.value = true;
-    console.log(`API: GET /api/trainings/${trainingId}/problems`, {
-      page: page.value,
-      size: pageSize.value
-    });
+  let seq = 0;
 
-    // 模拟 API
-    setTimeout(() => {
-      tableData.value = Array.from({ length: pageSize.value }, (_, i) => {
-        const id = 1000 + (page.value - 1) * 20 + i;
-        return {
-          id: String(id),
-          title: `DP 练习题 - ${id}`,
-          difficulty: ['简单', '普及-', '普及/提高-', '困难'][i % 4],
-          tags: ['DP', '背包'],
-          passRate: Math.floor(Math.random() * 80 + 10),
-          rate: (Math.random() * 5).toFixed(1)
-        };
-      });
-      total.value = 50;
-      loading.value = false;
-    }, 500);
+  const fetchProblemsInTraining = async (trainingId: string) => {
+    const current = ++seq;
+    loading.value = true;
+    error.value = null;
+    try {
+      const result = await getTrainingProblems(trainingId, page.value, pageSize.value);
+      if (current !== seq) return;
+      const list = result?.list ?? [];
+      const rows = await Promise.all(
+        list.map(async (item) => {
+          const check = await checkProblem(item.problemId);
+          return {
+            id: item.problemId,
+            displayId: item.displayId ?? 0,
+            problemCode: check?.problemCode ?? '',
+            title: check?.title ?? '',
+          };
+        }),
+      );
+      if (current !== seq) return;
+      tableData.value = rows;
+      total.value = result?.total ?? 0;
+    } catch (err) {
+      if (current !== seq) return;
+      tableData.value = [];
+      total.value = 0;
+      error.value = err instanceof Error ? err.message : '题单题目加载失败';
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
   const handlePageChange = (p: number, trainingId: string) => {
     page.value = p;
-    fetchProblemsInTraining(trainingId);
+    void fetchProblemsInTraining(trainingId);
   };
 
   return {
     loading,
+    error,
     tableData,
     total,
     page,
     pageSize,
     fetchProblemsInTraining,
-    handlePageChange
+    handlePageChange,
   };
 }

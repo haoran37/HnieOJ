@@ -56,6 +56,12 @@
 
     <div class="table-wrapper">
       <n-card :bordered="false" content-style="padding: 0; display: flex; flex-direction: column; height: 100%;">
+        <n-alert v-if="error" type="error" :bordered="false" style="margin: 12px 24px 0">
+          {{ error }}
+          <n-button size="tiny" secondary type="error" style="margin-left: 8px" @click="fetchTrainingSheets">
+            重试
+          </n-button>
+        </n-alert>
         <div class="table-scroll-area">
           <n-data-table
             :columns="columns"
@@ -88,14 +94,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, h } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTrainingList } from '@/composables/oj/useTrainingList';
-import { createTrainingColumns } from '@/utils/trainingColumns';
+import { formatFullTime } from '@/composables/useTime';
+import type { TrainingSheet } from '@/composables/oj/useTrainingList';
 
 const router = useRouter();
 const { 
-  tableData, loading, total, page, pageSize, searchParams,
+  tableData, loading, error, total, page, pageSize, searchParams,
   fetchTrainingSheets, handlePageChange, handleSearch, toggleType 
 } = useTrainingList();
 
@@ -103,7 +110,38 @@ const handleTitleClick = (id: string) => {
   router.push(`/training/${id}`);
 };
 
-const columns = createTrainingColumns(handleTitleClick);
+// 仅渲染后端真实返回的字段（无收藏/评分/完成度接口）
+const columns = [
+  { title: '编号', key: 'id', width: 80, align: 'center' as const },
+  {
+    title: '名称',
+    key: 'title',
+    render(row: TrainingSheet) {
+      return h('a', {
+        style: { textDecoration: 'none', color: '#2080f0', fontWeight: 'bold', cursor: 'pointer' },
+        onClick: (e: MouseEvent) => {
+          e.preventDefault();
+          handleTitleClick(row.id);
+        }
+      }, row.title);
+    }
+  },
+  {
+    title: '类型',
+    key: 'type',
+    width: 100,
+    align: 'center' as const,
+    render: (row: TrainingSheet) => (row.type === 'OFFICIAL' ? '官方' : '用户')
+  },
+  { title: '题目数', key: 'problemCount', width: 100, align: 'center' as const },
+  { title: '创建者', key: 'creator', width: 140 },
+  {
+    title: '创建时间',
+    key: 'gmtCreate',
+    width: 180,
+    render: (row: TrainingSheet) => formatFullTime(row.gmtCreate)
+  }
+];
 
 onMounted(() => {
   fetchTrainingSheets();

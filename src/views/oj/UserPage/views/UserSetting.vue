@@ -1,496 +1,528 @@
 <template>
   <div class="user-list-page setting-page">
-    
-    <div class="setting-card profile-header">
-      <div class="avatar-section">
-        <n-avatar :size="100" :src="userStore.userInfo.avatar" round class="user-avatar" />
-        <div class="avatar-mask">
-          <n-upload action="#" :show-file-list="false">
-            <n-icon size="24" color="#fff"><CameraIcon /></n-icon>
-          </n-upload>
+    <template v-if="!isSelf">
+      <n-result
+        status="warning"
+        title="无法编辑他人资料"
+        description="资料设置与密码修改仅本人可操作；请前往本人的设置页。"
+      >
+        <template v-if="ownUid" #footer>
+          <n-button type="primary" @click="goOwnSettings">前往我的设置</n-button>
+        </template>
+      </n-result>
+    </template>
+
+    <template v-else>
+      <!-- 基本信息 -->
+      <div class="setting-card">
+        <div class="card-header">
+          <div class="title">基本信息</div>
         </div>
-      </div>
-      <div class="profile-info">
-        <div class="main-name">{{ userStore.userInfo.username }}</div>
-        <div class="uid">UID: {{ userStore.userInfo.id }}</div>
-        <n-button text type="primary" size="small" class="upload-btn">
-          <n-upload action="#" :show-file-list="false">更换头像</n-upload>
-        </n-button>
-        <div class="tip">支持 JPG, PNG 格式，大小不超过 2MB</div>
-      </div>
-    </div>
-
-    <div class="setting-card">
-      <div class="card-header">
-        <div class="title">基本信息</div>
-        <n-button 
-          v-if="!isEditing" 
-          secondary type="primary" size="small" 
-          @click="startEdit"
-        >
-          <template #icon><n-icon><CreateIcon /></n-icon></template>
-          修改信息
-        </n-button>
-      </div>
-
-      <div v-if="!isEditing" class="info-view">
+        <n-alert v-if="profileError" type="error" :bordered="false" style="margin-bottom: 12px">
+          {{ profileError }}
+          <template #action>
+            <n-button size="small" @click="loadProfile">重试</n-button>
+          </template>
+        </n-alert>
+        <n-spin :show="profileLoading">
+          <n-form label-placement="left" label-width="110" size="small">
+            <n-grid :cols="2" :x-gap="24" responsive="screen" item-responsive>
+              <n-form-item-gi span="2 m:1" label="学号（只读）">
+                <n-input :value="profile.uid" disabled />
+              </n-form-item-gi>
+              <n-form-item-gi span="2 m:1" label="邮箱（只读）">
+                <n-input :value="profile.email || '未绑定'" disabled />
+              </n-form-item-gi>
+              <n-form-item-gi span="2 m:1" label="用户名">
+                <n-input
+                  v-model:value="profile.username"
+                  :maxlength="20"
+                  show-count
+                  placeholder="2-20 个字符"
+                />
+              </n-form-item-gi>
+              <n-form-item-gi span="2 m:1" label="头像地址">
+                <n-input
+                  v-model:value="profile.avatar"
+                  :maxlength="500"
+                  placeholder="http(s) 链接或以 / 开头的站内路径"
+                />
+              </n-form-item-gi>
+              <n-form-item-gi span="2 m:1" label="QQ">
+                <n-input v-model:value="profile.qq" placeholder="5-11 位数字，可留空清除" />
+              </n-form-item-gi>
+              <n-form-item-gi span="2 m:1" label="GitHub">
+                <n-input v-model:value="profile.github" placeholder="https://github.com/..." />
+              </n-form-item-gi>
+              <n-form-item-gi span="2" label="博客">
+                <n-input v-model:value="profile.blog" placeholder="https://..." />
+              </n-form-item-gi>
+            </n-grid>
+          </n-form>
+        </n-spin>
         <div class="compact-grid">
           <div class="compact-item">
-            <span class="label">姓名</span>
-            <span class="value">{{ userStore.userInfo.name }}</span>
-          </div>
-          <div class="compact-item">
-            <span class="label">学号</span>
-            <span class="value">{{ userStore.userInfo.id }}</span>
+            <span class="label">实名</span>
+            <span class="value">{{ profile.realname || '未填写' }}</span>
           </div>
           <div class="compact-item">
             <span class="label">学院</span>
-            <span class="value">{{ userStore.userInfo.college || '未填写' }}</span>
+            <span class="value">{{ profile.college || '未填写' }}</span>
+          </div>
+          <div class="compact-item">
+            <span class="label">年级</span>
+            <span class="value">{{ profile.grade || '未填写' }}</span>
           </div>
           <div class="compact-item">
             <span class="label">班级</span>
-            <span class="value">{{ userStore.userInfo.class || '未填写' }}</span>
+            <span class="value">{{ profile.class || '未填写' }}</span>
           </div>
+        </div>
+        <n-alert type="info" :bordered="false" style="margin: 12px 0">
+          实名、学院、年级、班级不可直接编辑，需通过下方「身份变更申请」提交审核。
+        </n-alert>
+        <div class="form-actions">
+          <n-button
+            type="primary"
+            :loading="savingProfile"
+            :disabled="savingProfile || !profileLoaded"
+            @click="handleSaveProfile"
+          >
+            保存资料
+          </n-button>
         </div>
       </div>
 
-      <div v-else class="info-edit">
-        <n-alert type="warning" show-icon class="edit-alert">
-          修改关键信息（学号、学院、班级）提交后需要管理员审核。
+      <!-- 身份变更申请 -->
+      <div class="setting-card">
+        <div class="card-header">
+          <div class="title">身份变更申请</div>
+        </div>
+        <n-alert v-if="hasPending" type="warning" :bordered="false" style="margin-bottom: 12px">
+          已有待审核的变更申请，请等待管理员处理后再提交新的申请。
         </n-alert>
-        
-        <n-form 
-          ref="formRef" 
-          :model="formValue" 
-          label-placement="left" 
-          label-width="70"
-          size="small"
-          class="compact-form"
-        >
-          <n-grid :x-gap="20" :y-gap="12" cols="1 s:2">
-            <n-grid-item>
-              <n-form-item label="姓名">
-                <n-input v-model:value="formValue.name" placeholder="请输入姓名" />
-              </n-form-item>
-            </n-grid-item>
-            <n-grid-item>
-              <n-form-item label="学号">
-                <n-input v-model:value="formValue.studentId" placeholder="请输入学号" />
-              </n-form-item>
-            </n-grid-item>
-            <n-grid-item>
-              <n-form-item label="学院">
-                <n-select v-model:value="formValue.college" :options="collegeOptions" />
-              </n-form-item>
-            </n-grid-item>
-            <n-grid-item>
-              <n-form-item label="班级">
-                <n-input v-model:value="formValue.class" placeholder="例：软件工程2201" />
-              </n-form-item>
-            </n-grid-item>
-          </n-grid>
-          
-          <n-form-item label="修改原因" class="reason-item" style="margin-top: 8px">
-            <n-select v-model:value="formValue.reason" :options="reasonOptions" placeholder="请选择修改原因" />
+        <n-alert v-else type="info" :bordered="false" style="margin-bottom: 12px">
+          仅支持实名、学院、年级、班级变更；提交后需管理员审核，UID 不可变更。
+        </n-alert>
+        <n-form label-placement="left" label-width="90" size="small">
+          <n-form-item label="实名" required>
+            <n-input v-model:value="identity.realname" :maxlength="50" placeholder="请输入实名" />
           </n-form-item>
-
-          <div class="form-actions">
-            <n-button @click="cancelEdit" size="small">取消</n-button>
-            <n-button type="primary" @click="handleSubmitInfo" size="small">提交审核</n-button>
-          </div>
+          <n-form-item label="学院" required>
+            <n-select
+              :value="identity.collegeId"
+              :options="identityCollegeOptions"
+              placeholder="选择学院"
+              clearable
+              @update:value="handleIdentityCollegeChange"
+            />
+          </n-form-item>
+          <n-form-item label="年级" required>
+            <n-select
+              :value="identity.grade"
+              :options="identityGradeOptions"
+              :disabled="!identity.collegeId"
+              placeholder="选择年级"
+              clearable
+              @update:value="handleIdentityGradeChange"
+            />
+          </n-form-item>
+          <n-form-item label="班级" required>
+            <n-select
+              :value="identity.classId"
+              :options="identityClassOptions"
+              :disabled="!identity.grade"
+              placeholder="选择班级"
+              clearable
+              @update:value="(value: number | null) => (identity.classId = value)"
+            />
+          </n-form-item>
+          <n-form-item label="变更原因" required>
+            <n-input
+              v-model:value="identity.reason"
+              type="textarea"
+              :maxlength="1000"
+              show-count
+              :autosize="{ minRows: 2, maxRows: 6 }"
+              placeholder="请说明变更原因"
+            />
+          </n-form-item>
         </n-form>
-      </div>
-    </div>
+        <div class="form-actions">
+          <n-button
+            type="primary"
+            :loading="submittingIdentity"
+            :disabled="submittingIdentity || hasPending"
+            @click="handleSubmitIdentity"
+          >
+            提交申请
+          </n-button>
+        </div>
 
-    <div class="setting-card">
-      <div class="card-header">
-        <div class="title">成就认证申请</div>
-      </div>
-      <div class="achievement-form">
-        <n-form
-          label-placement="left"
-          label-width="100"
+        <n-divider />
+
+        <n-alert v-if="requestsError" type="error" :bordered="false" style="margin-bottom: 12px">
+          {{ requestsError }}
+          <template #action>
+            <n-button size="small" @click="fetchMyRequests">重试</n-button>
+          </template>
+        </n-alert>
+
+        <n-data-table
+          remote
           size="small"
-        >
+          :columns="requestColumns"
+          :data="myRequests"
+          :loading="requestsLoading"
+          :row-key="(row: ProfileChangeVo) => row.id"
+          :pagination="false"
+          :scroll-x="760"
+        />
+        <div class="pagination-wrapper">
+          <n-pagination
+            :page="requestsPage"
+            :page-size="requestsPageSize"
+            :item-count="requestsTotal"
+            @update:page="handleRequestsPageChange"
+            @update:page-size="handleRequestsPageSizeChange"
+          />
+        </div>
+      </div>
+
+      <!-- 修改密码 -->
+      <div class="setting-card">
+        <div class="card-header">
+          <div class="title">修改密码</div>
+        </div>
+        <n-alert type="warning" :bordered="false" style="margin-bottom: 12px">
+          修改成功后服务端会失效全部旧会话，需要重新登录。
+        </n-alert>
+        <n-form label-placement="left" label-width="110" size="small">
+          <n-form-item label="当前密码" required>
+            <n-input
+              v-model:value="passwordForm.oldPassword"
+              type="password"
+              show-password-on="click"
+              placeholder="请输入当前密码"
+            />
+          </n-form-item>
+          <n-form-item label="新密码" required>
+            <n-input
+              v-model:value="passwordForm.newPassword"
+              type="password"
+              show-password-on="click"
+              placeholder="至少 6 位"
+            />
+          </n-form-item>
+          <n-form-item label="确认新密码" required>
+            <n-input
+              v-model:value="passwordForm.confirmPassword"
+              type="password"
+              show-password-on="click"
+              placeholder="再次输入新密码"
+            />
+          </n-form-item>
+        </n-form>
+        <div class="form-actions">
+          <n-button
+            type="primary"
+            :loading="changingPassword"
+            :disabled="changingPassword"
+            @click="handleChangePassword"
+          >
+            修改密码
+          </n-button>
+        </div>
+      </div>
+
+      <!-- 成就认证申请（真实 multipart 上传，保留原行为） -->
+      <div class="setting-card">
+        <div class="card-header">
+          <div class="title">成就认证申请</div>
+        </div>
+        <n-form label-placement="left" label-width="100" size="small">
           <n-form-item label="比赛名称" required>
-            <n-input v-model:value="achievementForm.title" placeholder="请输入比赛名称" />
+            <n-input v-model:value="form.title" placeholder="请输入比赛名称" />
+          </n-form-item>
+          <n-form-item label="说明">
+            <n-input
+              v-model:value="form.description"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="可补充成绩、链接等说明"
+            />
           </n-form-item>
           <n-form-item label="证明文件" required>
             <n-upload
-              action="#"
+              v-model:file-list="fileList"
               :default-upload="false"
               :max="1"
-              accept=".jpg,.jpeg,.png,.pdf"
-              @change="handleAchievementFileChange"
+              @change="handleFileChange"
             >
-              <n-button size="small">
-                <template #icon><n-icon><UploadIcon /></n-icon></template>
-                上传文件 (图片或PDF)
-              </n-button>
+              <n-button secondary>选择文件</n-button>
             </n-upload>
           </n-form-item>
-          <n-form-item label="详细信息">
-            <n-input
-              v-model:value="achievementForm.description"
-              type="textarea"
-              placeholder="请输入详细信息"
-              :rows="3"
-            />
-          </n-form-item>
-          <n-button type="primary" @click="handleSubmitAchievement" size="small">
-            <template #icon><n-icon><TrophyIcon /></n-icon></template>
-            提交申请
-          </n-button>
+          <div class="form-actions">
+            <n-button type="primary" :loading="submitting" @click="handleSubmit">提交申请</n-button>
+          </div>
         </n-form>
       </div>
-    </div>
-
-    <div class="setting-card">
-      <div class="card-header"><div class="title">账号安全</div></div>
-      <div class="security-list">
-        <div class="security-item">
-          <div class="icon-wrapper email"><n-icon size="20"><MailIcon /></n-icon></div>
-          <div class="content">
-            <div class="item-title">电子邮箱</div>
-            <div class="item-desc">
-              <span v-if="userStore.userInfo.email" class="bound-text">已绑定：{{ userStore.userInfo.email }}</span>
-              <span v-else class="unbound-text">未绑定邮箱，无法找回密码</span>
-            </div>
-          </div>
-          <div class="action">
-            <n-button secondary size="small" @click="showEmailModal = true">
-              {{ userStore.userInfo.email ? '更换' : '绑定' }}
-            </n-button>
-          </div>
-        </div>
-        <div class="security-item">
-          <div class="icon-wrapper lock"><n-icon size="20"><LockIcon /></n-icon></div>
-          <div class="content">
-            <div class="item-title">登录密码</div>
-            <div class="item-desc">定期修改密码可以保护账号安全</div>
-          </div>
-          <div class="action">
-            <n-button secondary size="small">修改</n-button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="setting-card">
-      <div class="card-header"><div class="title">第三方账号绑定</div></div>
-      <div class="oj-bind-list">
-        <div class="oj-item" v-for="oj in ojList" :key="oj.name">
-          <div class="oj-info">
-            <div class="oj-name">{{ oj.name }}</div>
-            <div class="oj-status">
-              <span v-if="oj.account" class="bound">已绑定: {{ oj.account }}</span>
-              <span v-else class="unbound">从未绑定</span>
-            </div>
-          </div>
-          <n-button 
-            size="tiny" 
-            :type="oj.account ? 'error' : 'primary'"
-            secondary
-          >
-            {{ oj.account ? '解绑' : '绑定' }}
-          </n-button>
-        </div>
-      </div>
-    </div>
-
-    <n-modal v-model:show="showEmailModal" preset="card" title="绑定/更换邮箱" style="width: 400px">
-      <n-space vertical size="large">
-        <n-auto-complete
-          v-model:value="emailForm.value"
-          :options="emailOptions"
-          placeholder="请输入新邮箱"
-          size="large"
-          clearable
-          :input-props="{ autocomplete: 'disabled' }"
-        >
-          <template #prefix><n-icon><MailIcon /></n-icon></template>
-        </n-auto-complete>
-
-        <n-input-group>
-          <n-input v-model:value="emailForm.code" placeholder="验证码" size="large" />
-          <n-button size="large" ghost>发送验证码</n-button>
-        </n-input-group>
-        <n-button type="primary" block size="large" @click="handleBindEmail">确认绑定</n-button>
-      </n-space>
-    </n-modal>
-
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
-import { useMessage } from 'naive-ui';
-import type { UploadFileInfo } from 'naive-ui';
-import { 
-  CameraOutline as CameraIcon, 
-  CreateOutline as CreateIcon,
-  MailOutline as MailIcon,
-  LockClosedOutline as LockIcon,
-  TrophyOutline as TrophyIcon,
-  CloudUploadOutline as UploadIcon
-} from '@vicons/ionicons5';
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useMessage, type DataTableColumns, type UploadFileInfo } from 'naive-ui';
+import { submitAchievementApply } from '@/utils/api';
+import type { ProfileChangeVo } from '@/utils/api';
+import { formatFullTime } from '@/composables/useTime';
+import { useUserSettings } from '@/composables/oj/useUserSettings';
 import { useUserStore } from '@/stores/userStore';
 
-const userStore = useUserStore();
+const route = useRoute();
+const router = useRouter();
 const message = useMessage();
-const showEmailModal = ref(false);
-const isEditing = ref(false);
+const userStore = useUserStore();
 
-// 基本信息表单
-const formValue = reactive({
-  name: '',
-  studentId: '',
-  college: '',
-  class: '',
-  reason: null
-});
+const ownUid = computed(() => userStore.userInfo?.id || '');
+const isSelf = computed(
+  () => !!ownUid.value && String(route.params.uid) === String(ownUid.value),
+);
 
-// 成就申请表单
-const achievementForm = reactive({
-  title: '',
-  description: '',
-  file: null as File | null
-});
+const {
+  profile,
+  profileLoading,
+  profileError,
+  profileLoaded,
+  savingProfile,
+  loadProfile,
+  saveProfile,
+  passwordForm,
+  changingPassword,
+  submitPassword,
+  identity,
+  identityCollegeOptions,
+  identityGradeOptions,
+  identityClassOptions,
+  submittingIdentity,
+  handleIdentityCollegeChange,
+  handleIdentityGradeChange,
+  myRequests,
+  requestsLoading,
+  requestsError,
+  requestsTotal,
+  requestsPage,
+  requestsPageSize,
+  hasPending,
+  fetchMyRequests,
+  handleRequestsPageChange,
+  handleRequestsPageSizeChange,
+  submitIdentity,
+  loadAll,
+  reset,
+} = useUserSettings({ isActive: () => isSelf.value });
 
-// 邮箱表单
-const emailForm = reactive({
-  value: '',
-  code: ''
-});
-
-// 邮箱自动补全逻辑
-const emailOptions = computed(() => {
-  const commonSuffixes = ['@gmail.com', '@163.com', '@qq.com', '@hnie.edu.cn', '@outlook.com'];
-  const prefix = emailForm.value.split('@')[0];
-  
-  if (!prefix) return [];
-  
-  return commonSuffixes.map((suffix) => ({
-    label: prefix + suffix,
-    value: prefix + suffix
-  }));
-});
-
-// 初始化表单
-const startEdit = () => {
-  formValue.name = userStore.userInfo.name;
-  formValue.studentId = userStore.userInfo.id;
-  formValue.college = userStore.userInfo.college || '';
-  formValue.class = userStore.userInfo.class || '';
-  formValue.reason = null;
-  isEditing.value = true;
+const goOwnSettings = () => {
+  if (!ownUid.value) return;
+  void router.push({ name: 'UserSetting', params: { uid: ownUid.value } });
 };
 
-const cancelEdit = () => {
-  isEditing.value = false;
-};
-
-const handleSubmitInfo = () => {
-  if (!formValue.reason) {
-    message.warning('请选择修改原因');
-    return;
-  }
-  // TODO: 实现逻辑
-  message.success('申请已提交，请等待管理员审核');
-  isEditing.value = false;
-};
-
-const handleBindEmail = () => {
-  if (!emailForm.value || !emailForm.code) {
-    message.warning('请填写完整信息');
-    return;
-  }
-  message.success('邮箱绑定成功');
-  showEmailModal.value = false;
-};
-
-const handleAchievementFileChange = (options: { fileList: UploadFileInfo[] }) => {
-  const file = options.fileList[0]?.file;
-  if (file) {
-    achievementForm.file = file;
-  } else {
-    achievementForm.file = null;
+const handleSaveProfile = async () => {
+  const ok = await saveProfile();
+  if (ok) {
+    // 同步 Pinia：顶部用户名等依赖 userStore 展示
+    try {
+      await userStore.loadProfile();
+    } catch {
+      // 资料保存已成功；顶部同步失败不改变保存结果
+    }
   }
 };
 
-const handleSubmitAchievement = () => {
-  if (!achievementForm.title) {
+const handleChangePassword = async () => {
+  const ok = await submitPassword();
+  if (!ok) return;
+  // 仅成功后清理本地会话并跳转登录；旧密码错误时不清会话
+  userStore.logout();
+  void router.replace('/login');
+};
+
+const handleSubmitIdentity = async () => {
+  await submitIdentity();
+};
+
+// ---------------- 成就认证上传（保留原 multipart 行为） ----------------
+const form = reactive({ title: '', description: '' });
+const file = ref<File | null>(null);
+// 受控文件列表：提交成功后必须清空，否则 n-upload 仍显示上一次的文件而 max=1 会阻止重选
+const fileList = ref<UploadFileInfo[]>([]);
+const submitting = ref(false);
+
+const handleFileChange = (data: { fileList: UploadFileInfo[] }) => {
+  const list = data.fileList;
+  const info = list && list.length > 0 ? list[list.length - 1] : null;
+  file.value = info?.file ?? null;
+};
+
+const handleSubmit = async () => {
+  if (!form.title.trim()) {
     message.warning('请输入比赛名称');
     return;
   }
-  if (!achievementForm.file) {
+  if (!file.value) {
     message.warning('请上传证明文件');
     return;
   }
-  
-  // TODO: 调用 API 提交成就申请
-  console.log('提交成就申请:', achievementForm);
-  
-  message.success('成就认证申请已提交，请等待审核');
-  
-  // 重置表单
-  achievementForm.title = '';
-  achievementForm.description = '';
-  achievementForm.file = null;
+  const fd = new FormData();
+  fd.append('title', form.title.trim());
+  if (form.description.trim()) fd.append('description', form.description.trim());
+  fd.append('file', file.value);
+
+  submitting.value = true;
+  try {
+    await submitAchievementApply(fd);
+    message.success('申请提交成功');
+    form.title = '';
+    form.description = '';
+    // 成功后才清空受控列表与已选文件；失败时两者都保留，用户可重试
+    file.value = null;
+    fileList.value = [];
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '申请提交失败');
+  } finally {
+    submitting.value = false;
+  }
 };
 
-//TODO: 从后端获取数据
-const collegeOptions = [
-  { label: '计算机与人工智能学院', value: 'cs_ai' },
-  { label: '电气工程学院', value: 'ee' },
-  { label: '机械工程学院', value: 'me' }
+// ---------------- 本人申请列表展示 ----------------
+const requestStatusText = (status: string | null) => {
+  if (status === 'APPROVED') return '已通过';
+  if (status === 'REJECTED') return '已驳回';
+  return '待处理';
+};
+
+const identityText = (row: ProfileChangeVo) => {
+  const original = row.original;
+  const proposed = row.proposed;
+  return [
+    `实名：${original?.realname || '未填写'} → ${proposed?.realname || '未填写'}`,
+    `学院：${original?.collegeId ?? '未填写'} → ${proposed?.collegeId ?? '未填写'}`,
+    `年级：${original?.grade || '未填写'} → ${proposed?.grade || '未填写'}`,
+    `班级：${original?.classId ?? '未填写'} → ${proposed?.classId ?? '未填写'}`,
+  ];
+};
+
+const requestColumns: DataTableColumns<ProfileChangeVo> = [
+  { title: '申请ID', key: 'id', width: 80 },
+  {
+    title: '变更内容（原值 → 目标值）',
+    key: 'diff',
+    minWidth: 260,
+    render: (row) =>
+      h(
+        'div',
+        { class: 'diff-cell' },
+        identityText(row).map((line) => h('div', line)),
+      ),
+  },
+  { title: '原因', key: 'reason', width: 140, className: 'cell-wrap' },
+  {
+    title: '状态',
+    key: 'status',
+    width: 90,
+    render: (row) => requestStatusText(row.status),
+  },
+  {
+    title: '审核意见',
+    key: 'reviewReason',
+    minWidth: 120,
+    className: 'cell-wrap',
+    render: (row) => row.reviewReason || '-',
+  },
+  {
+    title: '提交时间',
+    key: 'gmtCreate',
+    width: 160,
+    render: (row) => formatFullTime(row.gmtCreate),
+  },
 ];
 
-const reasonOptions = [
-  { label: '信息填写错误', value: 'error' },
-  { label: '转专业/班级变动', value: 'change' },
-  { label: '其他', value: 'other' }
-];
+const reload = () => {
+  if (!isSelf.value) return;
+  void loadAll();
+};
 
-const ojList = ref([
-  { name: 'Codeforces', account: '' },
-  { name: 'AtCoder', account: '' },
-  { name: 'SPOJ', account: '' },
-  { name: 'UVa', account: '_37_' },
-]);
+watch(
+  () => [route.params.uid, ownUid.value] as const,
+  () => {
+    // 切换他人 route / 账号：先清空并作废在途读取与 mutation，绝不用他人资料填本人表单
+    reset();
+    if (isSelf.value) {
+      void loadAll();
+    }
+  },
+  { flush: 'sync' },
+);
+
+onMounted(reload);
+onBeforeUnmount(() => reset());
 </script>
 
 <style scoped lang="less">
-.setting-container {
+.setting-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
-
 .setting-card {
   background: #fff;
-  border-radius: 4px;
-  padding: 24px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  margin-bottom: 24px;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
-
-
-// 顶部个人资料
-.profile-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-
-  .avatar-section {
-    position: relative;
-    cursor: pointer;
-    
-    .avatar-mask {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    &:hover .avatar-mask { opacity: 1; }
-  }
-
-  .profile-info {
-    .main-name { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 4px; }
-    .uid { font-family: monospace; color: #666; font-size: 14px; margin-bottom: 8px; }
-    .upload-btn { margin-bottom: 4px; font-size: 13px; }
-    .tip { font-size: 12px; color: #999; }
-  }
-}
-
 .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 16px;
-  border-bottom: 1px solid #f5f5f5;
-  padding-bottom: 10px;
-  
-  .title { font-size: 16px; font-weight: bold; color: #333; border-left: 4px solid #2080f0; padding-left: 12px; line-height: 1; }
+  .title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+  }
 }
-
 .compact-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px; 
-  padding: 0 8px;
-
-  .compact-item {
-    display: flex;
-    flex-direction: column;
-    
-    .label { font-size: 12px; color: #999; margin-bottom: 2px; }
-    .value { font-size: 14px; color: #333; font-weight: 500; }
-  }
-}
-
-// 编辑表单
-.info-edit {
-  .edit-alert { margin-bottom: 16px; }
-  .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
-  .reason-item { max-width: 50%; }
-}
-
-.security-list {
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-
-  .security-item {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 12px 16px;
-    background: #f9f9f9;
-    border-radius: 6px;
-
-    .icon-wrapper {
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      &.email { background: #e6f7ff; color: #1890ff; }
-      &.lock { background: #fff7e6; color: #fa8c16; }
-    }
-
-    .content {
-      flex: 1;
-      .item-title { font-size: 14px; font-weight: 600; color: #333; }
-      .item-desc { 
-        font-size: 12px; color: #666; margin-top: 2px; 
-        .bound-text { color: #18a058; }
-        .unbound-text { color: #d03050; }
-      }
-    }
+}
+.compact-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  .label {
+    color: #888;
+  }
+  .value {
+    color: #333;
+    font-weight: 500;
   }
 }
-
-.oj-bind-list {
-  max-width: 600px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-
-  .oj-item {
-    border: 1px solid #eee;
-    padding: 12px 16px;
-    border-radius: 6px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    
-    .oj-name { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
-    .oj-status { font-size: 12px; color: #999; }
-    .bound { color: #18a058; }
-  }
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+:deep(.cell-wrap) {
+  white-space: normal;
+  word-break: break-word;
+}
+:deep(.diff-cell div) {
+  line-height: 1.6;
+  word-break: break-word;
 }
 </style>

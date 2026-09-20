@@ -1,74 +1,96 @@
 <template>
   <div class="change-page">
-    <n-card :bordered="false" title="信息修改审核">
-      <template #header-extra>
-        <n-space>
-          <n-button
-            type="success"
-            :disabled="selectedIds.length === 0"
-            @click="handleBatchApprove"
-          >
-            <template #icon>
-              <n-icon :size="18"><CheckmarkDoneOutline /></n-icon>
-            </template>
-            批量通过
-          </n-button>
-        </n-space>
-      </template>
+    <n-card :bordered="false" title="变动申请">
+      <n-form inline label-placement="left" :show-feedback="false" class="search-bar">
+        <n-form-item label="关键字">
+          <n-input
+            v-model:value="searchForm.keyword"
+            placeholder="按学号 / 原因搜索"
+            clearable
+            @keyup.enter="handleSearch"
+          />
+        </n-form-item>
+        <n-form-item label="状态">
+          <n-select
+            v-model:value="searchForm.status"
+            :options="statusOptions"
+            placeholder="全部状态"
+            clearable
+            style="width: 150px"
+          />
+        </n-form-item>
+        <n-form-item>
+          <n-space>
+            <n-button type="primary" @click="handleSearch">查询</n-button>
+            <n-button @click="handleReset">重置</n-button>
+          </n-space>
+        </n-form-item>
+      </n-form>
+
+      <n-alert v-if="listError" type="error" :bordered="false" style="margin-bottom: 12px">
+        {{ listError }}
+        <template #action>
+          <n-button size="small" @click="fetchChanges">重试</n-button>
+        </template>
+      </n-alert>
 
       <n-data-table
+        remote
         :columns="columns"
-        :data="paginatedList"
-        :loading="loading"
-        :row-key="(row: ChangeItem) => row.uid"
-        v-model:checked-row-keys="selectedIds"
-        :scroll-x="1400"
-        :row-props="handleRowProps"
+        :data="changes"
+        :loading="listLoading"
+        :row-key="(row: ProfileChangeVo) => row.id"
+        :pagination="false"
+        :scroll-x="1300"
       />
 
       <div class="pagination-wrapper">
         <n-pagination
-          v-model:page="currentPage"
-          v-model:page-size="pageSize"
+          :page="currentPage"
+          :page-size="pageSize"
           :item-count="totalCount"
           show-size-picker
           :page-sizes="[10, 15, 20, 30, 50]"
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
         />
       </div>
     </n-card>
 
     <n-modal
-      v-model:show="showRejectModal"
+      :show="showReviewModal"
       preset="card"
-      title="打回申请"
+      :title="reviewMode === 'approve' ? '通过身份变更申请' : '驳回身份变更申请'"
       :mask-closable="false"
-      :style="{
-        width: 'auto',
-        minWidth: '600px',
-        maxWidth: '90vw'
-      }"
+      :style="{ width: 'auto', minWidth: '520px', maxWidth: '90vw' }"
+      @update:show="handleReviewShowChange"
     >
-      <n-form label-placement="left" :label-width="80">
-        <n-form-item label="用户">
-          <n-input :value="`${rejectForm.name} (${rejectForm.uid})`" disabled />
+      <n-form label-placement="left" label-width="90">
+        <n-form-item label="申请用户">
+          <n-input :value="reviewForm.uid" disabled />
         </n-form-item>
-        <n-form-item label="邮箱">
-          <n-input :value="rejectForm.email" disabled />
-        </n-form-item>
-        <n-form-item label="打回原因" required>
+        <n-form-item :label="reviewMode === 'approve' ? '通过原因' : '驳回原因'" required>
           <n-input
-            v-model:value="rejectForm.reason"
+            v-model:value="reviewForm.reason"
             type="textarea"
-            placeholder="请输入打回原因，将通过邮件发送给用户"
-            :rows="4"
+            :maxlength="1000"
+            show-count
+            :autosize="{ minRows: 3, maxRows: 8 }"
+            :placeholder="reviewMode === 'approve' ? '请填写通过原因' : '请填写驳回原因'"
           />
         </n-form-item>
       </n-form>
+      <n-alert v-if="reviewError" type="error" :bordered="false">{{ reviewError }}</n-alert>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showRejectModal = false">取消</n-button>
-          <n-button type="error" :loading="submitting" @click="handleRejectSubmit">
-            确定打回
+          <n-button :disabled="saving" @click="closeReview">取消</n-button>
+          <n-button
+            :type="reviewMode === 'approve' ? 'success' : 'error'"
+            :loading="saving"
+            :disabled="saving"
+            @click="submitReview"
+          >
+            {{ reviewMode === 'approve' ? '确认通过' : '确认驳回' }}
           </n-button>
         </n-space>
       </template>
@@ -77,211 +99,176 @@
 </template>
 
 <script setup lang="ts">
-import { h } from 'vue';
-import { NButton, NSpace, NTag, NIcon, type DataTableColumns } from 'naive-ui';
-import { CheckmarkDoneOutline } from '@vicons/ionicons5';
-import { useUserChange, type ChangeItem } from '@/composables/admin/useUserChange';
+import { h, onMounted } from 'vue';
+import { NButton, NSpace, NTag, type DataTableColumns } from 'naive-ui';
+import { formatFullTime } from '@/composables/useTime';
+import { useUserChange } from '@/composables/admin/useUserChange';
+import type { ProfileChangeVo } from '@/utils/api';
 
 const {
-  loading,
-  submitting,
-  paginatedList,
+  listLoading,
+  saving,
+  listError,
+  reviewError,
+  changes,
   totalCount,
-  selectedIds,
   currentPage,
   pageSize,
-  showRejectModal,
-  rejectForm,
-  handleApprove,
-  openRejectModal,
-  handleRejectSubmit,
-  handleBatchApprove,
-  formatFullTime
+  searchForm,
+  showReviewModal,
+  reviewMode,
+  reviewForm,
+  fetchChanges,
+  handleSearch,
+  handleReset,
+  handlePageChange,
+  handlePageSizeChange,
+  openApprove,
+  openReject,
+  closeReview,
+  handleReviewShowChange,
+  submitReview,
+  identityFields,
 } = useUserChange();
 
-// 状态标签映射逻辑 
-const getStatusType = (status: string) => {
-  if (status === 'approved') return 'success';
-  if (status === 'rejected') return 'error';
+const statusOptions = [
+  { label: '待处理', value: 'PENDING' },
+  { label: '已通过', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+];
+
+const statusType = (status: string | null) => {
+  if (status === 'APPROVED') return 'success';
+  if (status === 'REJECTED') return 'error';
   return 'warning';
 };
 
-const getStatusText = (status: string) => {
-  if (status === 'approved') return '通过';
-  if (status === 'rejected') return '打回';
+const statusText = (status: string | null) => {
+  if (status === 'APPROVED') return '已通过';
+  if (status === 'REJECTED') return '已驳回';
   return '待处理';
 };
 
-// 渲染内容详情 
-const renderContent = (content: Record<string, string | undefined>) => {
-  const fields = { name: '姓名', uid: 'UID', college: '学院', class: '班级' };
-  const items = Object.entries(content)
-    .filter(([_, value]) => value !== undefined)
-    .map(([key, value]) => `${fields[key as keyof typeof fields]}: ${value}`);
-  return items.join('\n');
+const FIELD_LABELS: Array<[string, string]> = [
+  ['realname', '实名'],
+  ['college', '学院'],
+  ['grade', '年级'],
+  ['class', '班级'],
+];
+
+// 原值 → 目标值，仅 4 项身份字段（UID 不可变更）
+const renderDiff = (row: ProfileChangeVo) => {
+  const original = identityFields(row.original);
+  const proposed = identityFields(row.proposed);
+  return h(
+    'div',
+    { class: 'diff-cell' },
+    FIELD_LABELS.map(([key, label]) =>
+      h('div', { key }, `${label}：${original[key]} → ${proposed[key]}`),
+    ),
+  );
 };
 
-/**
- * 【重点修改】行属性设置
- * 移除了非待处理行的 cursor: not-allowed，仅保留透明度区分 
- */
-const handleRowProps = (row: ChangeItem) => {
-  return {
-    style: row.status !== 'pending' ? 'opacity: 0.7;' : 'cursor: pointer;'
-  };
-};
-
-const columns: DataTableColumns<ChangeItem> = [
-  { 
-    type: 'selection',
-    // 只有待处理状态允许勾选 
-    disabled(row: ChangeItem) {
-      return row.status !== 'pending';
-    }
-  },
-  {
-    title: 'UID',
-    key: 'uid',
-    width: 130,
-    render: (row) =>
-      h(
-        'a',
-        {
-          href: `/user/${row.uid}`,
-          class: 'uid-link',
-          onClick: (e: MouseEvent) => {
-            e.preventDefault();
-            window.open(`/user/${row.uid}`, '_blank');
-          }
-        },
-        row.uid
-      )
-  },
-  {
-    title: '姓名',
-    key: 'name',
-    width: 100,
-    ellipsis: { tooltip: true }
-  },
-  {
-    title: '原因',
-    key: 'reason',
-    width: 140,
-    ellipsis: { tooltip: true }
-  },
-  {
-    title: '原先内容',
-    key: 'originalContent',
-    width: 200,
-    ellipsis: { tooltip: true },
-    render: (row) => renderContent(row.originalContent)
-  },
-  {
-    title: '修改内容',
-    key: 'modifiedContent',
-    width: 200,
-    ellipsis: { tooltip: true },
-    render: (row) => renderContent(row.modifiedContent)
-  },
+const columns: DataTableColumns<ProfileChangeVo> = [
+  { title: '申请ID', key: 'id', width: 90 },
+  { title: 'UID', key: 'uid', width: 130 },
+  { title: '原因', key: 'reason', width: 160, className: 'cell-wrap' },
+  { title: '变更内容（原值 → 目标值）', key: 'diff', minWidth: 300, render: renderDiff },
   {
     title: '提交时间',
-    key: 'submitTime',
-    width: 160,
-    render: (row) => formatFullTime(row.submitTime)
+    key: 'gmtCreate',
+    width: 170,
+    render: (row) => formatFullTime(row.gmtCreate),
   },
   {
     title: '状态',
     key: 'status',
-    width: 90,
+    width: 100,
     render: (row) =>
       h(
         NTag,
-        { size: 'small', type: getStatusType(row.status), bordered: false },
-        () => getStatusText(row.status)
-      )
+        { size: 'small', type: statusType(row.status), bordered: false },
+        () => statusText(row.status),
+      ),
+  },
+  {
+    title: '审核信息',
+    key: 'review',
+    width: 220,
+    render: (row) => {
+      if (row.status === 'PENDING') return '-';
+      return h('div', { class: 'review-cell' }, [
+        h('div', `审核人：${row.reviewerUid || '-'}`),
+        h('div', `原因：${row.reviewReason || '-'}`),
+        h('div', `时间：${formatFullTime(row.reviewAt)}`),
+      ]);
+    },
   },
   {
     title: '操作',
     key: 'actions',
-    width: 100,
+    width: 140,
     fixed: 'right',
-    render(row) {
-      if (row.status === 'pending') {
-        return h(NSpace, { size: 4 }, {
-          default: () => [
-            h(
-              NButton,
-              {
-                size: 'tiny',
-                type: 'success',
-                secondary: true,
-                onClick: () => handleApprove(row)
-              },
-              { default: () => '通过' }
-            ),
-            h(
-              NButton,
-              {
-                size: 'tiny',
-                type: 'error',
-                secondary: true,
-                onClick: () => openRejectModal(row)
-              },
-              { default: () => '打回' }
-            )
-          ]
-        });
-      }
-      return h('span', { style: 'color: #999; font-size: 12px;' }, '已处理');
-    }
-  }
+    render: (row) => {
+      if (row.status !== 'PENDING') return '-';
+      return h(NSpace, { size: 4 }, {
+        default: () => [
+          h(
+            NButton,
+            {
+              size: 'tiny',
+              type: 'success',
+              secondary: true,
+              disabled: saving.value,
+              onClick: () => openApprove(row),
+            },
+            { default: () => '通过' },
+          ),
+          h(
+            NButton,
+            {
+              size: 'tiny',
+              type: 'error',
+              secondary: true,
+              disabled: saving.value,
+              onClick: () => openReject(row),
+            },
+            { default: () => '驳回' },
+          ),
+        ],
+      });
+    },
+  },
 ];
+
+onMounted(() => {
+  void fetchChanges();
+});
 </script>
 
 <style scoped lang="less">
 .change-page {
-  :deep(.n-data-table) {
-    font-size: 13px;
-
-    .n-data-table-wrapper {
-      overflow-x: auto;
-      
-      &::-webkit-scrollbar {
-        height: 8px;
-      }
-      
-      &::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 4px;
-      }
-      
-      &::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-        
-        &:hover {
-          background: #555;
-        }
-      }
-    }
+  :deep(.n-card) {
+    width: 100%;
   }
-
-  .pagination-wrapper {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 16px;
-  }
-
-  :deep(.uid-link) {
-    color: #007BFF;
-    text-decoration: none;
-    cursor: pointer;
-    font-weight: 500;
-    
-    &:hover {
-      text-decoration: underline;
-      color: #0056b3;
-    }
-  }
+}
+.search-bar {
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+:deep(.cell-wrap) {
+  white-space: normal;
+  word-break: break-word;
+}
+:deep(.diff-cell div),
+:deep(.review-cell div) {
+  line-height: 1.6;
+  word-break: break-word;
 }
 </style>

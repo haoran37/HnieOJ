@@ -1,196 +1,253 @@
-import { ref, reactive, computed } from 'vue';
-import { useMessage, useDialog } from 'naive-ui';
-import { formatFullTime } from '@/composables/useTime';
+import { reactive, ref } from 'vue';
+import { useMessage } from 'naive-ui';
+import {
+  approveProfileChangeRequest,
+  getAdminProfileChangeRequests,
+  getClasses,
+  getColleges,
+  rejectProfileChangeRequest,
+  type ProfileChangeStatus,
+  type ProfileChangeVo,
+  type ProfileIdentityVo,
+} from '@/utils/api';
 
-export interface ChangeItem {
-  uid: string;
-  name: string;
-  reason: string;
-  originalContent: {
-    name?: string;
-    uid?: string;
-    college?: string;
-    class?: string;
-  };
-  modifiedContent: {
-    name?: string;
-    uid?: string;
-    college?: string;
-    class?: string;
-  };
-  submitTime: number;
-  status: 'pending' | 'approved' | 'rejected';
-  rejectReason?: string;
-}
-
+/**
+ * 管理端身份资料变更审核（B2-5）。
+ *
+ * - 列表走真实分页/状态/关键字；行 key 为申请 id（同一用户可有历史申请）；
+ * - 仅 PENDING 可审核；批准确认与驳回都必须填写原因（≤1000）；
+ * - 审核期间锁定申请 id 快照，禁止切换到其它记录；
+ * - 冲突/失败保留错误并重新读取真实状态，不假装成功、不弱化后端冲突。
+ */
 export function useUserChange() {
   const message = useMessage();
-  const dialog = useDialog();
-  
-  const loading = ref(false);
-  const submitting = ref(false);
-  
-  const showRejectModal = ref(false);
-  const rejectForm = reactive({
-    uid: '',
-    name: '',
-    email: '',
-    reason: ''
-  });
-  
-  const selectedIds = ref<string[]>([]);
+
+  const listLoading = ref(false);
+  const saving = ref(false);
+  const listError = ref<string | null>(null);
+  const reviewError = ref<string | null>(null);
+
+  const changes = ref<ProfileChangeVo[]>([]);
+  const totalCount = ref(0);
   const currentPage = ref(1);
   const pageSize = ref(15);
-  
-  //TODO: 通过后台获取数据
-  const changeList = ref<ChangeItem[]>([
-    {
-      uid: '202202050234',
-      name: '张三',
-      reason: '信息填写错误',
-      originalContent: {
-        name: '张三',
-        college: '信息科学与工程学院',
-        class: '计算机2201'
-      },
-      modifiedContent: {
-        name: '张三',
-        college: '信息科学与工程学院',
-        class: '计算机2202'
-      },
-      submitTime: Date.now() - 86400000,
-      status: 'pending'
-    },
-    {
-      uid: '202202050235',
-      name: '李四',
-      reason: '转专业/班级变动',
-      originalContent: {
-        uid: '202202050235',
-        college: '信息科学与工程学院'
-      },
-      modifiedContent: {
-        uid: '202202050236',
-        college: '计算机科学与技术学院'
-      },
-      submitTime: Date.now() - 172800000,
-      status: 'approved'
-    },
-    {
-      uid: '202202050237',
-      name: '王五',
-      reason: '其他',
-      originalContent: {
-        name: '王五'
-      },
-      modifiedContent: {
-        name: '王武'
-      },
-      submitTime: Date.now() - 259200000,
-      status: 'rejected',
-      rejectReason: '修改理由不充分'
-    }
-  ]);
-  
-  const paginatedList = computed(() => {
-    const start = (currentPage.value - 1) * pageSize.value;
-    const end = start + pageSize.value;
-    return changeList.value.slice(start, end);
+
+  const searchForm = reactive({
+    keyword: '',
+    status: null as ProfileChangeStatus | null,
   });
-  
-  const totalCount = computed(() => changeList.value.length);
-  
-  const handleApprove = async (item: ChangeItem) => {
-    submitting.value = true;
-    
-    // RESTful API: 通过用户信息修改申请
-    console.log('API: PUT /api/users/' + item.uid + '/changes/approve - 通过用户信息修改申请');
-    
-    setTimeout(() => {
-      const index = changeList.value.findIndex(r => r.uid === item.uid);
-      if (index !== -1 && changeList.value[index]) {
-        changeList.value[index]!.status = 'approved';
+
+  // 学院/班级名称解析（真实基础数据，仅用于把人看得懂的标签补上）
+  const collegeMap = ref<Record<number, string>>({});
+  const classMap = ref<Record<number, string>>({});
+  let collegesLoaded = false;
+
+  const loadCollegesOnce = async () => {
+    if (collegesLoaded) return;
+    collegesLoaded = true;
+    try {
+      const colleges = (await getColleges()) ?? [];
+      const map: Record<number, string> = {};
+      for (const item of Array.isArray(colleges) ? colleges : []) map[item.id] = item.name;
+      collegeMap.value = map;
+    } catch {
+      // 名称解析失败不影响审核主流程，界面回退显示学院 id
+      collegesLoaded = false;
+    }
+  };
+
+  const loadClassNames = async (rows: ProfileChangeVo[]) => {
+    const pairs = new Map<string, { collegeId: number; grade: string }>();
+    for (const row of rows) {
+      for (const identity of [row.original, row.proposed]) {
+        if (identity && identity.collegeId != null && identity.grade) {
+          const key = `${identity.collegeId}|${identity.grade}`;
+          pairs.set(key, { collegeId: identity.collegeId, grade: identity.grade });
+        }
       }
-      message.success('已通过');
-      submitting.value = false;
-    }, 500);
+    }
+    const entries = [...pairs.values()];
+    if (entries.length === 0) return;
+    const results = await Promise.allSettled(
+      entries.map((entry) => getClasses(entry.collegeId, entry.grade)),
+    );
+    const map = { ...classMap.value };
+    results.forEach((result) => {
+      if (result.status !== 'fulfilled') return;
+      for (const item of Array.isArray(result.value) ? result.value : []) map[item.id] = item.name;
+    });
+    classMap.value = map;
   };
-  
-  const openRejectModal = (item: ChangeItem) => {
-    rejectForm.uid = item.uid;
-    rejectForm.name = item.name;
-    rejectForm.email = `${item.uid}@example.com`;
-    rejectForm.reason = '';
-    showRejectModal.value = true;
+
+  let listSeq = 0;
+
+  const fetchChanges = async () => {
+    const seq = ++listSeq;
+    listLoading.value = true;
+    listError.value = null;
+    try {
+      const data = await getAdminProfileChangeRequests({
+        page: currentPage.value,
+        pageSize: pageSize.value,
+        status: searchForm.status,
+        keyword: searchForm.keyword,
+      });
+      if (seq !== listSeq) return;
+      changes.value = data?.list ?? [];
+      totalCount.value = data?.total ?? 0;
+      void loadCollegesOnce();
+      void loadClassNames(changes.value);
+    } catch (err) {
+      if (seq !== listSeq) return;
+      changes.value = [];
+      totalCount.value = 0;
+      listError.value = err instanceof Error ? err.message : '变更申请加载失败';
+    } finally {
+      if (seq === listSeq) listLoading.value = false;
+    }
   };
-  
-  const handleRejectSubmit = async () => {
-    if (!rejectForm.reason.trim()) {
-      message.warning('请输入打回原因');
+
+  const handleSearch = () => {
+    currentPage.value = 1;
+    void fetchChanges();
+  };
+
+  const handleReset = () => {
+    searchForm.keyword = '';
+    searchForm.status = null;
+    currentPage.value = 1;
+    void fetchChanges();
+  };
+
+  const handlePageChange = (page: number) => {
+    currentPage.value = page;
+    void fetchChanges();
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    pageSize.value = size;
+    currentPage.value = 1;
+    void fetchChanges();
+  };
+
+  // 审核弹窗
+  const showReviewModal = ref(false);
+  const reviewMode = ref<'approve' | 'reject'>('approve');
+  const reviewForm = reactive({
+    id: 0,
+    uid: '',
+    reason: '',
+  });
+  // 审核期间锁定申请 id，禁止切换到其它记录
+  const lockedId = ref<number | null>(null);
+
+  const openReview = (row: ProfileChangeVo, mode: 'approve' | 'reject') => {
+    if (saving.value) return;
+    if (row.status !== 'PENDING') return;
+    reviewMode.value = mode;
+    reviewForm.id = row.id;
+    reviewForm.uid = row.uid;
+    reviewForm.reason = '';
+    reviewError.value = null;
+    lockedId.value = row.id;
+    showReviewModal.value = true;
+  };
+
+  const openApprove = (row: ProfileChangeVo) => openReview(row, 'approve');
+  const openReject = (row: ProfileChangeVo) => openReview(row, 'reject');
+
+  const closeReview = () => {
+    if (saving.value) return;
+    showReviewModal.value = false;
+    lockedId.value = null;
+  };
+
+  const handleReviewShowChange = (value: boolean) => {
+    if (value) {
+      showReviewModal.value = true;
       return;
     }
-    
-    submitting.value = true;
-    
-    // RESTful API: 打回用户信息修改申请
-    console.log('API: PUT /api/users/' + rejectForm.uid + '/changes/reject - 打回用户信息修改申请', {
-      reason: rejectForm.reason,
-      email: rejectForm.email
-    });
-    
-    setTimeout(() => {
-      const index = changeList.value.findIndex(r => r.uid === rejectForm.uid);
-      if (index !== -1 && changeList.value[index]) {
-        changeList.value[index]!.status = 'rejected';
-        changeList.value[index]!.rejectReason = rejectForm.reason;
-      }
-      message.success('已打回，原因已通过邮件发送');
-      submitting.value = false;
-      showRejectModal.value = false;
-    }, 500);
+    closeReview();
   };
-  
-  const handleBatchApprove = () => {
-    if (selectedIds.value.length === 0) {
-      message.warning('请先选择要通过的项');
+
+  const submitReview = async () => {
+    if (saving.value) return;
+    const id = lockedId.value;
+    if (id == null) return;
+    const mode = reviewMode.value;
+    const reason = reviewForm.reason.trim();
+    if (reason.length > 1000) {
+      message.warning('原因长度不能超过 1000');
       return;
     }
-    
-    dialog.info({
-      title: '批量通过确认',
-      content: `确定要通过选中的 ${selectedIds.value.length} 个申请吗？`,
-      positiveText: '确定',
-      negativeText: '取消',
-      onPositiveClick: () => {
-        // API: 批量通过用户信息修改申请
-        console.log('API: PUT /api/users/changes/batch-approve - 批量通过用户信息修改申请', { uids: selectedIds.value });
-        
-        changeList.value.forEach(item => {
-          if (selectedIds.value.includes(item.uid)) {
-            item.status = 'approved';
-          }
-        });
-        message.success(`已通过 ${selectedIds.value.length} 个申请`);
-        selectedIds.value = [];
+    // 批准确认与驳回都要求填写原因
+    if (!reason) {
+      message.warning(mode === 'approve' ? '请填写通过原因' : '请填写驳回原因');
+      return;
+    }
+    saving.value = true;
+    reviewError.value = null;
+    try {
+      if (mode === 'approve') {
+        await approveProfileChangeRequest(id, reason);
+        message.success('已通过');
+      } else {
+        await rejectProfileChangeRequest(id, reason);
+        message.success('已驳回');
       }
-    });
+      showReviewModal.value = false;
+      lockedId.value = null;
+      await fetchChanges();
+    } catch (err) {
+      // 冲突/失败：保留错误并重新读取真实状态，不伪装成功
+      reviewError.value = err instanceof Error ? err.message : '审核失败，请重试';
+      message.error(reviewError.value);
+      await fetchChanges();
+    } finally {
+      saving.value = false;
+    }
   };
-  
+
+  const collegeLabel = (id: number | null | undefined): string => {
+    if (id == null) return '未填写';
+    return collegeMap.value[id] ?? `学院 #${id}`;
+  };
+
+  const classLabel = (id: number | null | undefined): string => {
+    if (id == null) return '未填写';
+    return classMap.value[id] ?? `班级 #${id}`;
+  };
+
+  const identityFields = (identity: ProfileIdentityVo | null): Record<string, string> => ({
+    realname: identity?.realname || '未填写',
+    college: collegeLabel(identity?.collegeId),
+    grade: identity?.grade || '未填写',
+    class: classLabel(identity?.classId),
+  });
+
   return {
-    loading,
-    submitting,
-    changeList,
-    paginatedList,
+    listLoading,
+    saving,
+    listError,
+    reviewError,
+    changes,
     totalCount,
-    selectedIds,
     currentPage,
     pageSize,
-    showRejectModal,
-    rejectForm,
-    handleApprove,
-    openRejectModal,
-    handleRejectSubmit,
-    handleBatchApprove,
-    formatFullTime
+    searchForm,
+    showReviewModal,
+    reviewMode,
+    reviewForm,
+    fetchChanges,
+    handleSearch,
+    handleReset,
+    handlePageChange,
+    handlePageSizeChange,
+    openApprove,
+    openReject,
+    closeReview,
+    handleReviewShowChange,
+    submitReview,
+    identityFields,
   };
 }

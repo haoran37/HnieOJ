@@ -9,12 +9,12 @@
         <div class="stat-line">
           <n-icon size="26" class="stat-icon blue-icon"><BarChartIcon /></n-icon>
           <span class="stat-label">评分:</span>
-          <span class="stat-value">{{ userInfo.rating }}</span>
+          <span class="stat-value">暂未开放</span>
         </div>
         <div class="stat-line">
           <n-icon size="26" class="stat-icon red-icon"><RibbonIcon /></n-icon>
           <span class="stat-label">贡献:</span>
-          <span class="stat-value">{{ userInfo.contribution }}</span>
+          <span class="stat-value">暂未开放</span>
         </div>
 
         <ul class="nav-list">
@@ -27,6 +27,10 @@
               @click="handleMenuClick(item.key)"
             >
               {{ item.label }}
+              <span
+                v-if="item.key === 'messages' && unreadCount"
+                class="unread-badge"
+              >{{ unreadCount }}</span>
             </n-button>
           </li>
         </ul>
@@ -39,32 +43,60 @@
             backgroundColor: '#2080f0',
             fontSize: '48px',
           }"
-          src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg"
-         />          
-        <div class="display-username">{{ userInfo.username }}</div>
+          :src="userStore.userInfo?.avatar || undefined"
+         />
+        <div class="display-username">{{ userStore.userInfo?.username || '未登录' }}</div>
       </div>
     </div>
   </BoardCard>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
 import { 
   PersonOutline as UserIcon,
   BarChartOutline as BarChartIcon,
   RibbonOutline as RibbonIcon
 } from '@vicons/ionicons5';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import BoardCard from '@/components/BoardCard.vue';
+import { useUserStore } from '@/stores/userStore';
+import { getUserMessageUnreadCount } from '@/utils/api';
+import { onUserMessagesChanged } from '@/composables/oj/useUserMessages';
 
-// TODO: 获取用户真实数据
-// 模拟数据
-const userInfo = ref({
-  username: 'username',
-  rating: 1280,
-  contribution: 0
+const userStore = useUserStore();
+
+// 真实未读数：读取失败保持 null，不伪装成 0
+const unreadCount = ref<number | null>(null);
+
+// 请求序号：账号切换后作废旧未读数响应，避免串号
+let unreadSeq = 0;
+const loadUnread = async () => {
+  const seq = ++unreadSeq;
+  if (!userStore.userInfo?.id) {
+    unreadCount.value = null;
+    return;
+  }
+  try {
+    const count = await getUserMessageUnreadCount();
+    if (seq !== unreadSeq || !userStore.userInfo?.id) return;
+    unreadCount.value = typeof count === 'number' ? count : null;
+  } catch {
+    if (seq !== unreadSeq) return;
+    unreadCount.value = null;
+  }
+};
+
+// 收件箱读/删成功后主动刷新真实未读数（同域事件，不引入全局状态框架）
+const offMessagesChanged = onUserMessagesChanged(() => {
+  void loadUnread();
 });
+onBeforeUnmount(() => {
+  ++unreadSeq;
+  offMessagesChanged();
+});
+onMounted(loadUnread);
 
-// 菜单配置username
+// 菜单配置
 const menuItems = [
   { label: '设置', key: 'settings' },
   { label: '团队', key: 'teams' },
@@ -76,9 +108,7 @@ const menuItems = [
 
 const emit = defineEmits(['menu-click']);
 
-// TODO: 菜单点击处理
 const handleMenuClick = (key: string) => {
-  console.log(`点击了菜单: ${key}`);
   emit('menu-click', key);
 };
 </script>
@@ -130,6 +160,17 @@ const handleMenuClick = (key: string) => {
           font-weight: 500;
           font-weight: bold;
           color: #2080f0;
+
+          .unread-badge {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 0 6px;
+            border-radius: 8px;
+            background: #d03050;
+            color: #fff;
+            font-size: 12px;
+            line-height: 16px;
+          }
         }
       }
     }

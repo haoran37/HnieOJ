@@ -1,153 +1,198 @@
 <template>
   <div class="user-sidebar">
     <n-card :bordered="false" size="small" class="side-card profile-card">
-      <div class="profile-header">
-        <n-avatar 
-          round 
-          :size="80" 
-          :src="userStore.userInfo.avatar" 
-          class="avatar"
-        />
-        <div class="names">
-          <div class="username">{{ userStore.userInfo.username }}</div>
-          <n-tag :type="roleConfig.type" size="small" :bordered="false" round>
-            {{ roleConfig.text }}
-          </n-tag>
+      <n-spin :show="loading">
+        <n-alert v-if="error" type="error" :bordered="false" size="small" style="margin-bottom: 8px">
+          {{ error }}
+        </n-alert>
+
+        <div class="profile-header">
+          <n-avatar round :size="80" :src="profile?.avatar || undefined" class="avatar" />
+          <div class="names">
+            <div class="username">{{ profile?.username || '未知用户' }}</div>
+            <n-tag v-if="roleText" :type="roleType" size="small" :bordered="false" round>
+              {{ roleText }}
+            </n-tag>
+          </div>
         </div>
-      </div>
-      
-      <n-divider style="margin: 12px 0" />
-      
-      <div class="info-list">
-        <div class="info-item">
-          <span class="label">姓名</span>
-          <span class="value">{{ userStore.userInfo.name }}</span>
+
+        <n-divider style="margin: 12px 0" />
+
+        <div class="info-list">
+          <div class="info-item">
+            <span class="label">姓名</span>
+            <span class="value">{{ profile?.realname || '未填写' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">学号</span>
+            <span class="value">{{ profile?.uid || route.params.uid }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">学院</span>
+            <span class="value">{{ profile?.college || '未填写' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">年级</span>
+            <span class="value">{{ profile?.grade || '未填写' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">班级</span>
+            <span class="value">{{ profile?.majorClass || '未填写' }}</span>
+          </div>
         </div>
-        <div class="info-item">
-          <span class="label">学号</span>
-          <span class="value">{{ userStore.userInfo.id }}</span>
-        </div>
-        <div class="info-item">
-          <span class="label">班级</span>
-          <span class="value">{{ userStore.userInfo.class || '未填写' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="label">状态</span>
-          <n-badge dot type="success" processing>
-            <!-- TODO: 响应式 -->
-            <span class="value" style="margin-left: 6px">在线</span>
-          </n-badge>
-        </div>
-        <div class="info-item">
-          <span class="label">上次登录</span>
-          <span class="value small">2026-01-12 14:30</span>
-        </div>
-      </div>
+      </n-spin>
     </n-card>
 
     <n-card title="个人成就" :bordered="false" size="small" class="side-card">
-      <n-data-table
-        :columns="achievementColumns"
-        :data="achievementData"
-        :bordered="false"
-        size="small"
-        :pagination="false"
-        class="mini-table"
-      />
+      <n-spin :show="loading">
+        <n-data-table
+          v-if="achievements.length > 0"
+          :columns="achievementColumns"
+          :data="achievements"
+          :bordered="false"
+          size="small"
+          :pagination="false"
+          class="mini-table"
+        />
+        <n-empty v-else description="暂无成就记录" size="small" />
+      </n-spin>
+    </n-card>
+
+    <n-card
+      v-if="isSelf"
+      title="消息"
+      :bordered="false"
+      size="small"
+      class="side-card"
+    >
+      <div class="message-entry">
+        <span v-if="unreadCount !== null" class="unread-text">
+          {{ unreadCount > 0 ? `未读消息 ${unreadCount} 条` : '暂无未读消息' }}
+        </span>
+        <span v-else class="unread-failed">未读数加载失败</span>
+        <n-button text type="primary" @click="goMessages">查看消息</n-button>
+      </div>
     </n-card>
 
     <n-card title="提交统计" :bordered="false" size="small" class="side-card">
-      <div class="stats-summary">
-        <div class="stat-box">
-          <div class="num">{{ solvedCount }}</div>
-          <div class="label">解决</div>
-        </div>
-        <div class="stat-box">
-          <div class="num">{{ submitCount }}</div>
-          <div class="label">提交</div>
-        </div>
-        <div class="stat-box">
-          <div class="num">{{ acRate }}%</div>
-          <div class="label">AC率</div>
-        </div>
-        <div class="stat-box">
-          <div class="num">{{ duplicateRate }}%</div>
-          <div class="label">重复率</div>
-        </div>
-      </div>
-      
-      <div class="chart-container">
-        <v-chart class="pie-chart" :option="pieOption" autoresize />
-      </div>
+      <n-empty description="提交统计暂未开放：后端暂无用户历史统计接口" size="small" />
     </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import VChart from '@/utils/echarts';
-import { useUserStore, UserRole } from '@/stores/userStore';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { getUserAchievements, getUserDetail, getUserMessageUnreadCount, type UserDetailVo, type UserAchievementVo } from '@/utils/api';
+import { onUserMessagesChanged } from '@/composables/oj/useUserMessages';
+import { formatFullTime } from '@/composables/useTime';
+import { useUserStore } from '@/stores/userStore';
 
+const route = useRoute();
+const router = useRouter();
 const userStore = useUserStore();
 
-// 身份标签配置
-const roleConfig = computed(() => {
-  const role = userStore.userInfo.role;
-  switch (role) {
-    case UserRole.ROOT:
-    case UserRole.ADMIN:
-      return { type: 'error', text: 'ADMIN' }; // 红色
-    case UserRole.TEACHER:
-      return { type: 'info', text: 'TEACHER' }; // 蓝色
-    case UserRole.TA:
-      return { type: 'warning', text: 'TA' }; // 橙色
-    case UserRole.STUDENT:
-    default:
-      return { type: 'success', text: 'STUDENT' }; // 绿色
+const loading = ref(false);
+const error = ref<string | null>(null);
+const profile = ref<UserDetailVo | null>(null);
+const achievements = ref<UserAchievementVo[]>([]);
+
+// 消息入口仅本人可见；未读数读取失败不伪 0
+const unreadCount = ref<number | null>(null);
+const ownUid = computed(() => userStore.userInfo?.id || '');
+const isSelf = computed(
+  () => !!ownUid.value && String(route.params.uid) === String(ownUid.value),
+);
+
+// 请求序号：路由/账号切换后作废旧未读数响应，避免把上一个用户的计数显示给当前用户
+let unreadSeq = 0;
+const loadUnread = async () => {
+  const seq = ++unreadSeq;
+  if (!isSelf.value) {
+    unreadCount.value = null;
+    return;
   }
+  try {
+    const count = await getUserMessageUnreadCount();
+    if (seq !== unreadSeq || !isSelf.value) return;
+    unreadCount.value = typeof count === 'number' ? count : null;
+  } catch {
+    if (seq !== unreadSeq) return;
+    unreadCount.value = null;
+  }
+};
+
+const goMessages = () => {
+  if (!ownUid.value) return;
+  void router.push({ name: 'UserMessage', params: { uid: ownUid.value } });
+};
+
+// 收件箱读/删成功后主动刷新真实未读数（同域事件，不引入全局状态框架）
+const offMessagesChanged = onUserMessagesChanged(() => {
+  void loadUnread();
+});
+onBeforeUnmount(() => {
+  ++unreadSeq;
+  offMessagesChanged();
 });
 
-//TODO: 从后端获取数据
-// 成就数据
+let seq = 0;
+const load = async (uid: string) => {
+  if (!uid) return;
+  const current = ++seq;
+  loading.value = true;
+  error.value = null;
+  try {
+    const [detail, achievementPage] = await Promise.all([
+      getUserDetail(uid),
+      getUserAchievements(uid, 1, 20),
+    ]);
+    if (current !== seq) return;
+    profile.value = detail;
+    achievements.value = achievementPage?.list ?? [];
+  } catch (err) {
+    if (current !== seq) return;
+    profile.value = null;
+    achievements.value = [];
+    error.value = err instanceof Error ? err.message : '用户信息加载失败';
+  } finally {
+    if (current === seq) loading.value = false;
+  }
+};
+
+const roleText = computed(() => {
+  const roles = profile.value?.roles ?? [];
+  if (roles.length === 0) return '';
+  return (roles[roles.length - 1] ?? '').toUpperCase();
+});
+
+const roleType = computed<'error' | 'info' | 'warning' | 'success'>(() => {
+  const role = roleText.value;
+  if (role === 'ADMIN' || role === 'ROOT') return 'error';
+  if (role === 'TEACHER') return 'info';
+  if (role === 'TA') return 'warning';
+  return 'success';
+});
+
 const achievementColumns = [
-  { title: '时间', key: 'date', width: 90 },
-  { title: '内容', key: 'content' }
-];
-const achievementData = [
-  { key: 1, date: '2025/03/30', content: '20届HNCPC铜牌' },
-  { key: 2, date: '2024/12/15', content: 'Codeforces 1600分' },
-  { key: 3, date: '2024/03/30', content: '加入ACM实验室' }
+  {
+    title: '时间',
+    key: 'achieveTime',
+    width: 110,
+    render: (row: UserAchievementVo) => formatFullTime(row.achieveTime),
+  },
+  { title: '内容', key: 'title' },
 ];
 
-// 提交数据
-const solvedCount = 124;
-const submitCount = 342;
-const acRate = 36;
-const duplicateRate = 12;
-
-// 饼图配置
-const pieOption = ref({
-  tooltip: { trigger: 'item' },
-  legend: { top: '0%', left: 'center', itemWidth: 8, itemHeight: 8, textStyle: { fontSize: 10 } },
-  series: [
-    {
-      name: '提交分布',
-      type: 'pie',
-      radius: ['40%', '70%'],
-      center: ['50%', '60%'],
-      avoidLabelOverlap: false,
-      itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
-      label: { show: false },
-      data: [
-        { value: 124, name: 'AC', itemStyle: { color: '#18a058' } },
-        { value: 50, name: 'WA', itemStyle: { color: '#d03050' } },
-        { value: 30, name: 'TLE', itemStyle: { color: '#f0a020' } },
-        { value: 18, name: 'MLE', itemStyle: { color: '#2080f0' } },
-        { value: 10, name: 'RE', itemStyle: { color: '#8a2be2' } }
-      ]
-    }
-  ]
-});
+watch(
+  () => [route.params.uid, ownUid.value] as const,
+  () => {
+    void loadUnread();
+    const uid = String(route.params.uid ?? '');
+    if (uid) void load(uid);
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="less">
@@ -167,7 +212,7 @@ const pieOption = ref({
   flex-direction: column;
   align-items: center;
   padding: 10px 0;
-  
+
   .names {
     margin-top: 10px;
     text-align: center;
@@ -183,7 +228,6 @@ const pieOption = ref({
     font-size: 13px;
     .label { color: #888; }
     .value { color: #333; font-weight: 500; }
-    .value.small { font-size: 12px; color: #666; }
   }
 }
 
@@ -196,24 +240,12 @@ const pieOption = ref({
   border-bottom: 1px solid #f9f9f9;
 }
 
-.stats-summary {
+.message-entry {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding: 0 4px;
-  
-  .stat-box {
-    text-align: center;
-    .num { font-size: 15px; font-weight: bold; color: #333; }
-    .label { font-size: 12px; color: #999; transform: scale(0.9); }
-  }
-}
-
-.chart-container {
-  height: 200px; 
-  .pie-chart {
-    height: 100%;
-    width: 100%;
-  }
+  align-items: center;
+  font-size: 13px;
+  .unread-text { color: #333; font-weight: 500; }
+  .unread-failed { color: #d03050; }
 }
 </style>

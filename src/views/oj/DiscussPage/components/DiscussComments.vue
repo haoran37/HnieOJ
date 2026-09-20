@@ -17,17 +17,8 @@
         </div>
         
         <div class="comment-actions">
-           <n-button text size="tiny" class="action-icon like" title="点赞" @click="handleLike(comment.id)">
-             <template #icon><n-icon><ThumbsUp /></n-icon></template>
-             <span v-if="comment.likes > 0" class="count">{{ comment.likes }}</span>
-           </n-button>
-           
            <n-button text size="tiny" class="action-icon reply" title="回复" @click="$emit('reply-user', comment.user.username)">
              <template #icon><n-icon><ReplyIcon /></n-icon></template>
-           </n-button>
-
-           <n-button text size="tiny" class="action-icon delete" title="删除" @click="handleDelete(comment.id)">
-             <template #icon><n-icon><TrashBin /></n-icon></template>
            </n-button>
         </div>
       </div>
@@ -43,7 +34,13 @@
         ref="inputRef"
       />
       <div class="editor-actions">
-        <n-button type="primary" size="tiny" @click="handleSubmit">提交评论</n-button>
+        <n-button
+          type="primary"
+          size="tiny"
+          :loading="submitting"
+          :disabled="submitting"
+          @click="handleSubmit"
+        >提交评论</n-button>
         <n-button size="tiny" text @click="$emit('close')">取消</n-button>
       </div>
     </div>
@@ -59,24 +56,21 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue';
 import { 
-  ThumbsUpOutline as ThumbsUp, 
-  TrashOutline as TrashBin,
   ChatboxOutline as ReplyIcon 
 } from '@vicons/ionicons5';
-import { useMessage } from 'naive-ui';
-
-const message = useMessage();
 
 const props = defineProps<{
   comments: any[];
   visible: boolean;
   initialText?: string;
+  submitComment?: (text: string) => Promise<boolean>;
 }>();
 
-const emit = defineEmits(['submit', 'close', 'open', 'reply-user']);
+const emit = defineEmits(['close', 'open', 'reply-user']);
 
 const inputValue = ref('');
 const inputRef = ref();
+const submitting = ref(false);
 
 watch(() => props.initialText, (val) => {
   if (val) {
@@ -85,21 +79,22 @@ watch(() => props.initialText, (val) => {
   }
 });
 
-const handleSubmit = () => {
-  if (!inputValue.value.trim()) return;
-  emit('submit', inputValue.value);
-  inputValue.value = '';
+// 仅当父级确认写入成功后才清空并关闭；失败时保留草稿供重试
+const handleSubmit = async () => {
+  if (!inputValue.value.trim() || submitting.value) return;
+  submitting.value = true;
+  try {
+    const ok = props.submitComment
+      ? await props.submitComment(inputValue.value)
+      : true;
+    if (!ok) return;
+    inputValue.value = '';
+    emit('close');
+  } finally {
+    submitting.value = false;
+  }
 };
 
-//TODO: 实现逻辑
-const handleLike = (id: number) => {
-  message.info(`[事件] 给评论 ${id} 点赞`);
-};
-
-//TODO: 实现逻辑
-const handleDelete = (id: number) => {
-  message.info(`[事件] 删除评论 ${id}`);
-};
 </script>
 
 <style scoped lang="less">

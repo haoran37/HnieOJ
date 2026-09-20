@@ -5,7 +5,7 @@
       <n-avatar
         round
         :size="42"
-        :src="avatar || 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'"
+        :src="avatar"
       />
     </div>
 
@@ -22,7 +22,7 @@
       </div>
 
       <div class="meta">
-        <span class="username" @click.stop="$emit('click-user', username)">
+        <span class="username" @click.stop="$emit('click-user', uid || username)">
           {{ username }}
         </span>
         <span class="date">发布于 {{ date }}</span>
@@ -71,6 +71,7 @@ import { NTag, NAvatar, NEllipsis, NButton, NIcon } from 'naive-ui';
 defineProps<{
   title: string
   username: string
+  uid?: string
   avatar?: string
   date: string
   problemId?: string | null

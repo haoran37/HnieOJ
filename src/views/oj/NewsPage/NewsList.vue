@@ -4,19 +4,29 @@
     <div class="page-header-card">
       <div class="header-content">
         <h1 class="page-title">新闻公告</h1>
-        <n-button 
-          v-if="userStore.isAdmin" 
-          type="primary" 
-          class="add-btn"
-          @click="handleAddNews"
-        >
-          <template #icon><n-icon><AddIcon /></n-icon></template>
-          发布新闻
-        </n-button>
       </div>
     </div>
 
+    <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">
+      {{ error }}
+      <n-button size="tiny" secondary type="error" style="margin-left: 8px" @click="fetchNews()">
+        重试
+      </n-button>
+    </n-alert>
+
     <n-card :bordered="false" class="list-card">
+      <n-space style="margin-bottom: 12px">
+        <n-input
+          v-model:value="keyword"
+          placeholder="搜索新闻标题"
+          style="width: 260px"
+          clearable
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
+        />
+        <n-button type="primary" @click="handleSearch">搜索</n-button>
+      </n-space>
+
       <n-data-table
         :columns="columns"
         :data="newsList"
@@ -43,25 +53,22 @@
 <script setup lang="ts">
 import { h, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { NTag, useMessage } from 'naive-ui';
-import { AddOutline as AddIcon, Flame as HotIcon } from '@vicons/ionicons5';
 import { useNewsList } from '@/composables/oj/useNewsList';
-import { useUserStore } from '@/stores/userStore';
 
 const router = useRouter();
-const message = useMessage();
-const userStore = useUserStore();
 
-const { 
-  loading, newsList, total, page, pageSize, 
-  fetchNews, handlePageChange 
-} = useNewsList();
-
-const handleAddNews = () => {
-  //TODO: 跳转到发布页面或弹出模态框
-  message.info('点击了发布新闻按钮（功能开发中）');
-  // router.push('/news/create'); 
-};
+const {
+  loading,
+  error,
+  newsList,
+  total,
+  page,
+  pageSize,
+  keyword,
+  fetchNews,
+  handleSearch,
+  handlePageChange
+} = useNewsList('NEWS');
 
 const columns = [
   {
@@ -69,38 +76,34 @@ const columns = [
     key: 'index',
     width: 80,
     align: 'center' as const,
-    render: (_: any, index: number) => (page.value - 1) * pageSize.value + index + 1
+    render: (_: unknown, index: number) => (page.value - 1) * pageSize.value + index + 1
   },
   {
     title: '标题',
     key: 'title',
-    render(row: any) {
-      const nodes = [];
-      if (row.isTop) {
-        nodes.push(h(NTag, { type: 'error', size: 'small', bordered: false, style: { marginRight: '8px', fontWeight: 'bold' } }, { default: () => '置顶' }));
-      }
-      nodes.push(h('a', {
+    render(row: { id: string; title: string }) {
+      return h('a', {
         class: 'news-link',
+        href: `/news/${row.id}`,
         onClick: (e: MouseEvent) => {
           e.preventDefault();
           router.push(`/news/${row.id}`);
         }
-      }, row.title));
-      if (row.viewCount > 500) {
-        nodes.push(h('span', { style: { marginLeft: '8px', color: '#d03050', display: 'inline-flex', alignItems: 'center', fontSize: '12px' } }, [
-          h(HotIcon, { style: { width: '14px', marginRight: '2px' } }),
-          row.viewCount
-        ]));
-      }
-      return h('div', { style: { display: 'flex', alignItems: 'center' } }, nodes);
+      }, row.title);
     }
+  },
+  {
+    title: '发布者',
+    key: 'author',
+    width: 160,
+    align: 'left' as const
   },
   {
     title: '发布时间',
     key: 'createTime',
-    width: 150,
+    width: 180,
     align: 'right' as const,
-    render: (row: any) => h('span', { style: { color: '#999', fontFamily: 'monospace' } }, row.createTime)
+    render: (row: { createTime: string }) => h('span', { style: { color: '#999', fontFamily: 'monospace' } }, row.createTime)
   }
 ];
 

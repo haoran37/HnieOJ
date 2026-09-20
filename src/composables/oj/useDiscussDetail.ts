@@ -1,31 +1,35 @@
 import { ref, computed } from 'vue';
 import { useMessage } from 'naive-ui';
-import { useUserStore } from '@/stores/userStore';
+import {
+  createDiscussionAnswer,
+  createDiscussionComment,
+  getDiscussionDetail,
+  voteDiscussion,
+} from '@/utils/api';
+import type { DiscussionDetailVo } from '@/utils/api';
+import { formatFullTime } from '@/composables/useTime';
 
-export const DEFAULT_AVATAR = 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg';
-
-// 二级评论接口
+// 二级评论
 export interface Comment {
   id: number;
   user: { id: string; username: string; avatar?: string };
   content: string;
   time: string;
-  likes: number;
 }
 
-// 一级回答接口
+// 一级回答
 export interface Answer {
   id: number;
   user: { id: string; username: string; avatar?: string };
   content: string; // Markdown
   time: string;
-  voteCount: number; // 赞踩差值
+  voteCount: number;
   upvoted: boolean;
   downvoted: boolean;
   comments: Comment[];
 }
 
-// 主题帖接口
+// 主题帖
 export interface DiscussionPost {
   id: string;
   title: string;
@@ -36,96 +40,88 @@ export interface DiscussionPost {
   voteCount: number;
   upvoted: boolean;
   downvoted: boolean;
-  category: string;
+  category: 'Site' | 'Problem';
+  problemCode: string | null;
   tags: string[];
 }
 
+export const CATEGORY_LABEL: Record<'Site' | 'Problem', string> = {
+  Site: '站内事务',
+  Problem: '题目讨论',
+};
+
 export function useDiscussDetail() {
   const message = useMessage();
-  const userStore = useUserStore();
   const loading = ref(false);
-  
+  const error = ref<string | null>(null);
+
   const post = ref<DiscussionPost | null>(null);
   const answers = ref<Answer[]>([]);
 
-  //TODO: 替换真实api
-  const fetchDetail = async (id: string) => {
+  // 提交互斥：防止重复点击创建重复回答/评论
+  const submittingAnswer = ref(false);
+  const submittingComment = ref(false);
+
+  let seq = 0;
+
+  const applyDetail = (vo: DiscussionDetailVo) => {
+    const p = vo.post;
+    post.value = {
+      id: String(p.id),
+      title: p.title,
+      content: p.content ?? '',
+      user: { id: p.uid ?? '', username: p.author ?? '' },
+      time: formatFullTime(p.gmtCreate),
+      viewCount: p.viewNum ?? 0,
+      voteCount: p.likeNum ?? 0,
+      // 详情接口未返回当前用户投票状态
+      upvoted: false,
+      downvoted: false,
+      category: p.category === 'Site' ? 'Site' : 'Problem',
+      problemCode: p.problemCode,
+      tags: p.problemCode
+        ? [p.problemCode, CATEGORY_LABEL[p.category === 'Site' ? 'Site' : 'Problem']]
+        : [CATEGORY_LABEL[p.category === 'Site' ? 'Site' : 'Problem']],
+    };
+    answers.value = (vo.answers ?? []).map((a) => ({
+      id: a.id,
+      user: { id: a.uid ?? '', username: a.author ?? '' },
+      content: a.content ?? '',
+      time: formatFullTime(a.gmtCreate),
+      voteCount: a.likeNum ?? 0,
+      upvoted: false,
+      downvoted: false,
+      comments: (a.comments ?? []).map((c) => ({
+        id: c.id,
+        user: { id: c.uid ?? '', username: c.author ?? '' },
+        content: c.content ?? '',
+        time: formatFullTime(c.gmtCreate),
+      })),
+    }));
+  };
+
+  // keepOnError：用于写入成功后的刷新失败场景——保留最后一次已知详情，
+  // 只暴露可重试错误，避免把已提交成功的内容清空成“加载失败”。
+  const fetchDetail = async (id: string, options: { keepOnError?: boolean } = {}): Promise<boolean> => {
+    const current = ++seq;
     loading.value = true;
-    setTimeout(() => {
-      post.value = {
-        id,
-        title: '关于题目 P1001 A+B Problem 的时间复杂度疑问',
-        content: `我在做这道题的时候，发现如果使用 \`cin\` 和 \`cout\` 会导致 TLE，但是改成 \`scanf\` 和 \`printf\` 就过了。
-
-\`\`\`cpp
-#include <iostream>
-using namespace std;
-int main() {
-    int a, b;
-    cin >> a >> b; 
-    cout << a + b << endl;
-    return 0;
-}
-\`\`\`
-
-请问这是为什么？有没有大佬能解释一下底层原理？`,
-        user: { 
-          id: 'u_author_001', 
-          username: 'Newbie_Coder', 
-          avatar: 'https://api.dicebear.com/7.x/miniavs/svg?seed=1' 
-        },
-        time: '2025-02-14 10:30',
-        viewCount: 1205,
-        voteCount: 12,
-        upvoted: true,
-        downvoted: false,
-        category: '题目讨论',
-        tags: ['C++', 'IO优化', 'P1001']
-      };
-
-      // 回答列表
-      answers.value = [
-        {
-          id: 101,
-          user: { id: 'u2', username: 'AK_King', avatar: 'https://api.dicebear.com/7.x/miniavs/svg?seed=2' },
-          content: `这是因为 C++ 的 \`cin/cout\` 为了兼容 C 语言的 \`scanf/printf\`，默认开启了同步流。这会导致每次 I/O 操作都检查同步，从而拖慢速度。
-          
-你可以通过添加以下代码来关闭同步：
-
-\`\`\`cpp
-ios::sync_with_stdio(false);
-cin.tie(nullptr);
-\`\`\`
-
-这样之后 \`cin\` 的速度就和 \`scanf\` 差不多了。`,
-          time: '2025-02-14 11:00',
-          voteCount: 45,
-          upvoted: false,
-          downvoted: false,
-          comments: [
-            { 
-              id: 201, 
-              user: { id: 'u_author_001', username: 'Newbie_Coder', avatar: '' }, 
-              content: '原来如此！测试了一下确实快了很多，感谢大佬！', 
-              time: '2025-02-14 11:05', 
-              likes: 2 
-            }
-          ]
-        },
-        {
-          id: 102,
-          user: { id: 'u4', username: 'Python_Fan', avatar: 'https://api.dicebear.com/7.x/miniavs/svg?seed=3' },
-          content: '建议直接用 Python，人生苦短，我用 Python。',
-          time: '2025-02-14 12:00',
-          voteCount: -5,
-          upvoted: false,
-          downvoted: true,
-          comments: []
-        }
-      ];
-      
-      loading.value = false;
-    }, 400);
+    error.value = null;
+    try {
+      const vo = await getDiscussionDetail(id);
+      if (current !== seq) return false;
+      applyDetail(vo);
+      return true;
+    } catch (err) {
+      if (current !== seq) return false;
+      if (!options.keepOnError) {
+        post.value = null;
+        answers.value = [];
+      }
+      error.value = err instanceof Error ? err.message : '讨论详情加载失败';
+      return false;
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
   // 排序：票数差值从大到小
@@ -133,82 +129,76 @@ cin.tie(nullptr);
     return [...answers.value].sort((a, b) => b.voteCount - a.voteCount);
   });
 
-  // 投票逻辑 (前端模拟)
-  const handleVote = (targetType: 'post' | 'answer', id: string | number, direction: 'up' | 'down') => {
-    //TODO: 首先逻辑
-    message.info(`[事件] 对 ${targetType === 'post' ? '帖子' : '回答'} ${id} 进行了 ${direction === 'up' ? '点赞' : '点踩'}`);
+  // 重新拉取当前详情：失败时保留旧内容，仅显示可重试错误
+  const reload = async (): Promise<boolean> => {
+    if (!post.value) return false;
+    return fetchDetail(post.value.id, { keepOnError: true });
+  };
 
-    const target = targetType === 'post' ? post.value : answers.value.find(a => a.id === id);
-    if (!target) return;
-
-    if (direction === 'up') {
-      if (target.upvoted) { 
-        target.upvoted = false; 
-        target.voteCount--; 
-      } else { 
-        target.upvoted = true; 
-        target.voteCount++; 
-        if (target.downvoted) { 
-          target.downvoted = false; 
-          target.voteCount++; 
-        } 
-      }
-    } else {
-      if (target.downvoted) { 
-        target.downvoted = false; 
-        target.voteCount++; 
-      } else { 
-        target.downvoted = true; 
-        target.voteCount--; 
-        if (target.upvoted) { 
-          target.upvoted = false; 
-          target.voteCount--; 
-        } 
-      }
+  // 真实投票：成功后重新拉取详情
+  const handleVote = async (targetType: 'post' | 'answer', id: string | number, direction: 'up' | 'down') => {
+    try {
+      await voteDiscussion(targetType, id, direction);
+      await reload();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '投票失败');
     }
   };
 
-  // 提交二级评论
-  const submitComment = (answerId: number, content: string) => {
-    //TODO: 首先逻辑
-    message.info(`[事件] 提交评论给回答 ${answerId}: ${content}`);
-    const ans = answers.value.find(a => a.id === answerId);
-    if (ans) {
-      ans.comments.push({
-        id: Date.now(),
-        user: { 
-          id: userStore.userInfo.id, 
-          username: userStore.userInfo.username, 
-          avatar: userStore.userInfo.avatar 
-        },
-        content: content,
-        time: '刚刚',
-        likes: 0
-      });
+  // 真实提交评论：返回是否写入成功；成功后重新拉取详情。
+  // submittingComment 必须覆盖“写入 + 刷新”全过程，避免刷新期间再次点击造成重复评论。
+  const submitComment = async (answerId: number, content: string): Promise<boolean> => {
+    if (submittingComment.value) return false;
+    submittingComment.value = true;
+    try {
+      try {
+        await createDiscussionComment(answerId, content);
+      } catch (err) {
+        message.error(err instanceof Error ? err.message : '评论发表失败');
+        return false;
+      }
       message.success('评论发表成功');
+      // 写入已成功：刷新失败只提示重试，不能让用户以为写入失败而重发
+      await reload();
+      return true;
+    } finally {
+      submittingComment.value = false;
     }
   };
 
-  // 提交新回答
-  const submitAnswer = (content: string) => {
-    //TODO: 首先逻辑
-    message.info(`[事件] 发布新回答: ${content.substring(0, 10)}...`);
-    answers.value.push({
-      id: Date.now(),
-      user: { 
-        id: userStore.userInfo.id, 
-        username: userStore.userInfo.username, 
-        avatar: userStore.userInfo.avatar 
-      },
-      content: content,
-      time: '刚刚',
-      voteCount: 0,
-      upvoted: false,
-      downvoted: false,
-      comments: []
-    });
-    message.success('回答提交成功');
+  // 真实提交回答：返回是否写入成功；成功后重新拉取详情。
+  // submittingAnswer 覆盖“写入 + 刷新”全过程，刷新未结束前不允许再次提交。
+  const submitAnswer = async (content: string): Promise<boolean> => {
+    if (!post.value) return false;
+    if (submittingAnswer.value) return false;
+    submittingAnswer.value = true;
+    try {
+      try {
+        await createDiscussionAnswer(post.value.id, content);
+      } catch (err) {
+        message.error(err instanceof Error ? err.message : '回答提交失败');
+        return false;
+      }
+      message.success('回答提交成功');
+      // 写入已成功：刷新失败只提示重试，不能让用户以为写入失败而重发
+      await reload();
+      return true;
+    } finally {
+      submittingAnswer.value = false;
+    }
   };
 
-  return { loading, post, sortedAnswers, fetchDetail, handleVote, submitComment, submitAnswer };
+  return {
+    loading,
+    error,
+    post,
+    sortedAnswers,
+    submittingAnswer,
+    submittingComment,
+    fetchDetail,
+    reload,
+    handleVote,
+    submitComment,
+    submitAnswer,
+  };
 }

@@ -1,104 +1,55 @@
 import { ref } from 'vue';
+import { getAnnouncementDetail } from '@/utils/api';
+import { formatFullTime } from '@/composables/useTime';
 
+// 公告/新闻详情：字段对应后端 AnnouncementDetailVo
 export interface NewsDetail {
   id: string;
   title: string;
-  author: string;
+  author: string; // 后端只返回 uid
   createTime: string;
   content: string;
-  viewCount: number;
 }
 
 export function useNewsDetail() {
   const loading = ref(false);
+  const error = ref<string | null>(null);
   const detail = ref<NewsDetail>({
     id: '',
     title: '',
     author: '',
     createTime: '',
     content: '',
-    viewCount: 0
   });
 
-  //TODO: 替换真实api
+  let seq = 0;
   const fetchNewsDetail = async (id: string) => {
+    const current = ++seq;
     loading.value = true;
-    setTimeout(() => {
+    error.value = null;
+    try {
+      const vo = await getAnnouncementDetail(id);
+      if (current !== seq) return;
       detail.value = {
-        id: id,
-        title: '【重要通知】HNIE Online Judge 系统维护公告',
-        author: 'Admin',
-        createTime: '2025-02-15 14:30',
-        viewCount: 1205,
-        content: `
-# 系统维护通知
-
-尊敬的各位用户：
-
-为了提供更加稳定、优质的服务，HNIE OJ 将于 **2025年2月20日 00:00 - 04:00** 进行服务器升级维护。
-
-## 维护内容
-1.  评测机核心组件升级至 v2.0
-2.  数据库性能优化
-3.  修复若干已知 Bug
-
-带来不便，敬请谅解！
-
-\`\`\`cpp
-#include <iostream>
-using namespace std;
-
-int main() {
-  cout << "Hello HnieOJ!" << endl;
-  return 0;
-}
-
-\`\`\`
-
-
-$$
-\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\pi^2}{6} = \\prod_{p \\text{ prime}} \\frac{1}{1 - p^{-2}} = \\frac{\\Gamma\\left(\\frac{1}{2}\\right)^2}{\\sqrt{2}}
-$$
-
-::: align-center
-  ![哈气](https://s11.ax1x.com/2023/04/27/p9QuT2R.jpg){{{width="300" height="auto"}}}
-:::
-        `
+        id: String(vo.id),
+        title: vo.title,
+        author: vo.uid ?? '',
+        createTime: formatFullTime(vo.gmtCreate),
+        content: vo.content ?? '',
       };
-      loading.value = false;
-    }, 400);
-  };
-
-  const deleteNews = async (id: string) => {
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        console.log('Deleted news:', id);
-        resolve();
-      }, 500);
-    });
-  };
-
-  //TODO: 更新新闻 (PUT)
-  const updateNews = async (id: string, data: Partial<NewsDetail>) => {
-    loading.value = true;
-    return new Promise<void>((resolve) => {
-      console.log(`PUT /api/news/${id}`, data);
-      setTimeout(() => {
-        // 更新本地数据
-        if (detail.value) {
-          detail.value = { ...detail.value, ...data };
-        }
-        loading.value = false;
-        resolve();
-      }, 600);
-    });
+    } catch (err) {
+      if (current !== seq) return;
+      detail.value = { id: '', title: '', author: '', createTime: '', content: '' };
+      error.value = err instanceof Error ? err.message : '公告详情加载失败';
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
   return {
     loading,
+    error,
     detail,
     fetchNewsDetail,
-    deleteNews,
-    updateNews
   };
 }

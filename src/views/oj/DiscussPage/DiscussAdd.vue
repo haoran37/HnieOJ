@@ -32,14 +32,6 @@
           <n-input v-model:value="formValue.problemId" placeholder="例如: P1001" :loading="validatingProblem" style="width: 200px" />
         </n-form-item>
 
-        <n-form-item 
-          v-if="showTopSwitch"
-          label="置顶"
-          path="isTop"
-        >
-          <n-switch v-model:value="formValue.isTop" />
-        </n-form-item>
-
         <n-form-item label="内容" path="content">
           <div style="width: 100%;">
             <v-md-editor 
@@ -48,10 +40,6 @@
               placeholder="请输入内容，支持 Markdown"
             ></v-md-editor>
           </div>
-        </n-form-item>
-
-        <n-form-item label="标签" path="tags">
-          <n-dynamic-tags v-model:value="formValue.tags" />
         </n-form-item>
 
         <div class="action-bar">
@@ -66,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { useDiscussAdd } from '@/composables/admin/useDiscussAdd';
+import { useDiscussAdd } from '@/composables/oj/useDiscussAdd';
 
 const {
   formRef,
@@ -74,7 +62,6 @@ const {
   rules,
   categoryOptions,
   showProblemIdInput,
-  showTopSwitch,
   validatingProblem,
   publishing,
   handlePublish,

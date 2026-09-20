@@ -11,11 +11,6 @@
           <div class="num">{{ total }}</div>
           <div class="label">主题总数</div>
         </div>
-        <n-divider vertical />
-        <div class="stat-item">
-          <div class="num highlight">+12</div>
-          <div class="label">今日新增</div>
-        </div>
       </div>
     </div>
 
@@ -51,6 +46,7 @@
           </div>
 
           <n-spin :show="loading">
+            <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">{{ error }}</n-alert>
             <div class="list-wrapper">
               <template v-if="displayList.length > 0">
                 <DiscussionItem 
@@ -130,7 +126,7 @@
 <script setup lang="ts">
 import { onMounted, h } from 'vue';
 import { useRouter } from 'vue-router';
-import { useMessage, NIcon } from 'naive-ui';
+import { NIcon } from 'naive-ui';
 import { 
   SearchOutline as SearchIcon, 
   AddOutline as AddIcon,
@@ -143,13 +139,12 @@ import { useDiscussList } from '@/composables/oj/useDiscussList';
 import { useUserStore } from '@/stores/userStore';
 
 const router = useRouter();
-const message = useMessage();
 const userStore = useUserStore();
 
-const { 
-  loading, displayList, total, page, pageSize, 
+const {
+  loading, error, displayList, total, page, pageSize,
   activeCategory, searchText, sortBy,
-  fetchDiscussions, handlePageChange 
+  fetchDiscussions, handlePageChange
 } = useDiscussList();
 
 const renderIcon = (icon: any) => () => h(NIcon, null, { default: () => h(icon) });
@@ -173,10 +168,9 @@ const handleDetail = (id: number) => {
   router.push(`/discuss/${id}`);
 };
 
-const handleUser = (username: string) => {
-  message.info(`查看用户: ${username}`);
-  message.warning('TODO: 实现根据username查询id的api');
-  router.push(`/user/${username}`);
+const handleUser = (uid: string) => {
+  if (!uid) return;
+  router.push(`/user/${uid}`);
 };
 
 const handleProblem = (pid: string) => {

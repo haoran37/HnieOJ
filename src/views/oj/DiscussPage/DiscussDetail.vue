@@ -1,6 +1,12 @@
 <template>
   <div class="discuss-detail-container">
     <n-spin :show="loading">
+      <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">
+        <div class="alert-row">
+          <span>{{ error }}</span>
+          <n-button size="tiny" secondary type="error" @click="handleRetryLoad">重试</n-button>
+        </div>
+      </n-alert>
       
       <div class="page-header-card" v-if="post">
         <div class="header-left">
@@ -69,8 +75,8 @@
                 :key="ans.id"
                 :answer="ans"
                 :can-delete="isAdmin"
+                :submit-comment="submitComment"
                 @vote="(dir) => handleVote('answer', ans.id, dir)"
-                @submit-comment="(text) => submitComment(ans.id, text)"
               />
             </div>
           </div>
@@ -84,7 +90,13 @@
                 placeholder="请确保你的回答能够提供帮助，代码请使用 Markdown 代码块格式。"
               />
               <div class="editor-footer">
-                <n-button type="primary" class="post-btn" @click="handlePostAnswer">发布回答</n-button>
+                <n-button
+                  type="primary"
+                  class="post-btn"
+                  :loading="submittingAnswer"
+                  :disabled="submittingAnswer"
+                  @click="handlePostAnswer"
+                >发布回答</n-button>
               </div>
             </div>
           </div>
@@ -114,35 +126,33 @@
               <n-divider style="margin: 16px 0;" />
               
               <div class="action-buttons">
-                <n-button v-if="isAuthor" block secondary type="info" class="action-btn" @click="message.info('跳转编辑')">
-                  修改问题
-                </n-button>
-                
-                <n-button v-else block secondary type="primary" class="action-btn" @click="scrollToEditor">
+                <n-button block secondary type="primary" class="action-btn" @click="scrollToEditor">
                   回复问题
-                </n-button>
-
-                <n-button v-if="isAdmin" block secondary type="error" class="action-btn" @click="message.warning('删除帖子')">
-                  删除帖子
                 </n-button>
               </div>
             </n-card>
 
             <n-card :bordered="false" title="相关问题" class="sidebar-card related-card">
-              <ul class="related-list">
-                <li><a href="#">xxxxxxxxTODO:推荐系统xxxxxxxx</a></li>
-                <li><a href="#">xxxxxxxxTODO:推荐系统xxxxxxxx</a></li>
-                <li><a href="#">xxxxxxxxTODO:推荐系统xxxxxxxx</a></li>
+              <n-alert
+                v-if="relatedError"
+                type="error"
+                :bordered="false"
+                size="small"
+                class="related-error"
+              >
+                <div class="alert-row">
+                  <span>{{ relatedError }}</span>
+                  <n-button size="tiny" secondary type="error" @click="retryRelated">重试</n-button>
+                </div>
+              </n-alert>
+              <ul class="related-list" v-else-if="relatedDiscussions.length > 0">
+                <li v-for="item in relatedDiscussions" :key="item.id">
+                  <a href="#" @click.prevent="router.push(`/discuss/${item.id}`)">{{ item.title }}</a>
+                </li>
               </ul>
+              <n-empty v-else description="暂无相关讨论" size="small" />
             </n-card>
 
-            <n-alert title="系统提示" type="warning" :bordered="false" style="margin-top: 16px; border-radius: 8px;">
-              该讨论系统还在开发中，如有问题欢迎到 
-              <n-button text type="primary" tag="a" href="#" target="_blank">
-                GitHub Issue
-              </n-button> 
-              提出。
-            </n-alert>
             
           </div>
         </n-grid-item>
@@ -153,48 +163,103 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { CaretUpOutline as CaretUp, CaretDownOutline as CaretDown } from '@vicons/ionicons5';
 import { useUserStore } from '@/stores/userStore';
 import { useDiscussDetail } from '@/composables/oj/useDiscussDetail';
+import { getRelatedDiscussions } from '@/utils/api';
 import DiscussAnswerItem from './components/DiscussAnswerItem.vue';
 
 const route = useRoute();
+const router = useRouter();
 const message = useMessage();
 const userStore = useUserStore();
 
-const { 
-  loading, post, sortedAnswers, 
-  fetchDetail, handleVote, submitComment, submitAnswer 
+const {
+  loading, error, post, sortedAnswers, submittingAnswer,
+  fetchDetail, reload, handleVote, submitComment, submitAnswer
 } = useDiscussDetail();
 
 const answerDraft = ref('');
+const relatedDiscussions = ref<{ id: number; title: string }[]>([]);
+const relatedError = ref<string | null>(null);
+// 局部序号：切换题目/帖子后作废更早的在途相关讨论请求
+let relatedSeq = 0;
 
-// 权限计算：确保 post 加载后进行比较
-const isAuthor = computed(() => {
-  if (!post.value) return false;
-  return post.value.user.id === userStore.userInfo.id;
-});
+const fetchRelatedDiscussions = async (problemCode: string) => {
+  const current = ++relatedSeq;
+  relatedError.value = null;
+  if (!problemCode) {
+    relatedDiscussions.value = [];
+    return;
+  }
+  try {
+    const list = await getRelatedDiscussions(problemCode, 5);
+    if (current !== relatedSeq) return;
+    relatedDiscussions.value = list ?? [];
+  } catch (err) {
+    if (current !== relatedSeq) return;
+    relatedDiscussions.value = [];
+    relatedError.value = err instanceof Error ? err.message : '相关讨论加载失败';
+  }
+};
+
+const retryRelated = () => {
+  if (post.value?.problemCode) void fetchRelatedDiscussions(post.value.problemCode);
+};
+
 const isAdmin = computed(() => userStore.isAdmin);
 
-const handlePostAnswer = () => {
-  if (!answerDraft.value.trim()) {
+// 只有确认写入成功才清空草稿；失败时保留内容供用户重试
+const handlePostAnswer = async () => {
+  const content = answerDraft.value;
+  if (!content.trim()) {
     message.warning('回答内容不能为空');
     return;
   }
-  submitAnswer(answerDraft.value);
+  const submitted = await submitAnswer(content);
+  if (!submitted) return;
   answerDraft.value = '';
-  setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
 };
 
 const scrollToEditor = () => {
   document.querySelector('.editor-section')?.scrollIntoView({ behavior: 'smooth' });
 };
 
+// 路由参数变化（点击“相关讨论”在同一组件内跳转）时立即重新加载并作废旧请求
+const loadByRoute = async (id: string) => {
+  answerDraft.value = '';
+  relatedSeq += 1;
+  relatedDiscussions.value = [];
+  relatedError.value = null;
+  const ok = await fetchDetail(id);
+  if (!ok || String(route.params.id) !== id) return;
+  if (post.value?.problemCode) {
+    void fetchRelatedDiscussions(post.value.problemCode);
+  }
+};
+
+// 详情已加载但刷新失败时，重试只重新拉取，不重新提交回答
+const handleRetryLoad = async () => {
+  if (post.value) {
+    const ok = await reload();
+    if (ok && post.value?.problemCode) void fetchRelatedDiscussions(post.value.problemCode);
+    return;
+  }
+  await loadByRoute(String(route.params.id));
+};
+
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id) void loadByRoute(String(id));
+  },
+);
+
 onMounted(() => {
-  fetchDetail(route.params.id as string);
+  void loadByRoute(String(route.params.id));
 });
 </script>
 
@@ -209,6 +274,17 @@ onMounted(() => {
   @media (min-width: 768px) {
     padding: 0 24px 60px;
   }
+}
+
+.alert-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.related-error {
+  margin: 0;
 }
 
 .white-card {

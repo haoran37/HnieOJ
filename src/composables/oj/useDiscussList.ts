@@ -1,104 +1,117 @@
-import { ref, computed } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { getDiscussions } from '@/utils/api';
+import { formatFullTime } from '@/composables/useTime';
+
+export type DiscussCategory = 'All' | 'Site' | 'Problem';
+export type DiscussSort = 'Latest' | 'Hot';
 
 export interface DiscussItem {
   id: number;
+  uid: string;
   title: string;
   username: string;
-  avatar?: string;
   date: string;
   problemId: string | null;
   category: 'Site' | 'Problem';
   replyCount: number;
   isTop: boolean;
-  contentSnippet: string; // 简略内容，用于搜索
+  contentSnippet: string;
 }
 
 export function useDiscussList() {
+  const route = useRoute();
   const loading = ref(false);
-  const allDiscussions = ref<DiscussItem[]>([]); // 存储所有数据
+  const error = ref<string | null>(null);
+  const list = ref<DiscussItem[]>([]);
+  const total = ref(0);
   const page = ref(1);
   const pageSize = ref(10);
-  
-  const activeCategory = ref<'All' | 'Site' | 'Problem'>('All');
+
+  const initialCategory = route.query.category;
+  const activeCategory = ref<DiscussCategory>(
+    initialCategory === 'Site' || initialCategory === 'Problem' ? initialCategory : 'All',
+  );
   const searchText = ref('');
-  const sortBy = ref<'Latest' | 'Hot'>('Latest');
+  const sortBy = ref<DiscussSort>('Latest');
 
-  //TODO: 替换真实api
+  let seq = 0;
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
   const fetchDiscussions = async () => {
+    const current = ++seq;
     loading.value = true;
-    
-    setTimeout(() => {
-      allDiscussions.value = Array.from({ length: 45 }, (_, i) => {
-        const isSite = i % 5 === 0;
-        const isTop = i === 0 || i === 1;
-        
-        return {
-          id: 1000 + i,
-          title: isSite 
-            ? `【公告】关于第 ${i} 次系统维护的通知` 
-            : `关于题目 P${1000 + i} 的时间复杂度疑问`,
-          username: `User_${i}`,
-          date: '2025-02-14',
-          problemId: isSite ? null : `P${1000 + i}`,
-          category: isSite ? 'Site' : 'Problem',
-          replyCount: Math.floor(Math.random() * 50),
-          isTop: isTop,
-          contentSnippet: '这里是帖子内容的简略预览...'
-        };
+    error.value = null;
+    try {
+      const result = await getDiscussions(page.value, pageSize.value, {
+        category: activeCategory.value === 'All' ? undefined : activeCategory.value,
+        keyword: searchText.value,
+        sort: sortBy.value,
       });
-      
-      loading.value = false;
-    }, 400);
+      if (current !== seq) return;
+      list.value = (result?.list ?? []).map((vo) => ({
+        id: vo.id,
+        uid: vo.uid ?? '',
+        title: vo.title,
+        username: vo.author ?? '',
+        date: formatFullTime(vo.gmtCreate),
+        problemId: vo.problemCode,
+        category: vo.category === 'Site' ? 'Site' : 'Problem',
+        replyCount: vo.answerCount ?? 0,
+        isTop: (vo.topPriority ?? 0) > 0,
+        contentSnippet: vo.description ?? '',
+      }));
+      total.value = result?.total ?? 0;
+    } catch (err) {
+      if (current !== seq) return;
+      list.value = [];
+      total.value = 0;
+      error.value = err instanceof Error ? err.message : '讨论列表加载失败';
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
-
-  // 前端过滤与排序
-  const filteredList = computed(() => {
-    let result = [...allDiscussions.value];
-
-    // 分类筛选
-    if (activeCategory.value !== 'All') {
-      result = result.filter(item => item.category === activeCategory.value);
-    }
-
-    // 文本搜索
-    if (searchText.value) {
-      const lowerText = searchText.value.toLowerCase();
-      result = result.filter(item => 
-        item.title.toLowerCase().includes(lowerText) || 
-        item.problemId?.toLowerCase().includes(lowerText) ||
-        item.username.toLowerCase().includes(lowerText)
-      );
-    }
-
-    // 排序
-    result.sort((a, b) => {
-      if (a.isTop !== b.isTop) return a.isTop ? -1 : 1;
-      
-      if (sortBy.value === 'Hot') {
-        return b.replyCount - a.replyCount;
-      }
-      return b.id - a.id; // ID 越大越新
-    });
-
-    return result;
-  });
-
-  // 分页后的数据
-  const displayList = computed(() => {
-    const start = (page.value - 1) * pageSize.value;
-    return filteredList.value.slice(start, start + pageSize.value);
-  });
-
-  const total = computed(() => filteredList.value.length);
 
   const handlePageChange = (p: number) => {
     page.value = p;
-    // window.scrollTo({ top: 0, behavior: 'smooth' });
+    void fetchDiscussions();
   };
+
+  const handleSearch = () => {
+    page.value = 1;
+    void fetchDiscussions();
+  };
+
+  const handleSortChange = (value: string | number) => {
+    sortBy.value = value as DiscussSort;
+    page.value = 1;
+    void fetchDiscussions();
+  };
+
+  const handleCategoryChange = (value: string | number) => {
+    activeCategory.value = value as DiscussCategory;
+    page.value = 1;
+    void fetchDiscussions();
+  };
+
+  // 搜索防抖，并取消在途旧请求
+  watch(searchText, () => {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchTimer = null;
+      handleSearch();
+    }, 300);
+  });
+
+  onUnmounted(() => {
+    if (searchTimer) clearTimeout(searchTimer);
+    seq += 1;
+  });
 
   return {
     loading,
-    displayList,
+    error,
+    list,
     total,
     page,
     pageSize,
@@ -106,6 +119,11 @@ export function useDiscussList() {
     searchText,
     sortBy,
     fetchDiscussions,
-    handlePageChange
+    handlePageChange,
+    handleSearch,
+    handleSortChange,
+    handleCategoryChange,
+    // 服务端分页下当前页即展示列表
+    displayList: list,
   };
 }

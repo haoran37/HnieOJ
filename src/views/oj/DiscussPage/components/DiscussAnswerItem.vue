@@ -39,7 +39,6 @@
 
         <div class="answer-actions">
           <span class="text-btn reply" @click="toggleComment">回复</span>
-          <span v-if="canDelete" class="text-btn delete" @click="handleDeleteAnswer">删除</span>
         </div>
 
         <DiscussComments
@@ -47,10 +46,10 @@
           :comments="answer.comments"
           :visible="showCommentEditor"
           :initial-text="commentText"
+          :submit-comment="handleSubmitComment"
           @open="toggleComment"
           @close="showCommentEditor = false"
           @reply-user="handleReplyUser"
-          @submit="(text) => { $emit('submit-comment', text); showCommentEditor = false; }"
         />
       </div>
     </div>
@@ -59,19 +58,16 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useMessage } from 'naive-ui';
 import { CaretUpOutline as CaretUp, CaretDownOutline as CaretDown } from '@vicons/ionicons5';
 import DiscussComments from './DiscussComments.vue';
-
-
-const message = useMessage();
 
 const props = defineProps<{
   answer: any;
   canDelete?: boolean;
+  submitComment?: (answerId: number, text: string) => Promise<boolean>;
 }>();
 
-const _emit = defineEmits(['vote', 'submit-comment']);
+defineEmits(['vote']);
 
 const showCommentEditor = ref(false);
 const commentText = ref('');
@@ -86,10 +82,12 @@ const handleReplyUser = (username: string) => {
   commentText.value = `@${username} `;
 };
 
-
-const handleDeleteAnswer = () => {
-  message.info(`[事件] 删除回答 ${props.answer.id}`);
+// 评论成功才由子组件关闭编辑框；失败时保留输入内容
+const handleSubmitComment = (text: string): Promise<boolean> => {
+  if (!props.submitComment) return Promise.resolve(true);
+  return props.submitComment(props.answer.id, text);
 };
+
 </script>
 
 <style scoped lang="less">

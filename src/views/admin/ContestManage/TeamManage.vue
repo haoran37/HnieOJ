@@ -12,21 +12,40 @@
             </template>
             确定要删除选中的 {{ checkedRowKeys.length }} 个队伍吗？
           </n-popconfirm>
-          <n-button type="primary" @click="handleAdd">
+          <n-button type="primary" :disabled="!selectedCid" @click="handleAdd">
             添加队伍
           </n-button>
         </n-space>
       </div>
 
-      <n-data-table
-        :columns="columns"
-        :data="teamList"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="(row) => row.id"
-        @update:checked-row-keys="handleCheck"
-        :scroll-x="1500"
-      />
+      <n-space vertical :size="16">
+        <n-select
+          :value="selectedCid"
+          :options="contestOptions"
+          :loading="contestLoading"
+          placeholder="请选择比赛"
+          filterable
+          remote
+          :filter="() => true"
+          style="width: 320px"
+          @search="handleContestSearch"
+          @update:value="handleCidChange"
+        />
+
+        <n-data-table
+          remote
+          :columns="columns"
+          :data="teamList"
+          :loading="loading"
+          :pagination="pagination"
+          :row-key="(row) => row.id"
+          :checked-row-keys="checkedRowKeys"
+          @update:checked-row-keys="handleCheck"
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+          :scroll-x="1500"
+        />
+      </n-space>
     </n-card>
 
     <n-modal v-model:show="showModal">
@@ -61,8 +80,8 @@
         </n-form>
         <template #footer>
           <n-space justify="end">
-            <n-button @click="showModal = false">取消</n-button>
-            <n-button type="primary" :loading="loading" @click="handleSubmit">
+            <n-button @click="closeModal">取消</n-button>
+            <n-button type="primary" :loading="saving" @click="handleSubmit">
               确定
             </n-button>
           </n-space>
@@ -73,7 +92,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import { 
   NCard, 
   NButton, 
@@ -83,6 +102,7 @@ import {
   NForm, 
   NFormItem, 
   NInput,
+  NSelect,
   NPopconfirm,
   type FormRules
 } from 'naive-ui';
@@ -90,6 +110,7 @@ import { useTeamManage } from '@/composables/admin/useTeamManage';
 
 const {
   loading,
+  saving,
   teamList,
   pagination,
   columns,
@@ -98,11 +119,20 @@ const {
   modalType,
   formValue,
   formRef,
-  fetchTeams,
+  contestOptions,
+  contestLoading,
+  selectedCid,
+  init,
+  handleContestSearch,
+  handleCidChange,
   handleAdd,
   handleBatchDelete,
   handleSubmit,
-  handleCheck
+  closeModal,
+  invalidate,
+  handleCheck,
+  handlePageChange,
+  handlePageSizeChange
 } = useTeamManage();
 
 const rules: FormRules = {
@@ -119,7 +149,11 @@ const rules: FormRules = {
 };
 
 onMounted(() => {
-  fetchTeams();
+  void init();
+});
+
+onUnmounted(() => {
+  invalidate();
 });
 </script>
 

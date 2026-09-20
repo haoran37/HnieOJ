@@ -19,12 +19,15 @@
         </div>
 
         <n-data-table
+          remote
           :columns="columns"
           :data="tableData"
           :loading="loading"
           :pagination="pagination"
           :row-key="(row) => row.id"
-          :scroll-x="1200"
+          :scroll-x="1400"
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
         />
       </n-space>
     </n-card>
@@ -45,6 +48,8 @@ const {
   columns,
   searchKeyword,
   handleSearch,
+  handlePageChange,
+  handlePageSizeChange,
   fetchContests
 } = useContestList();
 

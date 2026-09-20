@@ -2,13 +2,45 @@ import { ref, reactive, h, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { NButton, NTag, NSpace, useMessage, NPopconfirm, type DataTableColumns } from 'naive-ui';
 import { formatFullTime } from '@/composables/useTime';
-import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
+import {
+  checkProblem,
+  createAdminHomework,
+  deleteAdminHomework,
+  getAdminHomeworkDetail,
+  getAdminHomeworks,
+  getClasses,
+  getColleges,
+  getGrades,
+  updateAdminHomework,
+  updateAdminHomeworkStatus,
+  type AdminHomeworkListVo,
+  type AdminHomeworkProblemPayload,
+} from '@/utils/api';
 
 // --- 类型定义 ---
 export interface OptionNode {
   label: string;
-  value: string;
-  disabled?: boolean;
+  value: number;
+}
+
+/** 作业编排行：displayId 为 A/B 字符串，problemId 为内部数字 ID */
+export interface HomeworkProblemRow {
+  problemId: number;
+  problemCode: string;
+  displayId: string;
+  displayTitle: string;
+}
+
+/** 生成 A/B/.../Z/AA 形式的展示编号 */
+function buildDisplayIdByIndex(index: number): string {
+  let value = index + 1;
+  let result = '';
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    value = Math.floor((value - 1) / 26);
+  }
+  return result;
 }
 
 // --- 作业列表逻辑 ---
@@ -17,7 +49,7 @@ export function useHomeworkList() {
   const message = useMessage();
 
   const loading = ref(false);
-  const tableData = ref<any[]>([]);
+  const tableData = ref<AdminHomeworkListVo[]>([]);
   const searchKeyword = ref('');
 
   const pagination = reactive({
@@ -26,61 +58,30 @@ export function useHomeworkList() {
     itemCount: 0,
     showSizePicker: true,
     pageSizes: [10, 20, 50],
-    onChange: (page: number) => {
-      pagination.page = page;
-      fetchHomeworks();
-    },
-    onUpdatePageSize: (pageSize: number) => {
-      pagination.pageSize = pageSize;
-      pagination.page = 1;
-      fetchHomeworks();
-    }
   });
 
-  const fetchHomeworks = () => {
+  let fetchSeq = 0;
+
+  const fetchHomeworks = async () => {
+    const seq = ++fetchSeq;
     loading.value = true;
-    console.log('API Request: GET /api/admin/homework/list', {
-      page: pagination.page,
-      limit: pagination.pageSize,
-      keyword: searchKeyword.value
-    });
-
-    // Mock Data
-    setTimeout(() => {
-      const mockData = Array.from({ length: pagination.pageSize }, (_, i) => {
-        const id = (pagination.page - 1) * pagination.pageSize + i + 1;
-        const startTime = new Date();
-        startTime.setDate(startTime.getDate() + i);
-        const endTime = new Date(startTime);
-        endTime.setHours(endTime.getHours() + 48); // 2天后截止
-
-        const customTags = ['数据结构', '算法'];
-        
-        // 系统自动生成的截止日期标签
-        const deadlineTag = `截止: ${endTime.getMonth() + 1}-${endTime.getDate()}`;
-
-        // 标签生成逻辑
-        const tags = [];
-        tags.push({ name: deadlineTag, type: 'system' });
-        customTags.forEach(t => tags.push({ name: t, type: 'custom' }));
-
-        return {
-          id: id,
-          homeworkId: 1000 + id,
-          title: `数据结构作业 ${id}`,
-          startTime: formatFullTime(startTime),
-          endTime: formatFullTime(endTime),
-          source: '计算机学院',
-          author: 'TeacherWang',
-          status: i % 2 === 0, // true: active, false: disabled
-          tags: tags
-        };
+    try {
+      const data = await getAdminHomeworks({
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        keyword: searchKeyword.value,
       });
-      
-      tableData.value = mockData;
-      pagination.itemCount = 100;
-      loading.value = false;
-    }, 500);
+      if (seq !== fetchSeq) return;
+      tableData.value = data?.list ?? [];
+      pagination.itemCount = data?.total ?? 0;
+    } catch (error) {
+      if (seq !== fetchSeq) return;
+      tableData.value = [];
+      pagination.itemCount = 0;
+      message.error(error instanceof Error ? error.message : '作业列表加载失败');
+    } finally {
+      if (seq === fetchSeq) loading.value = false;
+    }
   };
 
   const handleSearch = () => {
@@ -88,143 +89,136 @@ export function useHomeworkList() {
     fetchHomeworks();
   };
 
-  const handleDelete = (row: any) => {
-    console.log('API Request: DELETE /api/admin/homework', { id: row.id });
-    message.success(`删除作业 ${row.title} 成功`);
+  const handlePageChange = (page: number) => {
+    pagination.page = page;
     fetchHomeworks();
   };
 
-  const _handleToggleStatus = (row: any) => {
-    const newStatus = !row.status;
-    console.log('API Request: PUT /api/admin/homework/status', { id: row.id, status: newStatus });
-    row.status = newStatus;
-    message.success(`作业 ${row.title} 已${newStatus ? '激活' : '禁用'}`);
+  const handlePageSizeChange = (pageSize: number) => {
+    pagination.pageSize = pageSize;
+    pagination.page = 1;
+    fetchHomeworks();
   };
 
-  const columns: DataTableColumns<any> = [
+  const handleDelete = async (row: AdminHomeworkListVo) => {
+    try {
+      await deleteAdminHomework(row.id);
+      message.success('作业已删除');
+      pagination.page = 1;
+      await fetchHomeworks();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '删除作业失败');
+    }
+  };
+
+  const handleToggleStatus = async (row: AdminHomeworkListVo) => {
+    const nextStatus = !row.status;
+    try {
+      await updateAdminHomeworkStatus(row.id, nextStatus);
+      message.success(nextStatus ? '作业已启用' : '作业已禁用');
+      await fetchHomeworks();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '状态更新失败');
+    }
+  };
+
+  const columns: DataTableColumns<AdminHomeworkListVo> = [
     {
       title: '编号',
-      key: 'homeworkId',
-      width: 100,
-      render(row: any) {
-        return h('span', { style: 'color: #000' }, row.homeworkId);
-      }
+      key: 'id',
+      width: 80,
+      render(row) {
+        return h('span', { style: 'color: #000' }, String(row.id));
+      },
     },
     {
       title: '名称',
       key: 'title',
-      minWidth: 250,
-      render(row: any) {
+      minWidth: 200,
+      ellipsis: { tooltip: true },
+      render(row) {
         return h(
           'a',
           {
-            href: `/homework/${row.homeworkId}`,
+            href: `/homework/${row.id}`,
             target: '_blank',
             style: 'color: #007BFF; text-decoration: none; cursor: pointer;',
             onClick: (e: Event) => {
               e.preventDefault();
-              window.open(`/homework/${row.homeworkId}`, '_blank');
-            }
+              window.open(`/homework/${row.id}`, '_blank');
+            },
           },
-          row.title
+          row.title,
         );
-      }
+      },
     },
     {
       title: '开始时间-结束时间',
       key: 'time',
       width: 230,
       render(row) {
-        return h('div', { style: 'display: flex; flex-direction: column; font-size: 14px;' }, [
-          h('div', { style: 'display: flex; align-items: center;' }, [
-            h('span', { style: 'color: #999; margin-right: 4px; width: 40px; text-align: right;' }, 'begin: '),
-            h('span', { style: 'color: #333;' }, row.startTime) 
-          ]),
-          h('div', { style: 'display: flex; align-items: center;' }, [
-            h('span', { style: 'color: #999; margin-right: 4px; width: 40px; text-align: right;' }, 'end: '),
-            h('span', { style: 'color: #333;' }, row.endTime)
-          ])
+        return h('div', { style: 'display: flex; flex-direction: column; font-size: 13px;' }, [
+          h('div', {}, `开始：${formatFullTime(row.startTime)}`),
+          h('div', {}, `截止：${formatFullTime(row.endTime)}`),
         ]);
-      }
+      },
     },
-    {
-      title: '标签',
-      key: 'tags',
-      width: 200,
-      render(row: any) {
-        return h(NSpace, { size: 4 }, {
-          default: () => row.tags.map((tag: any) => 
-            h(NTag, {
-              size: 'small',
-              bordered: false,
-              style: {
-                backgroundColor: stringToColor(tag.name),
-                color: stringToTextColor(tag.name)
-              }
-            }, { default: () => tag.name })
-          )
-        });
-      }
-    },
-    { title: '来源', key: 'source', width: 150 },
-    { 
-      title: '创建者', 
-      key: 'author', 
-      width: 150,
-      render(row: any) {
-        return h('span', { style: 'color: #333' }, row.author);
-      }
-    },
+    { title: '题目数', key: 'problemCount', width: 90 },
+    { title: '班级数', key: 'classCount', width: 90 },
+    { title: '来源', key: 'source', width: 140, ellipsis: { tooltip: true } },
+    { title: '创建者', key: 'author', width: 120 },
     {
       title: '状态',
       key: 'status',
-      width: 80,
-      render(row: any) {
+      width: 90,
+      render(row) {
         return h(
           NTag,
           { type: row.status ? 'success' : 'error', size: 'small' },
-          { default: () => (row.status ? '有效' : '禁用') }
+          { default: () => (row.status ? '启用' : '禁用') },
         );
-      }
+      },
     },
     {
       title: '操作',
       key: 'actions',
-      width: 150,
-      fixed: 'right' as const,
-      render(row: any) {
+      width: 220,
+      fixed: 'right',
+      render(row) {
         return h(NSpace, {}, {
           default: () => [
             h(
               NButton,
               {
                 size: 'small',
-                type: 'primary',
-                onClick: () => router.push({ name: 'AdminHomeworkEdit', params: { id: row.id } })
+                secondary: true,
+                type: row.status ? 'warning' : 'success',
+                onClick: () => handleToggleStatus(row),
               },
-              { default: () => '编辑' }
+              { default: () => (row.status ? '禁用' : '启用') },
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'primary',
+                onClick: () => router.push({ name: 'AdminHomeworkEdit', params: { id: row.id } }),
+              },
+              { default: () => '编辑' },
             ),
             h(
               NPopconfirm,
+              { onPositiveClick: () => handleDelete(row) },
               {
-                onPositiveClick: () => handleDelete(row)
+                trigger: () =>
+                  h(NButton, { size: 'small', type: 'error', secondary: true }, { default: () => '删除' }),
+                default: () => '确定删除该作业吗？',
               },
-              {
-                trigger: () => h(
-                  NButton,
-                  {
-                    size: 'small',
-                    type: 'error'
-                  },
-                  { default: () => '删除' }
-                ),
-                default: () => '确定删除该作业吗？'
-              }
-            )
-          ]
+            ),
+          ],
         });
-      }
-    }
+      },
+    },
   ];
 
   return {
@@ -234,7 +228,11 @@ export function useHomeworkList() {
     columns,
     searchKeyword,
     handleSearch,
-    fetchHomeworks
+    handlePageChange,
+    handlePageSizeChange,
+    fetchHomeworks,
+    handleDelete,
+    handleToggleStatus,
   };
 }
 
@@ -243,159 +241,246 @@ export function useHomeworkForm() {
   const router = useRouter();
   const message = useMessage();
   const loading = ref(false);
+  const saving = ref(false);
+  // 编辑身份：仅当目标 id 的完整详情成功加载后才允许保存，防止把旧记录写入新 id
+  const loadedDetailId = ref<string | null>(null);
+  const detailLoading = ref(false);
+  const detailError = ref<string | null>(null);
 
   const formValue = reactive({
     title: '',
     source: '',
     status: true,
     timeRange: null as [number, number] | null,
-    tags: [] as string[],
     description: '',
-    // 学生范围
-    targetClassIds: [] as string[],
-    // 题目列表
-    problems: [] as any[]
+    // 学生范围：后端 classIds 为数字数组
+    targetClassIds: [] as number[],
+    problems: [] as HomeworkProblemRow[],
   });
 
-  // 学生选择相关状态
+  // 学院 -> 年级 -> 班级（不引入后端不存在的“专业”维度）
   const studentSelectState = reactive({
     colleges: [] as OptionNode[],
-    majors: [] as OptionNode[],
+    grades: [] as Array<{ label: string; value: string }>,
     classes: [] as OptionNode[],
-    
-    filterCollegeId: null as string | null,
-    filterMajorId: null as string | null,
+    filterCollegeId: null as number | null,
+    filterGrade: null as string | null,
   });
 
   // 存储所有加载过的班级信息，用于回显已选班级名称
-  const classMap = ref(new Map<string, string>());
+  const classMap = ref(new Map<number, string>());
 
   const selectedClassList = computed(() => {
-    return formValue.targetClassIds.map(id => ({
+    return formValue.targetClassIds.map((id) => ({
       value: id,
-      label: classMap.value.get(id) || id // 如果找不到名称显示ID
+      label: classMap.value.get(id) ?? String(id),
     }));
   });
 
-  const handleRemoveClass = (id: string) => {
+  const fetchColleges = async () => {
+    try {
+      const list = await getColleges();
+      studentSelectState.colleges = (list ?? []).map((item) => ({
+        label: item.name,
+        value: item.id,
+      }));
+    } catch (error) {
+      studentSelectState.colleges = [];
+      message.error(error instanceof Error ? error.message : '学院列表加载失败');
+    }
+  };
+
+  // 局部请求序号：上级快速切换时旧响应不得回填
+  let gradeSeq = 0;
+  let classSeq = 0;
+
+  const handleCollegeChange = (collegeId: number | null) => {
+    studentSelectState.filterCollegeId = collegeId;
+    studentSelectState.filterGrade = null;
+    studentSelectState.grades = [];
+    studentSelectState.classes = [];
+    const seq = ++gradeSeq;
+    classSeq += 1;
+    if (!collegeId) return;
+    void (async () => {
+      try {
+        const list = await getGrades(collegeId);
+        if (seq !== gradeSeq) return;
+        studentSelectState.grades = (list ?? []).map((item) => ({
+          label: item.grade,
+          value: item.grade,
+        }));
+      } catch (error) {
+        if (seq !== gradeSeq) return;
+        studentSelectState.grades = [];
+        message.error(error instanceof Error ? error.message : '年级列表加载失败');
+      }
+    })();
+  };
+
+  const handleGradeChange = (grade: string | null) => {
+    studentSelectState.filterGrade = grade;
+    studentSelectState.classes = [];
+    const seq = ++classSeq;
+    const collegeId = studentSelectState.filterCollegeId;
+    if (!collegeId || !grade) return;
+    void (async () => {
+      try {
+        const list = await getClasses(collegeId, grade);
+        if (seq !== classSeq) return;
+        studentSelectState.classes = (list ?? []).map((item) => ({
+          label: item.name,
+          value: item.id,
+        }));
+        for (const item of list ?? []) {
+          classMap.value.set(item.id, item.name);
+        }
+      } catch (error) {
+        if (seq !== classSeq) return;
+        studentSelectState.classes = [];
+        message.error(error instanceof Error ? error.message : '班级列表加载失败');
+      }
+    })();
+  };
+
+  /** 依据已选班级 id 反查名称（后端无班级 by-id 接口，遍历真实学院/年级/班级） */
+  const resolveClassNames = async (ids: number[]) => {
+    const missing = ids.filter((id) => !classMap.value.has(id));
+    if (missing.length === 0) return;
+    try {
+      const colleges = (await getColleges()) ?? [];
+      for (const college of colleges) {
+        const grades = (await getGrades(college.id)) ?? [];
+        for (const grade of grades) {
+          const classes = (await getClasses(college.id, grade.grade)) ?? [];
+          for (const item of classes) {
+            classMap.value.set(item.id, item.name);
+          }
+        }
+      }
+    } catch {
+      // 反查失败时保留 id 展示，不阻断编辑
+    }
+  };
+
+  const handleRemoveClass = (id: number) => {
     const index = formValue.targetClassIds.indexOf(id);
     if (index > -1) {
       formValue.targetClassIds.splice(index, 1);
     }
   };
 
-  // 题目输入
   const problemInput = ref('');
+  // 防止重复并发添加，并配合记录代际作废旧响应
+  const addingProblem = ref(false);
 
-  // --- 模拟 API ---
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-  const fetchColleges = async () => {
-    await delay(200);
-    const data = [
-      { label: '计算机与信息工程学院', value: 'c1' },
-      { label: '电气工程学院', value: 'c2' },
-      { label: '机械工程学院', value: 'c3' },
-      { label: '外国语学院', value: 'c4' },
-      { label: '设计艺术学院', value: 'c5' }
-    ];
-    studentSelectState.colleges = data;
+  const nextDisplayId = (): string => {
+    const used = new Set(formValue.problems.map((p) => p.displayId.toUpperCase()));
+    let index = 0;
+    while (used.has(buildDisplayIdByIndex(index))) {
+      index += 1;
+    }
+    return buildDisplayIdByIndex(index);
   };
 
-  const fetchMajors = async (collegeId: string | null) => {
-    if (!collegeId) {
-      studentSelectState.majors = [];
+  const handleAddProblem = async () => {
+    const raw = problemInput.value.trim();
+    if (!raw) return;
+    const problemId = Number(raw);
+    if (!Number.isInteger(problemId) || problemId <= 0) {
+      message.warning('请输入题目内部数字编号');
       return;
     }
-    await delay(200);
-    const prefix = collegeId === 'c1' ? '计算机' : '电气'; 
-    const data = [
-      { label: `${prefix}专业01`, value: `${collegeId}_m1` },
-      { label: `${prefix}专业02`, value: `${collegeId}_m2` },
-      { label: `${prefix}专业03`, value: `${collegeId}_m3` }
-    ];
-    studentSelectState.majors = data;
-    studentSelectState.filterMajorId = null;
-  };
-
-  const fetchClasses = async (majorId: string | null) => {
-    if (!majorId) {
-      studentSelectState.classes = [];
+    if (formValue.problems.some((item) => item.problemId === problemId)) {
+      message.warning('题目已在列表中');
       return;
     }
-    await delay(200);
-    const data = Array.from({ length: 15 }).map((_, i) => ({
-      label: `22级${i + 1}班`,
-      value: `${majorId}_cl${i}`
-    }));
-    studentSelectState.classes = data;
-    
-    // 更新 classMap
-    data.forEach(c => {
-      classMap.value.set(c.value, c.label);
-    });
-  };
-
-  // --- 题目操作 ---
-  const handleAddProblem = () => {
-    if (!problemInput.value) return;
-    
+    if (addingProblem.value) return; // 防止重复并发添加
+    addingProblem.value = true;
+    const gen = detailSeq;
+    const submitted = problemInput.value;
     loading.value = true;
-    console.log('API Request: GET /api/admin/problem/check', { pid: problemInput.value });
-    
-    // Mock check
-    setTimeout(() => {
-      const exists = Math.random() > 0.1; 
-      if (exists) {
-        if (formValue.problems.some(p => p.problemId === problemInput.value)) {
-          message.warning('题目已在列表中');
-          loading.value = false;
-          return;
-        }
-
-        const newProblem = {
-          id: problemInput.value, 
-          problemId: problemInput.value,
-          title: `Problem ${problemInput.value}`,
-          difficulty: ['Low', 'Mid', 'High'][Math.floor(Math.random() * 3)]
-        };
-        formValue.problems.push(newProblem);
-        problemInput.value = '';
-        message.success('添加成功');
-      } else {
-        message.error('题目不存在');
+    try {
+      const result = await checkProblem(problemId);
+      if (gen !== detailSeq) return; // 记录已切换，丢弃旧响应
+      if (!result?.exists) {
+        message.warning('题目不存在，请确认编号');
+        return; // 保留输入
       }
-      loading.value = false;
-    }, 300);
+      if (formValue.problems.some((item) => item.problemId === problemId)) {
+        message.warning('题目已在列表中');
+        return;
+      }
+      formValue.problems.push({
+        problemId,
+        problemCode: result.problemCode ?? '',
+        displayId: nextDisplayId(),
+        displayTitle: result.title ?? String(problemId),
+      });
+      if (problemInput.value === submitted) problemInput.value = '';
+      message.success('题目已添加');
+    } catch (error) {
+      if (gen !== detailSeq) return;
+      message.error(error instanceof Error ? error.message : '题目查验失败，请重试');
+    } finally {
+      if (gen === detailSeq) {
+        loading.value = false;
+        addingProblem.value = false;
+      }
+    }
   };
 
   const handleRemoveProblem = (index: number) => {
     formValue.problems.splice(index, 1);
   };
 
+  const handleUpdateDisplayId = (index: number, value: string | number | null) => {
+    const row = formValue.problems[index];
+    if (!row) return;
+    row.displayId = String(value ?? '').toUpperCase();
+  };
+
   const handleMoveUp = (index: number) => {
     if (index > 0) {
-      const temp = formValue.problems[index];
-      formValue.problems[index] = formValue.problems[index - 1];
-      formValue.problems[index - 1] = temp;
+      const current = formValue.problems[index]!;
+      const previous = formValue.problems[index - 1]!;
+      formValue.problems[index] = previous;
+      formValue.problems[index - 1] = current;
+      // 后端按 displayId 排序，交换展示编号才能让新顺序持久化
+      const displayId = current.displayId;
+      current.displayId = previous.displayId;
+      previous.displayId = displayId;
     }
   };
 
   const handleMoveDown = (index: number) => {
     if (index < formValue.problems.length - 1) {
-      const temp = formValue.problems[index];
-      formValue.problems[index] = formValue.problems[index + 1];
-      formValue.problems[index + 1] = temp;
+      const current = formValue.problems[index]!;
+      const next = formValue.problems[index + 1]!;
+      formValue.problems[index] = next;
+      formValue.problems[index + 1] = current;
+      // 后端按 displayId 排序，交换展示编号才能让新顺序持久化
+      const displayId = current.displayId;
+      current.displayId = next.displayId;
+      next.displayId = displayId;
     }
   };
 
-  // --- 提交 ---
-  const handleSubmit = (isEdit: boolean, id?: string) => {
-    if (!formValue.title) {
+  const handleSubmit = async (isEdit: boolean, id?: string | number) => {
+    if (saving.value) return;
+    if (isEdit) {
+      // 编辑必须锁定到已成功加载的完整详情：加载中/加载失败/路由复用都不得写入
+      const requestedId = id === undefined || id === null || id === '' ? null : String(id);
+      if (!requestedId || loadedDetailId.value === null || loadedDetailId.value !== requestedId) {
+        message.error('数据尚未加载完成，请稍后重试');
+        return;
+      }
+    }
+    if (!formValue.title.trim()) {
       message.warning('请输入作业名称');
       return;
     }
-    if (!formValue.timeRange) {
+    if (!formValue.timeRange || formValue.timeRange.length !== 2) {
       message.warning('请选择作业时间');
       return;
     }
@@ -403,55 +488,120 @@ export function useHomeworkForm() {
       message.warning('请至少选择一个班级');
       return;
     }
-    
-    loading.value = true;
-    const api = isEdit ? `/api/admin/homework/${id}` : '/api/admin/homework';
-    const method = isEdit ? 'PUT' : 'POST';
-    
+
+    const problems: AdminHomeworkProblemPayload[] = formValue.problems.map((item) => ({
+      problemId: item.problemId,
+      displayId: item.displayId || null,
+    }));
+
     const payload = {
-      ...formValue,
+      title: formValue.title.trim(),
+      source: formValue.source.trim() || null,
+      status: formValue.status,
       startTime: formValue.timeRange[0],
-      endTime: formValue.timeRange[1]
+      endTime: formValue.timeRange[1],
+      description: formValue.description || null,
+      classIds: formValue.targetClassIds,
+      problems,
     };
 
-    console.log(`API Request: ${method} ${api}`, payload);
-
-    setTimeout(() => {
-      message.success(isEdit ? '更新成功' : '创建成功');
-      loading.value = false;
+    const submitGen = detailSeq;
+    saving.value = true;
+    try {
+      if (isEdit) {
+        await updateAdminHomework(id as string | number, payload);
+        if (submitGen !== detailSeq) return;
+        message.success('作业已保存');
+      } else {
+        await createAdminHomework(payload);
+        if (submitGen !== detailSeq) return;
+        message.success('作业已创建');
+      }
       router.push({ name: 'AdminHomeworkList' });
-    }, 500);
+    } catch (error) {
+      if (submitGen !== detailSeq) return;
+      // 失败保留完整表单
+      message.error(error instanceof Error ? error.message : '保存失败，请重试');
+    } finally {
+      if (submitGen === detailSeq) saving.value = false;
+    }
   };
 
-  // --- 加载数据 (编辑模式) ---
-  const loadData = (id: string) => {
+  let detailSeq = 0;
+
+  const resolveProblemMeta = async (
+    problemId: number,
+  ): Promise<{ problemCode: string; displayTitle: string }> => {
+    try {
+      const info = await checkProblem(problemId);
+      return { problemCode: info?.problemCode ?? '', displayTitle: info?.title ?? '' };
+    } catch {
+      return { problemCode: '', displayTitle: '' };
+    }
+  };
+
+  // 编辑身份作废：路由切换/卸载时清空已加载标记并作废在途详情、保存与异步添加
+  const reset = () => {
+    detailSeq += 1;
+    loadedDetailId.value = null;
+    detailError.value = null;
+    detailLoading.value = false;
+    loading.value = false;
+    saving.value = false;
+    addingProblem.value = false;
+  };
+
+  const loadData = async (id: string | number) => {
+    const seq = ++detailSeq;
+    const targetId = String(id);
+    loadedDetailId.value = null;
+    detailError.value = null;
+    detailLoading.value = true;
     loading.value = true;
-    console.log(`API Request: GET /api/admin/homework/${id}`);
-    
-    setTimeout(() => {
-      const now = Date.now();
-      formValue.title = `数据结构作业 ${id}`;
-      formValue.source = '计算机学院';
-      formValue.status = true;
-      formValue.timeRange = [now, now + 3600 * 1000 * 48];
-      formValue.tags = ['数据结构', '链表'];
-      formValue.description = '# 作业描述\n\n完成以下题目。';
-      formValue.targetClassIds = ['c1_m1_cl0', 'c1_m1_cl1']; // Mock selected classes
-      formValue.problems = [
-        { id: 1, problemId: '1001', title: 'A+B Problem', difficulty: 'Low' },
-        { id: 2, problemId: '1002', title: 'Matrix', difficulty: 'Mid' }
-      ];
-      
-      // 模拟回显班级名称
-      classMap.value.set('c1_m1_cl0', '22级1班');
-      classMap.value.set('c1_m1_cl1', '22级2班');
-
-      // 为了回显，可能需要预加载一些学院/专业数据，这里简化处理，假设用户重新选择或只显示ID
-      // 在实际应用中，可能需要根据 selectedClassIds 反推并加载选项，或者后端直接返回详细信息
-      fetchColleges(); 
-
-      loading.value = false;
-    }, 500);
+    // 新记录必须重置保存态：旧记录在途保存的 finally 依赖代际，不会清理新一代的 saving
+    saving.value = false;
+    addingProblem.value = false;
+    try {
+      const detail = await getAdminHomeworkDetail(targetId);
+      if (seq !== detailSeq) return;
+      // 先在本地组装题目元数据，await 期间若记录已切换则整体丢弃
+      const problems = await Promise.all(
+        (detail.problems ?? []).map(async (problem, index) => {
+          const meta = await resolveProblemMeta(problem.problemId);
+          return {
+            problemId: problem.problemId,
+            problemCode: meta.problemCode,
+            displayId: problem.displayId ?? buildDisplayIdByIndex(index),
+            displayTitle: meta.displayTitle,
+          };
+        }),
+      );
+      if (seq !== detailSeq) return;
+      const classIds = (detail.classIds ?? []).slice();
+      formValue.title = detail.title ?? '';
+      formValue.source = detail.source ?? '';
+      formValue.status = detail.status ?? false;
+      formValue.description = detail.description ?? '';
+      formValue.timeRange =
+        detail.timeRange && detail.timeRange.length === 2
+          ? [detail.timeRange[0]!, detail.timeRange[1]!]
+          : null;
+      formValue.targetClassIds = classIds;
+      formValue.problems = problems;
+      loadedDetailId.value = targetId;
+      await fetchColleges();
+      if (seq !== detailSeq) return;
+      await resolveClassNames(classIds);
+    } catch (error) {
+      if (seq !== detailSeq) return;
+      detailError.value = error instanceof Error ? error.message : '作业详情加载失败';
+      message.error(detailError.value);
+    } finally {
+      if (seq === detailSeq) {
+        loading.value = false;
+        detailLoading.value = false;
+      }
+    }
   };
 
   return {
@@ -460,15 +610,21 @@ export function useHomeworkForm() {
     selectedClassList,
     problemInput,
     loading,
+    saving,
+    loadedDetailId,
+    detailLoading,
+    detailError,
     fetchColleges,
-    fetchMajors,
-    fetchClasses,
+    handleCollegeChange,
+    handleGradeChange,
     handleRemoveClass,
     handleAddProblem,
     handleRemoveProblem,
+    handleUpdateDisplayId,
     handleMoveUp,
     handleMoveDown,
     handleSubmit,
-    loadData
+    loadData,
+    reset,
   };
 }

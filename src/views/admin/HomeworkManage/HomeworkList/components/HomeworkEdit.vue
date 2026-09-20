@@ -1,7 +1,12 @@
 <template>
   <div class="homework-edit-container">
     <n-card :bordered="false" title="编辑作业">
+      <n-alert v-if="detailError" type="error" class="detail-error" closable>
+        {{ detailError }}
+      </n-alert>
+      <div v-if="!loadedDetailId && !detailError" class="detail-loading">正在加载…</div>
       <n-form
+        v-if="loadedDetailId"
         ref="formRef"
         :model="formValue"
         label-placement="left"
@@ -32,10 +37,6 @@
           />
         </n-form-item>
 
-        <n-form-item label="标签" path="tags">
-          <n-dynamic-tags v-model:value="formValue.tags" />
-        </n-form-item>
-
         <n-form-item label="作业描述" path="description">
           <div style="width: 100%; height: 400px;">
             <v-md-editor v-model="formValue.description" height="100%" placeholder="请输入作业描述..." />
@@ -52,19 +53,19 @@
                 :options="studentSelectState.colleges"
                 placeholder="请选择学院"
                 style="width: 200px"
-                @update:value="fetchMajors"
+                @update:value="handleCollegeChange"
               />
               <n-select
-                v-model:value="studentSelectState.filterMajorId"
-                :options="studentSelectState.majors"
-                placeholder="请选择专业"
+                v-model:value="studentSelectState.filterGrade"
+                :options="studentSelectState.grades"
+                placeholder="请选择年级"
                 :disabled="!studentSelectState.filterCollegeId"
                 style="width: 200px"
-                @update:value="fetchClasses"
+                @update:value="handleGradeChange"
               />
             </n-space>
             
-            <n-card size="small" embedded v-if="studentSelectState.filterMajorId" class="class-select-card">
+            <n-card size="small" embedded v-if="studentSelectState.filterGrade" class="class-select-card">
               <div class="scrollable-checkbox-group">
                 <n-checkbox-group v-model:value="formValue.targetClassIds">
                   <n-space vertical>
@@ -78,7 +79,7 @@
                 </n-checkbox-group>
               </div>
             </n-card>
-            <div v-else class="hint-text">请先选择学院和专业以加载班级列表</div>
+            <div v-else class="hint-text">请先选择学院和年级以加载班级列表</div>
 
             <div class="selected-classes-area" v-if="selectedClassList.length > 0">
               <div class="selected-label">已选班级：</div>
@@ -100,18 +101,24 @@
         <n-divider title-placement="left">题目编排</n-divider>
 
         <ProblemConfig
-          v-model="problemInput"
+          v-model:modelValue="problemInput"
           :problems="formValue.problems"
           :loading="loading"
           @add="handleAddProblem"
           @remove="handleRemoveProblem"
           @moveUp="handleMoveUp"
           @moveDown="handleMoveDown"
+          @updateDisplayId="handleUpdateDisplayId"
         />
 
         <div class="actions">
           <n-button @click="router.back()" style="margin-right: 12px">取消</n-button>
-          <n-button type="primary" :loading="loading" @click="handleSubmit(true, route.params.id as string)">
+          <n-button
+            type="primary"
+            :loading="saving || detailLoading"
+            :disabled="!loadedDetailId"
+            @click="handleSubmit(true, route.params.id as string)"
+          >
             保存修改
           </n-button>
         </div>
@@ -121,12 +128,12 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted } from 'vue';
+import { watch, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { 
-  NCard, NForm, NFormItem, NInput, NSwitch, NDatePicker, 
-  NDynamicTags, NDivider, NSpace, NSelect, NCheckboxGroup, 
-  NCheckbox, NButton, NTag
+import {
+  NCard, NForm, NFormItem, NInput, NSwitch, NDatePicker,
+  NDivider, NSpace, NSelect, NCheckboxGroup,
+  NCheckbox, NButton, NTag, NAlert
 } from 'naive-ui';
 import ProblemConfig from '@/components/ProblemConfig.vue';
 import { useHomeworkForm } from '@/composables/admin/useHomeworkManage';
@@ -139,23 +146,38 @@ const {
   selectedClassList,
   problemInput,
   loading,
-  fetchColleges: _fetchColleges,
-  fetchMajors,
-  fetchClasses,
+  saving,
+  loadedDetailId,
+  detailLoading,
+  detailError,
+  handleCollegeChange,
+  handleGradeChange,
   handleRemoveClass,
   handleAddProblem,
   handleRemoveProblem,
+  handleUpdateDisplayId,
   handleMoveUp,
   handleMoveDown,
   handleSubmit,
-  loadData
+  loadData,
+  reset
 } = useHomeworkForm();
 
-onMounted(() => {
-  const id = route.params.id as string;
-  if (id) {
-    loadData(id);
-  }
+// 路由 id 变化时立即作废旧记录身份并按新 id 加载；无 id 时必须作废，避免退化成新增
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id) {
+      void loadData(id as string);
+    } else {
+      reset();
+    }
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  reset();
 });
 </script>
 
@@ -200,5 +222,15 @@ onMounted(() => {
     justify-content: flex-end;
     margin-top: 24px;
   }
+}
+
+.detail-error {
+  margin-bottom: 16px;
+}
+
+.detail-loading {
+  padding: 48px 0;
+  text-align: center;
+  color: #999;
 }
 </style>

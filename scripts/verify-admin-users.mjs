@@ -511,8 +511,10 @@ check('Service.vue：handleTabChange/refreshAll 返回真实 Promise', () => {
   assert.ok(source.includes('return fetchTokens()'), 'handleTabChange 必须返回 fetchTokens Promise');
   assert.ok(source.includes('return fetchRemoteAccounts()'), 'handleTabChange 必须返回 fetchRemoteAccounts Promise');
   assert.ok(
-    source.includes('const refreshAll = (): Promise<void> => handleTabChange(activeTab.value)'),
-    'refreshAll 必须返回 handleTabChange 的 Promise',
+    source.includes(
+      'const refreshAll = (): Promise<JudgeReadOutcome> => handleTabChange(activeTab.value)',
+    ),
+    'refreshAll 必须返回 handleTabChange 的回读结果',
   );
 });
 

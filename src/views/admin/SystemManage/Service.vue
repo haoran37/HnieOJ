@@ -4,8 +4,7 @@
       <h2 class="title">判题服务管理</h2>
       <n-space>
         <n-button size="small" :loading="loading" @click="refreshAll">刷新</n-button>
-        <n-button size="small" type="primary" @click="openIssueModal">签发节点凭证</n-button>
-        <n-button size="small" secondary @click="openAuthCodeModal">生成临时授权码</n-button>
+        <n-button size="small" type="primary" @click="openBootstrapModal">签发注册凭据</n-button>
       </n-space>
     </div>
 
@@ -45,52 +44,71 @@
       </n-tab-pane>
     </n-tabs>
 
-    <n-modal v-model:show="showIssueModal" preset="card" title="签发判题节点正式凭证" style="width: 520px">
-      <n-form label-placement="left" label-width="120">
+    <n-modal
+      v-model:show="showBootstrapModal"
+      preset="card"
+      title="签发节点注册凭据"
+      style="width: 600px"
+      @update:show="onBootstrapShowUpdate"
+    >
+      <n-alert type="info" :bordered="false" style="margin-bottom: 12px">
+        正式节点与临时节点都通过 Bootstrap 接口一次性签发注册凭据；明文凭据只在签发成功后展示一次。
+      </n-alert>
+      <n-form label-placement="left" label-width="150">
+        <n-form-item label="节点类型">
+          <n-select v-model:value="bootstrapForm.nodeType" :options="nodeTypeOptions" />
+        </n-form-item>
         <n-form-item label="节点名称">
-          <n-input v-model:value="issueForm.nodeName" placeholder="如 judge-node-01" />
+          <n-input v-model:value="bootstrapForm.nodeName" placeholder="如 judge-node-01" />
         </n-form-item>
         <n-form-item label="最大并发">
-          <n-input-number v-model:value="issueForm.maxConcurrency" :min="1" :max="10000" />
+          <n-input-number v-model:value="bootstrapForm.maxConcurrency" :min="1" :max="1000" />
         </n-form-item>
         <n-form-item label="支持判题模式">
           <n-select
-            v-model:value="issueForm.supportedJudgeModes"
+            v-model:value="bootstrapForm.supportedJudgeModes"
             multiple
-            filterable
-            tag
             :options="judgeModeOptions"
-            placeholder="默认 default；可输入自定义模式"
+            placeholder="默认 default；仅可选 default/spj/interactive"
           />
         </n-form-item>
-      </n-form>
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showIssueModal = false">取消</n-button>
-          <n-button type="primary" :loading="submitting" @click="handleIssue">签发</n-button>
-        </n-space>
-      </template>
-    </n-modal>
-
-    <n-modal v-model:show="showAuthCodeModal" preset="card" title="生成临时节点授权码" style="width: 520px">
-      <n-form label-placement="left" label-width="120">
-        <n-form-item label="节点名称">
-          <n-input v-model:value="authForm.nodeName" placeholder="可选" />
+        <n-form-item label="权重">
+          <n-input-number v-model:value="bootstrapForm.weight" :min="1" :max="100" placeholder="默认 10" />
+        </n-form-item>
+        <n-form-item label="注册凭据有效期">
+          <div class="field-with-hint">
+            <n-date-picker
+              v-model:value="bootstrapForm.expiresAt"
+              type="datetime"
+              clearable
+              style="width: 100%"
+            />
+            <n-text depth="3" class="field-hint">注册凭据本身的过期时间（最长 30 天），过期后不能再注册</n-text>
+          </div>
+        </n-form-item>
+        <n-form-item
+          :label="bootstrapForm.nodeType === 'temp' ? '节点授权截止（必填）' : '节点授权截止（可选）'"
+        >
+          <div class="field-with-hint">
+            <n-date-picker
+              v-model:value="bootstrapForm.authorizationUntil"
+              type="datetime"
+              clearable
+              style="width: 100%"
+            />
+            <n-text depth="3" class="field-hint">节点可被调度的硬截止时间；临时节点必填且必须晚于当前时间</n-text>
+          </div>
         </n-form-item>
         <n-form-item label="备注">
-          <n-input v-model:value="authForm.remark" placeholder="可选" />
-        </n-form-item>
-        <n-form-item label="有效期(秒)">
-          <n-input-number v-model:value="authForm.expireSeconds" :min="60" />
-        </n-form-item>
-        <n-form-item label="可兑换次数">
-          <n-input-number v-model:value="authForm.maxExchangeCount" :min="1" />
+          <n-input v-model:value="bootstrapForm.remark" placeholder="可选" />
         </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showAuthCodeModal = false">取消</n-button>
-          <n-button type="primary" :loading="submitting" @click="handleCreateAuthCode">生成</n-button>
+          <n-button :disabled="submitting" @click="closeBootstrapModal">取消</n-button>
+          <n-button type="primary" :loading="submitting" :disabled="submitting" @click="handleBootstrap">
+            签发
+          </n-button>
         </n-space>
       </template>
     </n-modal>
@@ -100,15 +118,16 @@
       preset="card"
       :title="secretTitle"
       style="width: 560px"
+      @update:show="onSecretShowUpdate"
       @after-leave="clearSecret"
     >
       <n-alert type="warning" :bordered="false" style="margin-bottom: 12px">
-        该凭证仅在签发成功时展示一次，关闭后无法再次查看，请立即复制并妥善保管。
+        该注册凭据仅在签发成功时展示一次；关闭弹窗、离开本页或切换账号后无法再次查看，请立即复制并通过受控渠道交给节点运维。
       </n-alert>
       <n-input :value="secretValue" readonly type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
       <template #footer>
         <n-space justify="end">
-          <n-button type="primary" @click="copySecret">复制凭证</n-button>
+          <n-button type="primary" :disabled="!secretValue" @click="copySecret">复制凭据</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -116,18 +135,26 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from 'vue';
+import { h, onMounted, onUnmounted, reactive, ref, watch, type VNode } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import type { DataTableColumns } from 'naive-ui';
-import { NButton, NSwitch, NTag, useDialog, useMessage } from 'naive-ui';
+import { NButton, NSpace, NTag, useDialog, useMessage } from 'naive-ui';
 import { formatFullTime } from '@/composables/useTime';
+import { useUserStore } from '@/stores/userStore';
 import {
+  JUDGE_MODES,
+  JUDGE_NODE_STATUS,
+  MAX_BOOTSTRAP_TTL_MS,
+  isNodeExpired,
   useJudgeNodes,
   type JudgeNode,
+  type JudgeReadOutcome,
   type RemoteJudgeAccount,
 } from '@/composables/admin/useJudgeNodes';
 
 const message = useMessage();
 const dialog = useDialog();
+const userStore = useUserStore();
 
 const {
   nodes,
@@ -138,51 +165,109 @@ const {
   fetchNodes,
   fetchTokens,
   fetchRemoteAccounts,
-  issueFormalToken,
-  createAuthCode,
+  resetSession,
+  createBootstrapToken,
   revokeToken,
-  setDraining,
+  drainNode,
+  enableNode,
 } = useJudgeNodes();
 
 const activeTab = ref('nodes');
 const submitting = ref(false);
 
-const showIssueModal = ref(false);
-const showAuthCodeModal = ref(false);
+const showBootstrapModal = ref(false);
 const showSecretModal = ref(false);
-const secretTitle = ref('节点凭证');
+const secretTitle = ref('节点注册凭据');
 const secretValue = ref('');
 
-const issueForm = reactive({
+// 生命周期操作去重：同一 token 请求在途期间只发一次
+const pendingTokenIds = reactive(new Set<string>());
+
+// 组件会话代号：账号切换/路由离开/卸载时递增，作废所有在途请求的后续副作用，
+// 不能只依赖 composable 的列表读取守卫。
+let sessionEpoch = 0;
+const isCurrentSession = (epoch: number) => epoch === sessionEpoch;
+
+// 签发弹窗代次：关闭/重新打开/切换会话都会递增，作废在途签发结果，
+// 避免关闭弹窗或换账号后迟到响应又弹出一次性凭据。
+let bootstrapEpoch = 0;
+const invalidateBootstrap = () => {
+  bootstrapEpoch += 1;
+  submitting.value = false;
+};
+
+const defaultExpiresAt = () => Date.now() + 60 * 60 * 1000;
+
+// 正式/临时节点合并为同一表单；nodeType 用 string 承接 n-select，提交前归一为 formal/temp
+const bootstrapForm = reactive({
+  nodeType: 'formal' as string,
   nodeName: '',
   maxConcurrency: 1,
-  supportedJudgeModes: [] as string[],
-});
-
-const authForm = reactive({
-  nodeName: '',
+  supportedJudgeModes: ['default'] as string[],
+  weight: 10 as number | null,
+  expiresAt: defaultExpiresAt() as number | null,
+  authorizationUntil: null as number | null,
   remark: '',
-  expireSeconds: 3600,
-  maxExchangeCount: 1,
 });
 
-const judgeModeOptions = [
-  { label: 'default（普通判题）', value: 'default' },
-  { label: 'spj（特殊判题）', value: 'spj' },
-  { label: 'interactive（交互题）', value: 'interactive' },
+const resetBootstrapForm = () => {
+  bootstrapForm.nodeType = 'formal';
+  bootstrapForm.nodeName = '';
+  bootstrapForm.maxConcurrency = 1;
+  bootstrapForm.supportedJudgeModes = ['default'];
+  bootstrapForm.weight = 10;
+  bootstrapForm.expiresAt = defaultExpiresAt();
+  bootstrapForm.authorizationUntil = null;
+  bootstrapForm.remark = '';
+};
+
+const nodeTypeOptions = [
+  { label: '正式节点（formal）', value: 'formal' },
+  { label: '临时节点（temp）', value: 'temp' },
 ];
 
-// 返回真实 Promise：签发/吊销/排空后的 await refreshAll 必须等到重新请求完成
-const handleTabChange = (name: string): Promise<void> => {
+const JUDGE_MODE_LABELS: Record<(typeof JUDGE_MODES)[number], string> = {
+  default: 'default（普通判题）',
+  spj: 'spj（特殊判题）',
+  interactive: 'interactive（交互题）',
+};
+
+const judgeModeOptions = JUDGE_MODES.map((mode) => ({
+  label: JUDGE_MODE_LABELS[mode],
+  value: mode,
+}));
+
+// 返回本次回读结果（而非只返回 Promise<void> 或写入共享变量）：签发/吊销/排空/恢复
+// 必须检查自己这次 await 到的 ok/stale/error，避免被并发旧读取覆盖后误报成功。
+const handleTabChange = (name: string): Promise<JudgeReadOutcome> => {
   if (name === 'nodes') return fetchNodes();
   if (name === 'tokens') return fetchTokens();
   return fetchRemoteAccounts();
 };
 
-const refreshAll = (): Promise<void> => handleTabChange(activeTab.value);
+const refreshAll = (): Promise<JudgeReadOutcome> => handleTabChange(activeTab.value);
 
 const clearSecret = () => {
   secretValue.value = '';
+};
+
+// 关闭秘钥弹窗时同步清空明文：只依赖 @after-leave 在离场动画/rAF 挂起时可能不触发，
+// 导致明文凭据残留在 DOM 中。
+const onSecretShowUpdate = (show: boolean) => {
+  if (!show) clearSecret();
+};
+
+// 路由离开/账号变更/卸载：清空一次性凭据、复位在途状态并作废所有旧请求，
+// 避免切换后的会话被迟到响应污染。
+const handleSessionReset = () => {
+  sessionEpoch += 1;
+  invalidateBootstrap();
+  clearSecret();
+  showSecretModal.value = false;
+  showBootstrapModal.value = false;
+  resetBootstrapForm();
+  pendingTokenIds.clear();
+  resetSession();
 };
 
 const copySecret = async () => {
@@ -195,112 +280,156 @@ const copySecret = async () => {
   }
 };
 
-const openIssueModal = () => {
-  issueForm.nodeName = '';
-  issueForm.maxConcurrency = 1;
-  issueForm.supportedJudgeModes = [];
-  showIssueModal.value = true;
+// 关闭/取消签发弹窗：立即作废在途签发，迟到响应不得再弹出一次性凭据
+const closeBootstrapModal = () => {
+  invalidateBootstrap();
+  showBootstrapModal.value = false;
 };
 
-const openAuthCodeModal = () => {
-  authForm.nodeName = '';
-  authForm.remark = '';
-  authForm.expireSeconds = 3600;
-  authForm.maxExchangeCount = 1;
-  showAuthCodeModal.value = true;
+const onBootstrapShowUpdate = (show: boolean) => {
+  if (!show) closeBootstrapModal();
 };
 
-const handleIssue = async () => {
-  if (!issueForm.nodeName.trim()) {
-    message.warning('请填写节点名称');
+const openBootstrapModal = () => {
+  invalidateBootstrap();
+  resetBootstrapForm();
+  showBootstrapModal.value = true;
+};
+
+const validateBootstrap = (): string | null => {
+  const form = bootstrapForm;
+  if (form.nodeType !== 'formal' && form.nodeType !== 'temp') return '节点类型必须为 formal 或 temp';
+  if (!form.nodeName.trim()) return '请填写节点名称';
+  if (!Number.isInteger(form.maxConcurrency) || form.maxConcurrency < 1 || form.maxConcurrency > 1000) {
+    return '最大并发需为 1..1000 的整数';
+  }
+  if (form.weight != null && (!Number.isInteger(form.weight) || form.weight < 1 || form.weight > 100)) {
+    return '权重需为 1..100 的整数';
+  }
+  if (!form.expiresAt) return '请选择注册凭据有效期';
+  const now = Date.now();
+  if (form.expiresAt <= now) return '注册凭据有效期必须晚于当前时间';
+  if (form.expiresAt > now + MAX_BOOTSTRAP_TTL_MS) return '注册凭据有效期最长 30 天';
+  if (form.nodeType === 'temp' && !form.authorizationUntil) {
+    return '临时节点必须填写节点授权截止';
+  }
+  if (form.authorizationUntil != null && form.authorizationUntil <= now) {
+    return '节点授权截止必须晚于当前时间';
+  }
+  const invalidMode = form.supportedJudgeModes.find(
+    (mode) => !(JUDGE_MODES as readonly string[]).includes(mode),
+  );
+  if (invalidMode) return `不支持的判题模式：${invalidMode}`;
+  return null;
+};
+
+const handleBootstrap = async () => {
+  if (submitting.value) return;
+  const invalid = validateBootstrap();
+  if (invalid) {
+    message.warning(invalid);
     return;
   }
-  if (!issueForm.maxConcurrency) {
-    message.warning('请填写最大并发');
-    return;
-  }
+  const epoch = sessionEpoch;
+  const requestEpoch = bootstrapEpoch;
   submitting.value = true;
   try {
-    const result = await issueFormalToken({
-      nodeName: issueForm.nodeName.trim(),
-      maxConcurrency: issueForm.maxConcurrency,
-      supportedJudgeModes: issueForm.supportedJudgeModes,
+    const result = await createBootstrapToken({
+      nodeType: bootstrapForm.nodeType as 'formal' | 'temp',
+      nodeName: bootstrapForm.nodeName.trim(),
+      maxConcurrency: bootstrapForm.maxConcurrency,
+      supportedJudgeModes: bootstrapForm.supportedJudgeModes,
+      weight: bootstrapForm.weight ?? undefined,
+      expiresAt: bootstrapForm.expiresAt as number,
+      authorizationUntil: bootstrapForm.authorizationUntil ?? undefined,
+      remark: bootstrapForm.remark.trim() || undefined,
     });
-    if (!result?.token) {
-      throw new Error('签发成功但未返回凭证');
+    // 切换账号/关闭弹窗后到达的响应必须整体作废，不得回填凭据或弹窗
+    if (!isCurrentSession(epoch) || requestEpoch !== bootstrapEpoch) return;
+    if (!result?.bootstrapToken) {
+      throw new Error('签发成功但未返回注册凭据');
     }
-    showIssueModal.value = false;
-    secretTitle.value = '节点正式凭证';
-    secretValue.value = result.token;
+    showBootstrapModal.value = false;
+    secretTitle.value = result.nodeType === 'temp' ? '临时节点注册凭据' : '正式节点注册凭据';
+    secretValue.value = result.bootstrapToken;
     showSecretModal.value = true;
-    await refreshAll();
+    const outcome = await refreshAll();
+    if (!isCurrentSession(epoch)) return;
+    if (outcome === 'error') {
+      message.warning('注册凭据已签发，但节点列表刷新失败，请手动刷新确认');
+    }
   } catch (err) {
-    message.error(err instanceof Error ? err.message : '签发节点凭证失败');
+    if (!isCurrentSession(epoch) || requestEpoch !== bootstrapEpoch) return;
+    message.error(err instanceof Error ? err.message : '签发节点注册凭据失败');
   } finally {
-    submitting.value = false;
+    if (isCurrentSession(epoch) && requestEpoch === bootstrapEpoch) submitting.value = false;
   }
 };
 
-const handleCreateAuthCode = async () => {
-  if (!authForm.expireSeconds || authForm.expireSeconds < 60) {
-    message.warning('有效期不能小于 60 秒');
-    return;
-  }
-  if (!authForm.maxExchangeCount || authForm.maxExchangeCount < 1) {
-    message.warning('可兑换次数至少为 1');
-    return;
-  }
-  submitting.value = true;
+const runLifecycle = async (
+  row: JudgeNode,
+  request: (tokenId: string) => Promise<unknown>,
+  successText: string,
+  failText: string,
+): Promise<void> => {
+  const tokenId = row.tokenId;
+  if (!tokenId || pendingTokenIds.has(tokenId)) return;
+  const epoch = sessionEpoch;
+  pendingTokenIds.add(tokenId);
   try {
-    const result = await createAuthCode({
-      nodeName: authForm.nodeName.trim(),
-      remark: authForm.remark.trim(),
-      expireSeconds: authForm.expireSeconds,
-      maxExchangeCount: authForm.maxExchangeCount,
-    });
-    if (!result?.authCode) {
-      throw new Error('生成成功但未返回授权码');
+    await request(tokenId);
+    if (!isCurrentSession(epoch)) return;
+    const outcome = await refreshAll();
+    if (!isCurrentSession(epoch)) return;
+    if (outcome === 'error') {
+      // 请求已提交但回读失败：不得声称状态已确认
+      message.warning(`${successText}，但列表刷新失败，请手动刷新确认`);
+    } else if (outcome === 'ok') {
+      message.success(successText);
     }
-    showAuthCodeModal.value = false;
-    secretTitle.value = '临时节点授权码';
-    secretValue.value = result.authCode;
-    showSecretModal.value = true;
+    // outcome === 'stale'：回读被更新的请求取代，不确认成功也不误报失败。
   } catch (err) {
-    message.error(err instanceof Error ? err.message : '生成授权码失败');
+    if (!isCurrentSession(epoch)) return;
+    message.error(err instanceof Error ? err.message : failText);
   } finally {
-    submitting.value = false;
+    // 旧会话的 finally 不得删除新会话同 token 的在途标记
+    if (isCurrentSession(epoch)) pendingTokenIds.delete(tokenId);
   }
 };
 
 const confirmRevoke = (row: JudgeNode) => {
   const tokenId = row.tokenId;
-  if (!tokenId) return;
+  if (!tokenId || row.status === JUDGE_NODE_STATUS.REVOKED || pendingTokenIds.has(tokenId)) return;
+  const epoch = sessionEpoch;
   dialog.warning({
     title: '吊销凭证',
     content: `确定吊销节点 ${row.nodeName || row.nodeId || tokenId} 的凭证吗？`,
     positiveText: '确定',
     negativeText: '取消',
     onPositiveClick: async () => {
-      try {
-        await revokeToken(tokenId);
-        message.success('已吊销');
-        await refreshAll();
-      } catch (err) {
-        message.error(err instanceof Error ? err.message : '吊销失败');
-      }
+      // 弹窗确认可能在切换账号后才回调，此时不得再发起请求
+      if (!isCurrentSession(epoch)) return;
+      await runLifecycle(row, revokeToken, '已吊销', '吊销失败');
     },
   });
 };
 
-const toggleDraining = async (row: JudgeNode, value: boolean) => {
-  if (!row.tokenId) return;
-  try {
-    await setDraining(row.tokenId, value);
-    message.success(value ? '已进入排空状态' : '已恢复接收任务');
-    await refreshAll();
-  } catch (err) {
-    message.error(err instanceof Error ? err.message : '更新排空状态失败');
-  }
+// 仅 active 且未硬到期可排空；后端对 revoked/disabled 排空返回 403
+const canDrain = (row: JudgeNode) =>
+  row.status === JUDGE_NODE_STATUS.ACTIVE && !isNodeExpired(row);
+
+// 已吊销/硬到期节点后端拒绝启用，UI 不提供“恢复”入口，避免假成功
+const canEnable = (row: JudgeNode) =>
+  row.status !== JUDGE_NODE_STATUS.REVOKED && !isNodeExpired(row);
+
+const handleDrain = (row: JudgeNode) => {
+  if (!canDrain(row) || pendingTokenIds.has(row.tokenId)) return;
+  return runLifecycle(row, drainNode, '已排空，节点停止接收新任务', '排空失败');
+};
+
+const handleEnable = (row: JudgeNode) => {
+  if (!canEnable(row) || pendingTokenIds.has(row.tokenId)) return;
+  return runLifecycle(row, enableNode, '已恢复接收任务', '恢复失败');
 };
 
 const nodeColumns: DataTableColumns<JudgeNode> = [
@@ -320,11 +449,11 @@ const nodeColumns: DataTableColumns<JudgeNode> = [
     title: '并发(运行/最大)',
     key: 'runningTasks',
     width: 140,
-    render: (row) => `${row.runningTasks ?? 0} / ${row.approvedMaxConcurrency ?? row.maxConcurrency ?? '-'}`,
+    render: (row) => `${row.runningTasks ?? 0} / ${row.maxConcurrency ?? '-'}`,
   },
   { title: '版本', key: 'version', width: 100, render: (row) => row.version || '-' },
   { title: '最后心跳', key: 'lastHeartbeatTime', width: 170, render: (row) => formatFullTime(row.lastHeartbeatTime) },
-  { title: '授权到期', key: 'authorizationUntil', width: 170, render: (row) => formatFullTime(row.authorizationUntil || row.expireTime) },
+  { title: '到期', key: 'expireTime', width: 170, render: (row) => formatFullTime(row.expireTime) },
   {
     title: '支持模式',
     key: 'supportedJudgeModes',
@@ -332,27 +461,37 @@ const nodeColumns: DataTableColumns<JudgeNode> = [
     render: (row) => (row.supportedJudgeModes?.length ? row.supportedJudgeModes.join(', ') : '-'),
   },
   {
-    title: '排空',
-    key: 'draining',
-    width: 90,
-    render(row) {
-      return h(NSwitch, {
-        value: !!row.draining,
-        size: 'small',
-        onUpdateValue: (value: boolean) => { void toggleDraining(row, value); },
-      });
-    },
-  },
-  {
     title: '操作',
     key: 'actions',
-    width: 100,
+    width: 190,
     render(row) {
-      return h(NButton, {
+      const pending = pendingTokenIds.has(row.tokenId);
+      const actions: VNode[] = [];
+      if (row.status === JUDGE_NODE_STATUS.DRAINING || row.status === JUDGE_NODE_STATUS.DISABLED) {
+        actions.push(h(NButton, {
+          text: true,
+          type: 'primary',
+          size: 'small',
+          disabled: !canEnable(row) || pending,
+          onClick: () => handleEnable(row),
+        }, { default: () => '恢复' }));
+      } else if (row.status === JUDGE_NODE_STATUS.ACTIVE) {
+        actions.push(h(NButton, {
+          text: true,
+          type: 'primary',
+          size: 'small',
+          disabled: !canDrain(row) || pending,
+          onClick: () => handleDrain(row),
+        }, { default: () => '排空' }));
+      }
+      actions.push(h(NButton, {
         text: true,
         type: 'error',
+        size: 'small',
+        disabled: row.status === JUDGE_NODE_STATUS.REVOKED || pending,
         onClick: () => confirmRevoke(row),
-      }, { default: () => '吊销' });
+      }, { default: () => '吊销' }));
+      return h(NSpace, { size: 12, align: 'center' }, { default: () => actions });
     },
   },
 ];
@@ -374,6 +513,23 @@ const accountColumns: DataTableColumns<RemoteJudgeAccount> = [
 onMounted(() => {
   void fetchNodes();
 });
+
+// 账号变化（登录/登出/切换）时作废旧会话数据并清理一次性凭据
+watch(
+  () => userStore.token,
+  () => {
+    handleSessionReset();
+    if (userStore.token) void refreshAll();
+  },
+);
+
+onBeforeRouteLeave(() => {
+  handleSessionReset();
+});
+
+onUnmounted(() => {
+  handleSessionReset();
+});
 </script>
 
 <style scoped lang="less">
@@ -393,6 +549,17 @@ onMounted(() => {
       font-size: 18px;
       font-weight: bold;
       color: #333;
+    }
+  }
+
+  .field-with-hint {
+    width: 100%;
+
+    .field-hint {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      line-height: 1.4;
     }
   }
 }

@@ -29,9 +29,9 @@
     "@vicons/ionicons5": "^0.13.0",
     "@vueuse/core": "^14.1.0",
     "codemirror": "^6.0.2",
-    "echarts": "^6.0.0",
+    "echarts": "^6.1.0",
     "highlight.js": "^11.11.1",
-    "katex": "^0.16.27",
+    "katex": "^0.18.7",
     "pinia": "^3.0.4",
     "vite-plugin-vue-setup-extend": "^0.4.0",
     "vue": "^3.5.26",
@@ -58,7 +58,7 @@
     "unplugin-auto-import": "^20.3.0",
     "unplugin-vue-components": "^30.0.0",
     "vfonts": "^0.0.3",
-    "vite": "^7.3.0",
+    "vite": "^7.3.5",
     "vite-plugin-vue-devtools": "^8.0.5",
     "vue-tsc": "^3.2.1"
   }

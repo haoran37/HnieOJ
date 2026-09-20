@@ -2,8 +2,8 @@
   <n-flex class="navi-bar" align="center" justify="center" :wrap="false">
     <div class="content-limit-container">
       <RouterLink class="logo-container" to="/">
-        <img :src="logo" alt="HNIEOJ Logo" width="35" height="35" />
-        <span>HNIEOJ</span>
+        <img :src="appStore.logoUrl || logo" alt="HNIEOJ Logo" width="35" height="35" />
+        <span>{{ appStore.websiteName || 'HNIEOJ' }}</span>
       </RouterLink>
 
       <div class="menu-wrapper">
@@ -30,16 +30,22 @@
 
 <script lang="ts" setup>
 import logo from '@/assets/hie.svg'
-import { computed, h } from 'vue'
+import { computed, h, onMounted } from 'vue'
 import { useUserStore } from '@/stores/userStore'
+import { useAppStore } from '@/stores/app'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import type { DropdownOption, MenuOption } from 'naive-ui'
 import { ojRouters } from '@/router/routers'
 import { ChevronDown as ChevronDownIcon } from '@vicons/ionicons5'
 
 const userStore = useUserStore()
+const appStore = useAppStore()
 const route = useRoute()
 const router = useRouter()
+
+onMounted(() => {
+  if (!appStore.systemLoaded) void appStore.fetchSystemInfo()
+})
 
 const activeKey = computed(() => (route.meta?.activeMenu as string) || (route.name as string))
 

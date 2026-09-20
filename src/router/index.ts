@@ -19,25 +19,40 @@ const router = createRouter({
 /**
  * 全局前置守卫
  */
-router.beforeEach((to, _, next) => {
+router.beforeEach(async (to) => {
   loadingBar.start()
   const userStore = useUserStore()
 
   const title = to.meta.title ? `${to.meta.title} - HnieOJ` : 'HnieOJ'
   document.title = title
 
-  // 常量路由直接放行
+  // 等待本地 token 从 profile 恢复完成，避免刷新时被误判为未登录
+  await userStore.restoreSession()
+
+  // profile 恢复出现网络/服务异常时明确提示；已持有 token 的会话保持可重试，不清理有效 token
+  const restoreFailed = userStore.sessionError !== null
+  if (restoreFailed) {
+    message.error(userStore.sessionError as string)
+    userStore.clearSessionError()
+  }
+
+  // 常量路由直接放行（游客可访问）
   if (to.meta.constant === true) {
-    next()
-    return
+    return true
+  }
+
+  // 已登录但 profile 因网络/服务异常未恢复：不用“权限不足”掩盖真实错误，
+  // 回到可公开访问的首页，下次导航会再次触发 restoreSession 重试
+  if (restoreFailed && userStore.isLogin) {
+    loadingBar.error()
+    return { name: 'Home' }
   }
 
   // 登录拦截
   if (!userStore.isLogin) {
     message.warning('请先登录')
-    next({ name: 'Login', query: { redirect: to.fullPath } })
     loadingBar.error()
-    return
+    return { name: 'Login', query: { redirect: to.fullPath } }
   }
 
   const { requireAdmin, roles } = to.meta
@@ -45,23 +60,21 @@ router.beforeEach((to, _, next) => {
   // 后台权限检查
   if (requireAdmin && !userStore.isAdmin) {
     message.error('权限不足，无法访问后台管理系统')
-    next({ name: 'Forbidden' })
     loadingBar.error()
-    return
+    return { name: 'Forbidden' }
   }
 
-  // 角色检查
+  // 角色检查：按真实角色列表判断，多角色用户命中任意一个即可
   if (roles && roles.length > 0) {
-    const userRole = userStore.userInfo.role
-    if (!roles.includes(userRole)) {
+    const allowed = new Set(roles)
+    if (!userStore.userInfo.roles.some((role) => allowed.has(role))) {
       message.error('当前账号权限不足以访问此功能')
-      next({ name: 'NotFound' })
       loadingBar.error()
-      return
+      return { name: 'NotFound' }
     }
   }
 
-  next()
+  return true
 })
 
 router.afterEach(() => {

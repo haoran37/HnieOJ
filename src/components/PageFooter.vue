@@ -1,10 +1,14 @@
 <template>
   <footer class="page-footer">
     <div class="content-limit-container">
-      <div class="powered-info">{{ SITE_CONFIG.footer.poweredBy }}</div>
+      <div class="powered-info">{{ SITE_CONFIG.footer.poweredBy }}<template v-if="appStore.websiteName"> · {{ appStore.websiteName }}</template></div>
 
       <div class="copyright-info">
         <span>{{ SITE_CONFIG.footer.copyright }}</span>
+        <template v-if="appStore.icpCode">
+          <span class="divider">|</span>
+          <span class="icp-link">{{ appStore.icpCode }}</span>
+        </template>
         <span class="divider">|</span>
         <a
           :href="SITE_CONFIG.footer.icpLink"
@@ -21,6 +25,9 @@
 
 <script lang="ts" setup>
 import { SITE_CONFIG } from '@/configs'
+import { useAppStore } from '@/stores/app'
+
+const appStore = useAppStore()
 </script>
 
 <style scoped lang="less">

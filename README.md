@@ -71,15 +71,22 @@ VITE_BACKEND_URL=http://localhost:8800
 
 后端启动、数据库/Nacos 配置与 Docker Compose 部署以同级后端仓库为准，详见 [HnieOJ-backend](https://github.com/haoran37/HnieOJ-backend) 的 `README.md`、`deploy/nacos/README.md`、`deploy/docker/docker-compose.dev.yml` 与 `deploy/MIGRATION-redis-gateway.md`。
 
-## 判题节点凭证
+## 判题节点凭证与注册
 
-判题节点运行期只使用逐节点 Bearer 凭证，不连接 Nacos/Redis：
+判题节点运行期只使用本机 `config.yaml` 与持久化 `identity.json`，不直连 Nacos/Redis，也不把私钥交给服务端：
 
-1. 管理员在后台「系统管理 → 服务管理」签发正式凭证（`POST /api/admin/judge/nodes/formal-tokens`，参数 `nodeName`、`maxConcurrency`、`supportedJudgeModes`）。
-2. 凭证仅在签发成功时一次性展示供复制，请按节点部署脚本要求保存到节点凭证文件，不要写入前端或提交到仓库。
-3. 临时节点由管理员签发授权码，节点首次启动用授权码兑换临时凭证，之后自动续期。
+1. 管理员在后台「系统管理 → 服务管理」签发注册凭据：正式（formal）与临时（temp）节点统一调用 `POST /api/admin/judge/nodes/bootstrap-tokens`，字段为 `nodeType`、`nodeName`、`maxConcurrency`（1..1000）、`supportedJudgeModes`（仅 `default`/`spj`/`interactive`）、`weight`（1..100，可选），以及两个不同的截止时间：
+   - **注册凭据有效期** `expiresAt`（epoch 毫秒）：这张一次性 Bootstrap 凭据本身的过期时间，最长 30 天，过期后不能再注册；
+   - **节点授权截止** `authorizationUntil`（epoch 毫秒）：节点可被调度的硬截止；临时节点必填且必须晚于当前时间。
+2. 明文 `bootstrapToken` 只在签发成功时于当前会话模态展示一次；关闭弹窗、离开本页或切换账号即清空，不写入浏览器存储、不打印，请通过受控渠道交给节点运维。
+3. 节点在宿主机用 CSPRNG 生成 Ed25519 私钥并持久化 `identity.json`，凭 Bootstrap 申请注册挑战（`POST /judge/nodes/enrollment-challenges`）并完成注册（`POST /judge/nodes/enroll`）；注册成功后经 WSS（`/ws/judge/node`）认证并接收 `TASK_ASSIGN`，不再使用旧 bearer-only 令牌或共享正式密钥。已注册节点重启复用 `identity.json`，无需再次 Bootstrap；一次性 Bootstrap 以整目录只读挂载（目录 0700、`bootstrap.token` 0600），注册成功后由运维删除宿主机明文。
+4. 节点本机 `config.yaml` 的 `hnieoj.audience` 必须与后端 `hnieoj.submission.judge.node-security.audience`（`HNIEOJ_JUDGE_NODE_AUDIENCE`）一致，`baseUrl`（HTTPS）与 `wssUrl`（WSS）也要与后端入口一起修改；留空或写错会导致 WSS 认证失败。判题节点只有本地 config + identity，私钥只保存在节点宿主机、沙箱不挂载私钥。
 
-节点部署与凭证保存路径、续期细节见 go-judge 仓库 README 的「节点凭证」与 `deploy/deploy-judge-node.sh`。
+已退休的旧通路不再可用：节点侧 `POST /api/judge/temp-token` 与 `POST /api/admin/judge/nodes/formal-token/rotate` 仍保留在旧 controller 中但显式返回 403；`POST /api/admin/judge/nodes/formal-tokens`（逐节点正式凭证）与 `POST /api/admin/judge/nodes/tokens/{tokenId}/draining`（排空开关）已无对应路由。以上能力统一由 Bootstrap + Ed25519 注册 + WSS 取代。
+
+节点排空/恢复/吊销由管理端调用 `POST /api/admin/judge/nodes/tokens/{tokenId}/drain`、`/enable` 与 `/revoke`；「服务管理 → 节点状态」以 `status === draining` 展示排空状态，并发展示 `maxConcurrency`、到期展示 `expireTime`，已吊销或硬到期节点不提供恢复入口。
+
+节点部署与凭证保存路径、续期细节见 go-judge 仓库 README 的「节点凭证」与 `deploy/deploy-judge-node.sh`；受众、HTTPS/WSS、Redis Streams 与租约排障以后端仓库 `docs/judge-ops.md` 为准。
 
 判题模式说明：后端默认只启用 `default`。需要 SPJ / 交互题时，需按现有配置将 `spj`/`interactive` 显式加入后端 `hnieoj.submission.supported-judge-modes`（环境变量 `HNIEOJ_SUBMISSION_SUPPORTED_JUDGE_MODES`），并与节点正式凭证的 `supportedJudgeModes` 及节点配置保持一致后才可评测；这不是前端开关。判题节点运行环境：go-judge 镜像基于 Debian（`Dockerfile.hnieoj` 的 `debian:bookworm-slim`）并内置 Java 17（`openjdk-17-jdk-headless`）、C/C++17、Python 3 等工具链；`mount.yaml` 定义的是 go-judge 判题沙箱的 bind mount 白名单（把宿主机路径映射给被测程序），属于沙箱挂载而非 Docker 卷，不会在节点上安装软件包。
 

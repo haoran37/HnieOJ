@@ -4,7 +4,7 @@
 字段以后端当前 DTO/VO 为准（文档 response schema 多为空）。
 
 - 生成来源：`all-apis.json` / `api-inventory.json` / `backend-routes.json`（只读冻结输入）。
-- 状态含义：**已接线** = 前端真实页面/请求已对接；**部分接线** = 仅局部；**未接线** = 本批未覆盖；**节点/内部** = 非浏览器调用；**已废弃** = 后端已移除；**后端缺失** = 文档有但后端无实现。
+- 状态含义：**已接线** = 前端真实页面/请求已对接；**部分接线** = 仅局部；**未接线** = 本批未覆盖；**节点/内部** = 非浏览器调用；**已废弃** = 后端已移除；**已退休** = 旧流程停用（旧 controller 可能仍保留路由并显式拒绝，或仅余无消费方的空写路径），能力由 Bootstrap + Ed25519 + WSS 取代；**后端缺失** = 文档有但后端无实现。
 - 后端网关目前除登录/注册/system 公开接口外均要求登录；页面避免对受保护数据反复请求造成重定向。
 
 ## A. 117 项逐条清单
@@ -69,12 +69,12 @@
 | 56 | POST `/api/admin/submissions/judge-outbox/{id}/retry` | src/views/admin/SystemManage/Status.vue（行内重试） | AdminSubmissionController | 已接线 | 已发送(sent)后端返回 400，UI 禁用；成功后重读列表 |
 | 57 | POST `/api/admin/submissions/rejudge-tasks` | src/composables/admin/useRejudge.ts | AdminSubmissionController | 已接线 | {problemCode,rangeStart,rangeEnd} |
 | 58 | GET `/api/admin/submissions/rejudge-tasks` | src/composables/admin/useRejudge.ts | AdminSubmissionController | 已接线 |  |
-| 59 | POST `/api/judge/temp-token` | 判题节点入口（非浏览器调用） | JudgeNodeAuthController | 节点/内部 | 节点用授权码兑换短期 Token，前端不调用 |
-| 60 | POST `/api/admin/judge/nodes/auth-codes` | src/composables/admin/useJudgeNodes.ts（Service.vue） | AdminJudgeNodeController | 已接线 | {nodeName,remark,expireSeconds,maxExchangeCount} |
-| 61 | POST `/api/admin/judge/nodes/formal-token/rotate` | 不调用 | —（后端无此路由） | 已废弃 | 源码改用 POST /api/admin/judge/nodes/formal-tokens 逐节点签发 |
+| 59 | POST `/api/judge/temp-token` | 判题节点入口（非浏览器调用） | JudgeNodeAuthController | 已退休 | 旧 controller 仍保留该路由并显式返回 403（「临时令牌兑换已退休」）；临时节点改走 `POST /api/admin/judge/nodes/bootstrap-tokens`（nodeType=temp）+ Ed25519 注册与 WSS 认证 |
+| 60 | POST `/api/admin/judge/nodes/auth-codes` | 不调用 | AdminJudgeNodeController | 已退休 | 旧 controller 仍保留该路由（写入的授权码已无兑换消费方）；前端不再调用，正式/临时节点统一改用 `POST /api/admin/judge/nodes/bootstrap-tokens` |
+| 61 | POST `/api/admin/judge/nodes/formal-token/rotate` | 不调用 | AdminJudgeNodeController（FormalJudgeTokenService） | 已退休 | 旧 controller 仍保留该路由并显式返回 403（RETIRED_MESSAGE）；正式节点改走 `POST /api/admin/judge/nodes/bootstrap-tokens`（nodeType=formal） |
 | 62 | GET `/api/admin/judge/nodes/tokens` | src/composables/admin/useJudgeNodes.ts fetchTokens() | AdminJudgeNodeController | 已接线 |  |
 | 63 | POST `/api/admin/judge/nodes/tokens/{tokenId}/revoke` | src/composables/admin/useJudgeNodes.ts revokeToken() | AdminJudgeNodeController | 已接线 |  |
-| 64 | GET `/api/admin/judge/nodes` | src/composables/admin/useJudgeNodes.ts fetchNodes() | AdminJudgeNodeController | 已接线 | 展示在线/并发/租约/授权信息 |
+| 64 | GET `/api/admin/judge/nodes` | src/composables/admin/useJudgeNodes.ts fetchNodes() | AdminJudgeNodeController | 已接线 | 展示在线/心跳/并发(maxConcurrency)/到期(expireTime)/支持模式；VO 不含 authorizationUntil/draining |
 | 65 | GET `/api/contests` | src/composables/oj/useContests.ts（ContestList.vue） | ContestController | 已接线 | 分页 + type(ACM/OI)；无内外部/自主筛选参数 |
 | 66 | GET `/api/contests/{id}` | src/composables/oj/useContestDetail.ts（ContestDetail.vue） | ContestController | 已接线 | 详情含 problems（内部 problemId/displayId/displayTitle） |
 | 67 | GET `/api/contests/check` | src/utils/api.ts checkContest()（useTeamManage.ts handleCidChange() 切换比赛时真实查验） | ContestController | 已接线 | 回传 {valid,contestId,title}；无效比赛不请求队伍列表 |
@@ -127,24 +127,24 @@
 | 114 | GET `/api/admin/config` | src/composables/admin/useSystemConfig.ts fetchConfig()（Config.vue） | AdminSystemConfigController | 已接线 | registerMode 原样保留 OPEN/EMAIL_SUFFIX/INVITE_CODE，不静默转换 |
 | 115 | PUT `/api/admin/config` | src/composables/admin/useSystemConfig.ts saveConfig() | AdminSystemConfigController | 已接线 | smtpPassword 留空整键省略以保留旧值；保存成功后重新 GET 确认 |
 | 116 | GET `/api/admin/judge/account` | src/composables/admin/useSystemConfig.ts（Config.vue 远程评测账号）/ useJudgeNodes.ts | AdminJudgeController | 已接线 | 真实列表；新增/编辑/删除见 B 节 |
-| 117 | POST `/api/admin/judge/token/reset` | 不调用 | —（后端无此路由） | 已废弃 | 共享主 Token 已废弃，改用逐节点 formal-tokens |
+| 117 | POST `/api/admin/judge/token/reset` | 不调用 | —（后端无此路由） | 已退休 | 保留 117 原始条目索引；共享主 Token 已废弃，改用 `POST /api/admin/judge/nodes/bootstrap-tokens` 一次性签发注册凭据 |
 
 ## B. 后端存在但不在 117 文档的增补路由
 
 | 方法 路径 | 消费端/前端入口 | 说明 |
 |-----------|----------------|------|
-| POST `/api/admin/judge/nodes/formal-tokens` | `useJudgeNodes.ts`（Service.vue） | 逐节点签发正式凭证 `{nodeName,maxConcurrency,supportedJudgeModes}`，返回一次性 token |
+| POST `/api/admin/judge/nodes/bootstrap-tokens` | `useJudgeNodes.ts createBootstrapToken()`（Service.vue「签发注册凭据」） | 正式/临时节点统一一次性签发 Bootstrap：`{nodeType(formal/temp),nodeName,maxConcurrency(1..1000),supportedJudgeModes(default/spj/interactive),weight(1..100),expiresAt(epoch 毫秒，≤30 天),authorizationUntil(epoch 毫秒，temp 必填且必须为未来),remark}`；响应 `NodeBootstrapVo{authCodeId,bootstrapToken,nodeType,expiresAt}`，明文只返回一次 |
 | GET `/api/admin/problem/{id}` | `useProblemForm.ts fetchDetail()`（ProblemEdit.vue） | **本批新增（不计入 117 项）**：返回 `AdminProblemDetailVo{problem:完整 ProblemRequest, tags:string[]}`，供编辑回填 SPJ/交互程序、限制、`isRemoveEndBlank` 等公共 VO 不含字段；有 `PROBLEM_UPDATE` 保护 |
 | GET `/api/admin/discussions/{id}` | `useDiscussManage.ts openEditModal()`（DiscussList 编辑弹窗） | **本批新增（不计入 117 项）**：`Result<{id,title,category,problemCode,content,status,isTop}>`，仅 ADMIN/ROOT，正常/关闭讨论都返回真实内容且不计浏览量 |
 | GET `/api/admin/announcements/{id}` | `useAnnouncement.ts openEditModal()`（Announcement.vue 编辑） | **本批新增（不计入 117 项）**：`Result<AnnouncementDetailVo>`（id/title/content/uid/status/gmtCreate/gmtModified），仅 ADMIN/ROOT，上线/下线都可读 |
-| POST `/api/admin/judge/nodes/tokens/{tokenId}/draining` | `useJudgeNodes.ts setDraining()` | 节点排空开关 `{draining}` |
+| POST `/api/admin/judge/nodes/tokens/{tokenId}/drain`、`/enable`、`/disable`、`/policy`、`/revoke` | `useJudgeNodes.ts drainNode()/enableNode()/revokeToken()`（Service.vue 行内操作） | 节点生命周期（ADMIN/ROOT）：`drain` 停止新调度、`enable` 恢复 active、`disable` 禁用并提升 accessVersion、`policy` 调整并发/权重/模式/授权截止、`revoke` 吊销；响应 `JudgeNodeTokenVo`。前端以 `status === draining` 展示排空，以 `maxConcurrency`/`expireTime` 展示并发与到期，已吊销/硬到期不提供恢复入口 |
 | GET `/api/admin/achievements/{id}/file` | `useAchievementManage.ts handleDownloadFile()`（成就申请详情/列表按钮） | 本地附件受保护下载（Bearer Blob，带鉴权）；外部 http(s) fileUrl 仍以链接展示，不做服务端代理 |
 | GET `/api/admin/training/{id}` | `useTrainingForm.ts loadData()`（TrainingEdit.vue） | **本批新增（不计入 117 项）**：`Result<AdminTrainingDetailVo{id,title,type,auth,privatePwd,description,status(boolean),rank,problems[{problemId,displayId(Integer)}]}>`，仅 ADMIN/ROOT，停用/私有题单不受启用过滤且返回 privatePwd 与全部有序题目 |
 | GET `/api/admin/judge/servers` | 前端节点管理使用 `/api/admin/judge/nodes` | 兼容投影：`AdminJudgeServerController.listServers` 直接投影 `judgeNodeSecurityService.listTokens(null)`，与已接线 `nodes` 同源，不是独立旧服务器数据源；前端不为重复字段新增页面 |
 | GET `/api/problems/{id}/testdata/download`、`/{caseNo}/download` | `StatusInfo.vue`、`ProblemEdit.vue` 测试数据卡片 | 角色 TEACHER/ADMIN/ROOT；ProblemEdit 也提供真实管理入口（上传 POST `/api/admin/problem/{id}/testdata`、下载全部/单个测试点） |
 | POST `/api/admin/rejudge`、GET `/api/admin/rejudge/list`、GET `/api/admin/rejudge/{taskId}/details` | `useRejudge.ts` 使用新路径 `/api/admin/submissions/rejudge-tasks` 与 `/api/admin/rejudge/{id}/details` | legacy 创建接口保留 |
 | POST `/api/submissions`（multipart） | `ProblemSubmit.vue` 文件上传 | `problemCode/language/file/contestId` |
-| POST `/api/judge/temp-token`、`/judge/*`、`/internal/*` | 判题机（go-judge）节点 | 非浏览器调用 |
+| `POST /api/judge/temp-token`、`/judge/*`、`/internal/*` | 判题机（go-judge）节点 | 非浏览器调用；`temp-token` 为旧 controller 显式 403 退休路由，节点改走 `/api/admin/judge/nodes/bootstrap-tokens` + Ed25519 + WSS。节点只有本地 config + identity，沙箱不挂载私钥，节点不直连 Nacos/Redis；受众/HTTPS/WSS 以后端 `docs/judge-ops.md` 为准 |
 | GET `/api/tags` | `useTags.ts`（TagSelectModal.vue）/ `useTagManage.ts`（ProblemManage/Tag.vue） | **B1 新增（不计入 117 项）**：真实标签目录，按真实 category 分组，category=source 映射「来源」，空分类归「未分类」；题目查询/编辑仍用 name 字符串 |
 | POST/PUT/DELETE `/api/admin/tags` | `useTagManage.ts`（ProblemManage/Tag.vue） | **B1 新增（不计入 117 项）**：ADMIN/ROOT + `problem:create/update/delete`；名称必填 ≤50、color ≤20、category ≤50；删除被引用标签返回业务错误并原样提示 |
 | GET `/api/problems/{problemCode}/recommendations?limit=5` | `ProblemDetail.vue` 推荐题目侧栏 | **B1 新增（不计入 117 项）**：公开题按标签/难度推荐；空显示「暂无推荐」，失败可重试；按 problemCode 导航，旧响应作废 |
@@ -166,7 +166,7 @@
 | 用户信息变更审核（「变动申请」页） | **已接线（B2）**：`useUserChange.ts` + `Change.vue` 走真实分页/状态/关键字，行 key 为申请 id，仅 PENDING 可审核、原因必填，冲突保留错误并刷新真实状态；已移除 disabled 占位批量按钮 |
 | 成就附件本地/外部区分 | 本地存储：`fileUrl` 为受保护路径 `/api/admin/achievements/{id}/file`，前端 Bearer 下载为 Blob；外部仅 http(s) 以链接打开，不把 local key 当链接、也不走服务端代理 |
 | 注册开关/注册模式执行缺口 | `registerMode` 已按后端合法枚举（OPEN/EMAIL_SUFFIX/INVITE_CODE）保存与回读，但 user 模块未读取 allowRegister/registerMode，RegisterRequest 无 inviteCode；Config.vue 明确提示该设置当前不影响实际注册，不虚构邀请码注册已生效 |
-| 共享主 Judge Token 重置 | 已废弃，改用逐节点凭证（Service.vue） |
+| 共享主 Judge Token 重置 | 已退休，改用 Bootstrap 一次性注册凭据（Service.vue `POST /api/admin/judge/nodes/bootstrap-tokens`）+ Ed25519 注册 |
 | 后台仪表盘历史趋势/判题分布/热点统计 | 后端无相应接口；`useDashboard.ts` 取用户/题目/题单/比赛/作业/提交列表的真实 `total`（真实 0 显示 0），任一接口读取失败显示「加载失败」并提供重新加载，不沿用旧成功值、也不伪装「暂未开放」；增长趋势、提交结果分布、热门/冷门题目、活跃题单仍显示「暂未开放」，不用随机统计 |
 | 比赛模式独立大屏 | 后端无 `/api/special/contest-mode` 等赛事信息/独立开关接口；`useContestMode.ts` 不伪造赛事名称、倒计时或节点时延，页面仅展示真实服务端时间并明确「比赛模式暂未开放」 |
 
@@ -201,6 +201,7 @@
 - `scripts/verify-admin-content.mjs`：真实实例化 `useProblemForm`/`useAnnouncement`/`useDiscussManage`/`useDiscussAdd`，受控 HTTP 覆盖草稿保护、旧响应隔离、管理端详情映射、空 examples 保存、`total>pageSize` 第二页与创建不发送 `isTop`。运行：`node scripts/verify-admin-content.mjs`。
 - `scripts/verify-admin-business.mjs`：真实实例化本批 `useContestForm`/`useContestList`/`useTrainingForm`/`useHomeworkForm`/`useTeamManage`，受控 HTTP 覆盖题目按 `problemId` 数字查验、比赛/作业 String(A/B) 与训练 Integer displayId、账号重复/401 保留输入、PUT 失败保留表单、作业数字 classIds 与旧年级响应隔离、队伍成员 UID 与批量删除 body、`total>pageSize` 第二页，并回归记录切换竞态（详情元数据迟到、失败详情不得保存旧表单、迟到题目添加不跨记录、旧保存不得卡住新记录保存态）、题目的上/下移交换 `displayId` 后按编号排序持久化与仅改标题不重排、队伍迟到查验/A→B→A 不清空当前列表、公开 check 无效时回退管理详情（停用比赛仍可管理，404 才停止）、关闭弹窗后延迟校验不得提交、编辑表单详情未加载完成前不渲染、比赛模式系统时间本地时区格式化。运行：`node scripts/verify-admin-business.mjs`。
 - `scripts/verify-final-status.mjs`：实例化真实 `userStore` 与 `useDashboard`，覆盖未查询到做题记录返回未知（不伪称「未开始」/0 题、AC/WA 映射保留）、仪表盘真实 `total=0` 显示 0、接口读取失败标记 error 且不沿用旧成功值、重新加载成功后恢复。运行：`node scripts/verify-final-status.mjs`。
+- `scripts/verify-judge-nodes.mjs`（节点安全批次新增）：受控 HTTP 覆盖正式/临时节点统一 `POST /api/admin/judge/nodes/bootstrap-tokens` 的严格 DTO、`/tokens/{tokenId}/drain` 与 `/enable`、`/revoke` 生命周期路由、会话代号作废在途旧响应、同一会话并发列表读取「最新响应才可写入」，并真实转译 `Service.vue` 的 `<script setup>` 做组件级行为回归：切换账号/关闭签发弹窗作废迟到凭据、切会话后迟到的排空与吊销确认不再刷新或发请求、旧签发 `finally` 不得清除新签发提交态、生命周期成功但回读失败时提示「已提交但刷新失败」而非谎报成功；同时做源码级约束：不得再调用已退休 `formal-token`/`auth-codes`/`draining` 路由，列表只读 `maxConcurrency`/`expireTime`、排空以 `status === draining` 判定，注册凭据不写浏览器存储、不打印。运行：`node scripts/verify-judge-nodes.mjs`。
 - `scripts/verify-auth.mjs`、`scripts/verify-business.mjs` 同样以受控 HTTP 桩（替换 `globalThis.fetch`）验证认证/业务请求契约，不依赖真实后端；`scripts/verify-admin-users.mjs`、`scripts/verify-oj-composables.mjs`、`scripts/verify-oj-rework.mjs`、`scripts/verify-final-status.mjs` 也均为仓库内可直接运行的受控 HTTP 或源码回归。真实后端联调需另行启动服务，不属于以上脚本。
 - `scripts/verify-remaining-b1.mjs`（B1 批次新增）：受控 HTTP 覆盖标签目录/管理、推荐、远程评测账号、公告/新闻的真实 API 路径与参数、推荐旧响应作废、密码 payload 空保留/非空原样、分类、加载失败不伪空、保存期间重复提交防护；并编译 `ProblemDetail.vue` 的 `<script setup>` 直接实例化，验证推荐请求竞态。运行：`node scripts/verify-remaining-b1.mjs`。
 

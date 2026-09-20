@@ -2,26 +2,25 @@ import { h } from 'vue';
 import type { Router } from 'vue-router';
 import type { Submission } from '@/composables/oj/useStatusList';
 
-// 状态枚举与颜色配置
+// 状态枚举与颜色配置（键为后端 SubmissionStatusConstant.toText 的文案）
 export const statusConfig: Record<string, { color: string; label: string }> = {
-  'Accepted': { color: '#d03050', label: 'Accepted' },
-  
-  'Wrong Answer': { color: '#18a058', label: 'Wrong Answer' },
-  'Time Limit Exceeded': { color: '#18a058', label: 'Time Limit Exceeded' },
-  'Memory Limit Exceeded': { color: '#18a058', label: 'Memory Limit Exceeded' },
-  'Output Limit Exceeded': { color: '#18a058', label: 'Output Limit Exceeded' },
-  'File Error': { color: '#18a058', label: 'File Error' },
-  'Nonzero Exit Status': { color: '#18a058', label: 'Nonzero Exit Status' },
-  'Signalled': { color: '#18a058', label: 'Signalled' },
-  
-  'Compilation Error': { color: '#2080f0', label: 'Compilation Error' },
-  'Runtime Error': { color: '#2080f0', label: 'Runtime Error' },
-  'Internal Error': { color: '#2080f0', label: 'Internal Error' },
-  
+  'Accepted': { color: '#18a058', label: 'Accepted' },
+
+  'Wrong Answer': { color: '#d03050', label: 'Wrong Answer' },
+  'Time Limit Exceeded': { color: '#d03050', label: 'Time Limit Exceeded' },
+  'Memory Limit Exceeded': { color: '#d03050', label: 'Memory Limit Exceeded' },
+  'Runtime Error': { color: '#d03050', label: 'Runtime Error' },
+
+  'Compile Error': { color: '#f0a020', label: 'Compile Error' },
+  'System Error': { color: '#f0a020', label: 'System Error' },
+  'Judgement Failed': { color: '#f0a020', label: 'Judgement Failed' },
+  'Invalid Interaction': { color: '#f0a020', label: 'Invalid Interaction' },
+
   'Pending': { color: '#909399', label: 'Pending' },
   'Compiling': { color: '#909399', label: 'Compiling' },
-  'Judging': { color: '#909399', label: 'Judging' },
-  'Cancelled': { color: '#909399', label: 'Cancelled' }
+  'Running': { color: '#909399', label: 'Running' },
+
+  'Unknown': { color: '#999', label: 'Unknown' }
 };
 
 export const createStatusColumns = (router: Router) => [

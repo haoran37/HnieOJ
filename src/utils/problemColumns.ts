@@ -1,20 +1,20 @@
 import { h } from 'vue'
 import type { DataTableColumns } from 'naive-ui'
-import { NTag, NRate, NProgress, NSpace } from 'naive-ui'
+import { NTag, NProgress, NSpace } from 'naive-ui'
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils'
 import { renderStatusIcon } from '@/utils/statusUtils'
 import type { ProblemRow } from '@/types/problem'
+import { difficultyLabel } from '@/types/problem'
 
-const difficultyColors: Record<string, string> = {
-  入门: '#f56c6c',
-  简单: '#f0a020',
-  中等: '#2080f0',
-  困难: '#7b61ff',
+const difficultyColors: Record<number, string> = {
+  0: '#f0a020',
+  1: '#2080f0',
+  2: '#7b61ff',
 }
 
 export const createColumns = (
-  getProblemStatus: (id: string) => string,
-  onTitleClick?: (id: string) => void,
+  getProblemStatus: (problemCode: string) => string,
+  onTitleClick?: (problemCode: string) => void,
 ): DataTableColumns<ProblemRow> => [
   {
     title: '状态',
@@ -22,15 +22,15 @@ export const createColumns = (
     width: 60,
     align: 'center',
     render(row) {
-      return renderStatusIcon(getProblemStatus(row.id))
+      return renderStatusIcon(getProblemStatus(row.problemCode))
     },
   },
   {
     title: '题号',
-    key: 'id',
-    width: 100,
+    key: 'problemCode',
+    width: 110,
     render(row) {
-      return h('span', { style: { fontWeight: 500 } }, `P${row.id}`)
+      return h('span', { style: { fontWeight: 500 } }, row.problemCode)
     },
   },
   {
@@ -38,7 +38,7 @@ export const createColumns = (
     key: 'title',
     render(row) {
       return h('a', {
-        href: `/problem/${row.id}`,
+        href: `/problem/${row.problemCode}`,
         style: {
           textDecoration: 'none',
           color: '#2080f0',
@@ -46,7 +46,7 @@ export const createColumns = (
         },
         onClick: (event: MouseEvent) => {
           event.preventDefault()
-          onTitleClick?.(row.id)
+          onTitleClick?.(row.problemCode)
         },
       }, row.title)
     },
@@ -81,18 +81,19 @@ export const createColumns = (
     key: 'difficulty',
     width: 100,
     render(row) {
-      const color = difficultyColors[row.difficulty] ?? '#999'
+      const label = difficultyLabel(row.difficulty)
+      const color = row.difficulty !== null ? (difficultyColors[row.difficulty] ?? '#999') : '#999'
       return h(NTag, {
         color: { color, textColor: '#fff', borderColor: color },
         style: { borderRadius: '4px' },
         size: 'small',
-      }, { default: () => row.difficulty })
+      }, { default: () => label })
     },
   },
   {
     title: '通过率',
     key: 'passRate',
-    width: 150,
+    width: 170,
     render(row) {
       return h(NProgress, {
         type: 'line',
@@ -101,19 +102,6 @@ export const createColumns = (
         color: row.passRate > 50 ? '#18a058' : '#f0a020',
         height: 18,
         borderRadius: 4,
-      })
-    },
-  },
-  {
-    title: '评分',
-    key: 'rate',
-    width: 150,
-    render(row) {
-      return h(NRate, {
-        readonly: true,
-        defaultValue: Number(row.rate),
-        allowHalf: true,
-        size: 'small',
       })
     },
   },

@@ -1,5 +1,12 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  // API 基础地址，留空表示同源
+  readonly VITE_API_BASE_URL?: string
+  // Vite 开发代理的后端地址（默认 http://localhost:8800）
+  readonly VITE_BACKEND_URL?: string
+}
+
 // src/v-md-editor.d.ts
 declare module '@kangc/v-md-editor/lib/preview' {
   import type { DefineComponent } from 'vue';

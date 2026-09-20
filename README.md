@@ -8,8 +8,8 @@
 ## 项目状态
 
 - 当前进度：OJ 端与管理端页面开发基本完成。
-- 待完成项：后端接口对接、联调、性能与体验优化。
-- 当前说明：部分模块仍使用 mock 数据和占位上传地址。
+- 接口对接：用户/内容/题目/判题/比赛/题单/作业等业务已接入真实后端接口。
+- 待完成项：后端未提供的能力（如历史趋势统计、排行榜、比赛大屏等）已在页面明确标注「暂未开放」，待后端补齐。
 - 维护节奏：长期内开发会放缓，本 README 用于说明现阶段状态。
 
 ## 功能概览
@@ -50,6 +50,39 @@ pnpm install
 pnpm dev
 ```
 
+## 本地前后端联调
+
+前端通过 Vite 代理访问后端；默认代理目标为 `http://localhost:8800`。如需指向其他后端，可在项目根目录创建 `.env.local` 覆盖（见 `.env.example`）：
+
+```bash
+# 留空表示同源（开发环境由 Vite 代理）
+VITE_API_BASE_URL=
+# Vite 开发服务器代理的后端地址
+VITE_BACKEND_URL=http://localhost:8800
+```
+
+`pnpm dev` 后，`/api`、`/ws` 与题面图片 `/oj/images` 会代理到 `VITE_BACKEND_URL`。
+
+所需服务：
+
+- 后端网关及后端各业务服务（默认 `8800`）
+- MySQL 8、Redis 7.4、Nacos（配置与注册中心）
+- 判题节点 go-judge（可选，用于代码评测）
+
+后端启动、数据库/Nacos 配置与 Docker Compose 部署以同级后端仓库为准，详见 [HnieOJ-backend](https://github.com/haoran37/HnieOJ-backend) 的 `README.md`、`deploy/nacos/README.md`、`deploy/docker/docker-compose.dev.yml` 与 `deploy/MIGRATION-redis-gateway.md`。
+
+## 判题节点凭证
+
+判题节点运行期只使用逐节点 Bearer 凭证，不连接 Nacos/Redis：
+
+1. 管理员在后台「系统管理 → 服务管理」签发正式凭证（`POST /api/admin/judge/nodes/formal-tokens`，参数 `nodeName`、`maxConcurrency`、`supportedJudgeModes`）。
+2. 凭证仅在签发成功时一次性展示供复制，请按节点部署脚本要求保存到节点凭证文件，不要写入前端或提交到仓库。
+3. 临时节点由管理员签发授权码，节点首次启动用授权码兑换临时凭证，之后自动续期。
+
+节点部署与凭证保存路径、续期细节见 go-judge 仓库 README 的「节点凭证」与 `deploy/deploy-judge-node.sh`。
+
+判题模式说明：后端默认只启用 `default`。需要 SPJ / 交互题时，需按现有配置将 `spj`/`interactive` 显式加入后端 `hnieoj.submission.supported-judge-modes`（环境变量 `HNIEOJ_SUBMISSION_SUPPORTED_JUDGE_MODES`），并与节点正式凭证的 `supportedJudgeModes` 及节点配置保持一致后才可评测；这不是前端开关。判题节点运行环境：go-judge 镜像基于 Debian（`Dockerfile.hnieoj` 的 `debian:bookworm-slim`）并内置 Java 17（`openjdk-17-jdk-headless`）、C/C++17、Python 3 等工具链；`mount.yaml` 定义的是 go-judge 判题沙箱的 bind mount 白名单（把宿主机路径映射给被测程序），属于沙箱挂载而非 Docker 卷，不会在节点上安装软件包。
+
 ## 常用命令
 
 ```bash
@@ -88,16 +121,18 @@ src/
 ## 开发说明
 
 - 请勿手动修改自动生成文件：`auto-imports.d.ts`、`components.d.ts`。
-- 后端联调阶段将逐步把 composables 中的 mock 逻辑替换为真实 API。
+- 业务数据统一通过 `src/utils/api.ts` 访问真实后端；后端未提供的能力不得伪造数据，需以「暂未开放」空状态展示。
 - 提交 PR 前至少执行：`pnpm type-check` 与 `pnpm lint`。
 
 ## 里程碑计划
 
-- [ ] 对接鉴权与后端业务接口
-- [ ] 替换 mock 数据并完成全链路联调
+- [x] 对接鉴权与后端业务接口
+- [x] 替换 mock 数据并完成全链路联调
 - [ ] 完善错误处理与边界状态体验
 - [ ] 优化首屏性能与构建体积
 - [ ] 补充测试与部署文档
+
+> 已完成接入的能力均调用真实后端；后端未提供的统计、排行榜、比赛大屏等能力不会伪造数据或假成功，统一在页面以「暂未开放」标注，详见 [docs/api-integration.md](./docs/api-integration.md) 的缺失能力清单。
 
 ## 许可证
 

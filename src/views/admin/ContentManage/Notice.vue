@@ -1,486 +1,412 @@
 <template>
-  <div class="notice-manage-page">
-    <n-alert title="注意" type="warning">
-      该功能还在不断优化中，如有问题请到 GitHub Issues 上提出
-    </n-alert>
-    <br>
+  <div class="notice-page">
     <n-card :bordered="false" title="通知管理">
-      <template #header-extra>
-        <n-button type="primary" @click="openCreateModal">
-          <template #icon><n-icon>
-              <MegaphoneOutline />
-            </n-icon></template>
-          发布新通知
-        </n-button>
-      </template>
+      <n-form inline label-placement="left" :show-feedback="false" class="search-bar">
+        <n-form-item label="关键字">
+          <n-input
+            v-model:value="searchForm.keyword"
+            placeholder="按标题搜索"
+            clearable
+            @keyup.enter="handleSearch"
+          />
+        </n-form-item>
+        <n-form-item label="状态">
+          <n-select
+            v-model:value="searchForm.status"
+            :options="statusOptions"
+            placeholder="全部状态"
+            clearable
+            style="width: 140px"
+          />
+        </n-form-item>
+        <n-form-item>
+          <n-space>
+            <n-button type="primary" @click="handleSearch">查询</n-button>
+            <n-button @click="handleReset">重置</n-button>
+            <n-button type="primary" secondary @click="openCreateModal">新建通知</n-button>
+          </n-space>
+        </n-form-item>
+      </n-form>
 
-      <n-data-table :columns="columns" :data="noticeList" :loading="loading" :pagination="pagination"
-        :row-key="(row: any) => row.id" />
+      <n-alert v-if="listError" type="error" :bordered="false" style="margin-bottom: 12px">
+        {{ listError }}
+        <template #action>
+          <n-button size="small" @click="fetchNotices">重试</n-button>
+        </template>
+      </n-alert>
+
+      <n-data-table
+        remote
+        :columns="columns"
+        :data="notices"
+        :loading="listLoading"
+        :row-key="(row: NoticeListVo) => row.id"
+        :pagination="false"
+        :scroll-x="900"
+      />
+
+      <div class="pagination-wrapper">
+        <n-pagination
+          :page="currentPage"
+          :page-size="pageSize"
+          :item-count="totalCount"
+          show-size-picker
+          :page-sizes="[10, 20, 50]"
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+        />
+      </div>
     </n-card>
 
-    <n-modal v-model:show="showModal" preset="card" title="发布系统通知" style="width: 1400px; height: 85vh;"
+    <n-modal
+      :show="showModal"
+      preset="card"
+      :title="modalTitle"
       :mask-closable="false"
-      :content-style="{ padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }">
-      <div class="modal-body-layout">
+      :style="{ width: 'auto', minWidth: '640px', maxWidth: '92vw' }"
+      @update:show="handleModalShowChange"
+    >
+      <n-spin :show="detailLoading">
+        <n-form label-placement="left" label-width="90">
+          <n-form-item label="标题" required>
+            <n-input
+              v-model:value="form.title"
+              :disabled="modalMode === 'view'"
+              :maxlength="255"
+              show-count
+              placeholder="请输入通知标题"
+            />
+          </n-form-item>
+          <n-form-item label="正文" required>
+            <n-input
+              v-model:value="form.content"
+              type="textarea"
+              :disabled="modalMode === 'view'"
+              :maxlength="20000"
+              :autosize="{ minRows: 4, maxRows: 12 }"
+              placeholder="纯文本 / 安全 Markdown，将按纯文本展示"
+            />
+          </n-form-item>
+          <n-form-item label="收件方式" required>
+            <n-radio-group
+              :value="form.targetType"
+              :disabled="modalMode === 'view'"
+              @update:value="handleTargetTypeChange"
+            >
+              <n-radio-button value="USERS">指定用户</n-radio-button>
+              <n-radio-button value="CLASSES">班级</n-radio-button>
+            </n-radio-group>
+          </n-form-item>
 
-        <div class="left-panel">
-          <div class="panel-scroll-content">
-            <n-form label-placement="top" :model="formModel">
-              <n-grid :x-gap="12" :cols="2">
-                <n-grid-item>
-                  <n-form-item label="通知标题" required>
-                    <n-input v-model:value="formModel.title" placeholder="请输入标题" />
-                  </n-form-item>
-                </n-grid-item>
-                <n-grid-item>
-                  <n-form-item label="通知类型" required>
-                    <n-select v-model:value="formModel.type" :options="typeOptions" />
-                  </n-form-item>
-                </n-grid-item>
-              </n-grid>
+          <n-form-item v-if="form.targetType === 'USERS'" label="收件用户" required>
+            <n-select
+              v-model:value="form.targetIds"
+              multiple
+              filterable
+              remote
+              clearable
+              :disabled="modalMode === 'view'"
+              :loading="userSearching"
+              :options="userPickerOptions"
+              :max-tag-count="6"
+              placeholder="输入用户名/学号搜索并显式选择（最多 1000）"
+              @search="handleUserSearch"
+            />
+          </n-form-item>
 
-              <n-divider style="margin: 8px 0 16px 0" />
+          <template v-else>
+            <n-form-item label="学院" required>
+              <n-select
+                :value="selectedCollegeId"
+                :options="collegeOptions"
+                :disabled="modalMode === 'view'"
+                placeholder="选择学院"
+                clearable
+                @update:value="handleCollegeChange"
+              />
+            </n-form-item>
+            <n-form-item label="年级" required>
+              <n-select
+                :value="selectedGrade"
+                :options="gradeOptions"
+                :disabled="modalMode === 'view' || !selectedCollegeId"
+                placeholder="选择年级"
+                clearable
+                @update:value="handleGradeChange"
+              />
+            </n-form-item>
+            <n-form-item label="班级" required>
+              <n-select
+                v-model:value="form.targetIds"
+                multiple
+                filterable
+                clearable
+                :disabled="modalMode === 'view' || !selectedGrade"
+                :options="classPickerOptions"
+                :max-tag-count="6"
+                placeholder="选择班级（可多选，最多 1000）"
+              />
+            </n-form-item>
+          </template>
 
-              <n-form-item label="发送范围" required>
-                <n-radio-group v-model:value="formModel.targetMode">
-                  <n-space vertical>
-                    <n-radio value="BROADCAST_ROLE">按角色广播</n-radio>
-                    <n-radio value="BROADCAST_COLLEGE">按学院广播</n-radio>
-                    <n-radio value="BROADCAST_MAJOR">按专业广播</n-radio>
-                    <n-radio value="BROADCAST_CLASS">按班级广播</n-radio>
-                    <n-radio value="SPECIFIC_USER">选择特定用户</n-radio>
-                  </n-space>
-                </n-radio-group>
-              </n-form-item>
+          <n-alert v-if="modalMode === 'view'" type="info" :bordered="false">
+            已发布通知只读：正文与收件目标不可再编辑。
+          </n-alert>
+        </n-form>
+      </n-spin>
 
-              <div class="dynamic-selection-area">
-
-                <div v-if="formModel.targetMode === 'BROADCAST_ROLE'">
-                  <n-checkbox-group v-model:value="formModel.selectedRoles">
-                    <n-space>
-                      <n-checkbox value="STUDENT" label="全体学生" />
-                      <n-checkbox value="TA" label="全体助教" />
-                      <n-checkbox value="TEACHER" label="全体教师" />
-                      <n-checkbox value="ADMIN" label="全体管理" />
-                    </n-space>
-                  </n-checkbox-group>
-                </div>
-
-                <div v-else-if="formModel.targetMode === 'BROADCAST_COLLEGE'">
-                  <div class="scrollable-checkbox-group">
-                    <n-checkbox-group v-model:value="broadcastState.selectedCollegeIds">
-                      <n-grid :cols="1" :y-gap="8">
-                        <n-grid-item v-for="col in broadcastState.colleges" :key="col.value">
-                          <n-checkbox :value="col.value" :label="col.label" />
-                        </n-grid-item>
-                      </n-grid>
-                    </n-checkbox-group>
-                  </div>
-                </div>
-
-                <div v-else-if="formModel.targetMode === 'BROADCAST_MAJOR'">
-                  <n-form-item label="先选择学院" :show-label="false" class="mb-2">
-                    <n-select v-model:value="broadcastState.filterCollegeId" :options="broadcastState.colleges"
-                      placeholder="请选择学院" @update:value="(v: string | null) => fetchMajors(v, 'BROADCAST')" />
-                  </n-form-item>
-                  <n-card size="small" embedded v-if="broadcastState.filterCollegeId" class="compact-card">
-                    <div class="scrollable-checkbox-group">
-                      <n-checkbox-group v-model:value="broadcastState.selectedMajorIds">
-                        <n-space vertical>
-                          <n-checkbox v-for="m in broadcastState.majors" :key="m.value" :value="m.value"
-                            :label="m.label" />
-                        </n-space>
-                      </n-checkbox-group>
-                    </div>
-                  </n-card>
-                </div>
-
-                <div v-else-if="formModel.targetMode === 'BROADCAST_CLASS'">
-                  <n-space vertical class="mb-2" :size="12">
-                    <n-select v-model:value="broadcastState.filterCollegeId" :options="broadcastState.colleges"
-                      placeholder="请选择学院" @update:value="(v: string | null) => fetchMajors(v, 'BROADCAST')" />
-                    <n-select v-model:value="broadcastState.filterMajorId" :options="broadcastState.majors"
-                      placeholder="请选择专业" :disabled="!broadcastState.filterCollegeId"
-                      @update:value="(v: string | null) => fetchClasses(v, 'BROADCAST')" />
-                  </n-space>
-                  <n-card size="small" embedded v-if="broadcastState.filterMajorId" class="compact-card">
-                    <div class="scrollable-checkbox-group">
-                      <n-checkbox-group v-model:value="broadcastState.selectedClassIds">
-                        <n-space vertical>
-                          <n-checkbox v-for="c in broadcastState.classes" :key="c.value" :value="c.value"
-                            :label="c.label" />
-                        </n-space>
-                      </n-checkbox-group>
-                    </div>
-                  </n-card>
-                </div>
-
-                <div v-else-if="formModel.targetMode === 'SPECIFIC_USER'">
-                  <n-space class="mb-2">
-                    <n-button size="small" dashed type="info" @click="openStudentModal">
-                      <template #icon><n-icon>
-                          <SchoolOutline />
-                        </n-icon></template>
-                      添加学生
-                    </n-button>
-                    <n-button size="small" dashed type="success" @click="openStaffModal">
-                      <template #icon><n-icon>
-                          <BriefcaseOutline />
-                        </n-icon></template>
-                      添加教职工
-                    </n-button>
-                  </n-space>
-                  <div class="user-tags-wrapper">
-                    <n-empty v-if="!formModel.selectedSpecificUsers.length" description="暂未选择用户" size="small" />
-                    <n-space v-else :size="[4, 4]">
-                      <n-tag v-for="(u, idx) in formModel.selectedSpecificUsers" :key="u.value" closable size="small"
-                        :type="getRoleColor(u.role)" @close="removeUserTag(idx)">
-                        {{ u.name }}
-                      </n-tag>
-                    </n-space>
-                  </div>
-                </div>
-
-              </div>
-            </n-form>
-          </div>
-        </div>
-
-        <div class="right-panel">
-          <div class="editor-header">通知内容*</div>
-          <div class="editor-wrapper">
-            <v-md-editor v-model="formModel.content" height="100%" placeholder="请输入通知内容..." />
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <n-space justify="end">
-          <n-button @click="showModal = false">取消</n-button>
-          <n-button type="primary" :loading="loading" @click="handleSubmit">确认发布</n-button>
-        </n-space>
-      </div>
-    </n-modal>
-
-    <n-modal v-model:show="showStudentModal" preset="card" title="添加学生" style="width: 800px;">
-      <n-space vertical>
-        <n-grid :x-gap="8" :cols="3">
-          <n-grid-item>
-            <n-select v-model:value="studentState.college" :options="studentState.colleges" placeholder="学院"
-              @update:value="(v: string | null) => fetchMajors(v, 'STUDENT')" />
-          </n-grid-item>
-          <n-grid-item>
-            <n-select v-model:value="studentState.major" :options="studentState.majors" placeholder="专业"
-              :disabled="!studentState.college" @update:value="(v: string | null) => fetchClasses(v, 'STUDENT')" />
-          </n-grid-item>
-          <n-grid-item>
-            <n-select v-model:value="studentState.classId" :options="studentState.classes" placeholder="班级"
-              :disabled="!studentState.major" @update:value="fetchStudents" />
-          </n-grid-item>
-        </n-grid>
-        <n-transfer v-model:value="studentState.tempSelectedIds" :options="studentTransferOptions" source-title="可选学生"
-          target-title="已选学生" filterable virtual-scroll style="height: 400px" />
-      </n-space>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showStudentModal = false">取消</n-button>
-          <n-button type="primary" @click="confirmAddStudents">确定</n-button>
+          <n-button :disabled="saving || publishing" @click="closeModal">关闭</n-button>
+          <n-button
+            v-if="modalMode !== 'view'"
+            type="primary"
+            :loading="saving"
+            :disabled="saving || publishing"
+            @click="handleSubmit"
+          >
+            保存草稿
+          </n-button>
         </n-space>
       </template>
     </n-modal>
 
-    <n-modal v-model:show="showStaffModal" preset="card" title="添加教职工" style="width: 700px;">
-      <n-space justify="space-between" align="center" class="mb-2">
-        <n-radio-group v-model:value="staffState.activeTab" size="medium" @update:value="fetchStaffList">
-          <n-space>
-            <n-radio-button value="TEACHER" label="教师" />
-            <n-radio-button value="TA" label="助教" />
-            <n-radio-button value="ADMIN" label="管理员" />
-          </n-space>
-        </n-radio-group>
-
-        <n-input v-model:value="staffState.keyword" placeholder="搜索姓名 (回车)" style="width: 200px"
-          @keyup.enter="fetchStaffList">
-          <template #suffix><n-icon>
-              <SearchOutline />
-            </n-icon></template>
-        </n-input>
-      </n-space>
-
-      <div class="staff-select-box">
-        <n-checkbox-group v-if="staffState.activeTab === 'TEACHER'" v-model:value="staffState.tempSelectedTeachers">
-          <n-grid :cols="2" :y-gap="10">
-            <n-grid-item v-for="u in staffState.teachersList" :key="u.value">
-              <n-checkbox :value="u.value" :label="u.label" />
-            </n-grid-item>
-          </n-grid>
-        </n-checkbox-group>
-        <n-checkbox-group v-if="staffState.activeTab === 'TA'" v-model:value="staffState.tempSelectedTAs">
-          <n-grid :cols="2" :y-gap="10">
-            <n-grid-item v-for="u in staffState.tasList" :key="u.value">
-              <n-checkbox :value="u.value" :label="u.label" />
-            </n-grid-item>
-          </n-grid>
-        </n-checkbox-group>
-        <n-checkbox-group v-if="staffState.activeTab === 'ADMIN'" v-model:value="staffState.tempSelectedAdmins">
-          <n-grid :cols="2" :y-gap="10">
-            <n-grid-item v-for="u in staffState.adminsList" :key="u.value">
-              <n-checkbox :value="u.value" :label="u.label" />
-            </n-grid-item>
-          </n-grid>
-        </n-checkbox-group>
-      </div>
-
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showStaffModal = false">取消</n-button>
-          <n-button type="primary" @click="confirmAddStaff">确定添加所有选中</n-button>
+    <n-modal
+      :show="showPublishModal"
+      preset="card"
+      title="确认发布通知"
+      :mask-closable="false"
+      :style="{ width: 'auto', minWidth: '520px', maxWidth: '90vw' }"
+      @update:show="handlePublishShowChange"
+    >
+      <n-alert type="warning" :bordered="false" style="margin-bottom: 12px">
+        发布后不可撤回；已投递到用户收件箱的消息不会因删除通知管理记录而撤回。
+      </n-alert>
+      <template v-if="publishDetail">
+        <p><strong>标题：</strong>{{ publishDetail.title }}</p>
+        <p>
+          <strong>收件方式：</strong>
+          {{ publishDetail.targetType === 'CLASSES' ? '班级' : '指定用户' }}
+        </p>
+        <p><strong>收件目标（{{ publishDetail.targetIds.length }}）：</strong></p>
+        <n-space size="small">
+          <n-tag
+            v-for="id in publishDetail.targetIds"
+            :key="id"
+            size="small"
+            :bordered="false"
+          >
+            {{ id }}
+          </n-tag>
         </n-space>
       </template>
-    </n-modal>
-
-    <n-modal v-model:show="showDetailModal" preset="card" title="详情" style="width: 700px">
-      <div v-if="currentDetail">
-        <div class="detail-header">
-          <h2 class="detail-title">
-            <n-tag :type="getTypeTag(currentDetail.type)" class="mr-2">{{ currentDetail.type }}</n-tag>
-            {{ currentDetail.title }}
-          </h2>
-          <div class="detail-meta">
-            <span><n-icon>
-                <PersonOutline />
-              </n-icon> {{ currentDetail.publisher }}</span>
-            <span><n-icon>
-                <TimeOutline />
-              </n-icon> {{ formatFullTime(currentDetail.publishTime) }}</span>
-          </div>
-        </div>
-        <n-divider />
-        <div class="detail-target-section">
-          <div class="label mb-1">接收对象 ({{ currentDetail.targetSummary }})：</div>
-          <div class="target-list-box">
-            <n-scrollbar style="max-height: 150px">
-              <n-space :size="[6, 6]" v-if="currentDetail.targetDetailList?.length">
-                <n-tag v-for="name in currentDetail.targetDetailList" :key="name" size="small" :bordered="false"
-                  type="info">
-                  {{ name }}
-                </n-tag>
-              </n-space>
-              <span v-else class="text-gray">加载中或无详细列表...</span>
-            </n-scrollbar>
-          </div>
-        </div>
-        <n-divider />
-        <div class="detail-content">
-          <v-md-preview :text="currentDetail.content" />
-        </div>
-      </div>
+      <n-spin v-else :show="true" style="min-height: 60px" />
+      <template #footer>
+        <n-space justify="end">
+          <n-button :disabled="publishing" @click="closePublishModal">取消</n-button>
+          <n-button
+            type="primary"
+            :loading="publishing"
+            :disabled="publishing || !publishDetail"
+            @click="confirmPublish"
+          >
+            确认发布
+          </n-button>
+        </n-space>
+      </template>
     </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { h } from 'vue';
-import {
-  NTag, NButton, type DataTableColumns, NIcon, type TagProps
-} from 'naive-ui';
-import {
-  MegaphoneOutline, EyeOutline, PersonOutline, TimeOutline,
-  SchoolOutline, BriefcaseOutline, SearchOutline
-} from '@vicons/ionicons5';
-import { useNotice, type SystemNotice, type UserRole } from '@/composables/admin/useNotice';
+import { computed, h, onMounted } from 'vue';
+import { NButton, NSpace, NTag, useDialog, type DataTableColumns } from 'naive-ui';
+import { formatFullTime } from '@/composables/useTime';
+import { useNotice } from '@/composables/admin/useNotice';
+import type { NoticeListVo } from '@/utils/api';
+
+const dialog = useDialog();
 
 const {
-  loading, showModal, showStudentModal, showStaffModal, showDetailModal,
-  noticeList, formModel, broadcastState, studentState, staffState, studentTransferOptions,
-  currentDetail,
-  fetchMajors, fetchClasses, fetchStudents, fetchStaffList,
-  openCreateModal, openStudentModal, openStaffModal,
-  confirmAddStudents, confirmAddStaff, removeUserTag,
-  handleSubmit, openDetailModal, formatFullTime
+  listLoading,
+  detailLoading,
+  saving,
+  publishing,
+  deleting,
+  listError,
+  notices,
+  totalCount,
+  currentPage,
+  pageSize,
+  searchForm,
+  showModal,
+  modalMode,
+  form,
+  fetchNotices,
+  handleSearch,
+  handleReset,
+  handlePageChange,
+  handlePageSizeChange,
+  openCreateModal,
+  openDetailModal,
+  closeModal,
+  handleModalShowChange,
+  collegeOptions,
+  gradeOptions,
+  selectedCollegeId,
+  selectedGrade,
+  userSearching,
+  userPickerOptions,
+  classPickerOptions,
+  loadColleges,
+  handleUserSearch,
+  handleCollegeChange,
+  handleGradeChange,
+  handleTargetTypeChange,
+  handleSubmit,
+  showPublishModal,
+  publishDetail,
+  openPublishConfirm,
+  closePublishModal,
+  handlePublishShowChange,
+  confirmPublish,
+  handleDelete,
 } = useNotice();
 
-const pagination = { pageSize: 10 };
-
-const typeOptions = [
-  { label: '系统通知', value: 'SYSTEM' },
-  { label: '紧急通知', value: 'URGENT' },
-  { label: '活动通知', value: 'ACTIVITY' },
-  { label: '教务通知', value: 'ACADEMIC' }
+const statusOptions = [
+  { label: '草稿', value: 'DRAFT' },
+  { label: '已发布', value: 'PUBLISHED' },
 ];
 
-const getRoleColor = (role: UserRole): TagProps['type'] => {
-  switch (role) {
-    case 'STUDENT': return 'info';
-    case 'TA': return 'warning';
-    case 'TEACHER': return 'success';
-    case 'ADMIN': return 'error';
-    default: return 'default';
-  }
-}
+const modalTitle = computed(() => {
+  if (modalMode.value === 'view') return '通知详情';
+  return modalMode.value === 'create' ? '新建通知草稿' : '编辑通知草稿';
+});
 
-const getTypeTag = (type: string) => {
-  switch (type) {
-    case 'URGENT': return 'error';
-    case 'SYSTEM': return 'info';
-    case 'ACADEMIC': return 'warning';
-    default: return 'success';
-  }
+const statusText = (status: string | null) => (status === 'PUBLISHED' ? '已发布' : '草稿');
+
+const handleDeleteConfirm = (row: NoticeListVo) => {
+  dialog.warning({
+    title: '删除通知管理记录',
+    content: '只删除通知管理记录，不会撤回已投递到用户收件箱的消息。确认删除？',
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: () => handleDelete(row),
+  });
 };
 
-const columns: DataTableColumns<SystemNotice> = [
-  { title: '序号', key: 'index', width: 60, render: (_, i) => i + 1 },
-  { title: '标题', key: 'title', width: 250, ellipsis: { tooltip: true } },
-  { title: '类型', key: 'type', width: 100, render: (row) => h(NTag, { size: 'small', bordered: false, type: getTypeTag(row.type) }, () => row.type) },
-  { title: '接收对象', key: 'targetSummary', width: 220, ellipsis: { tooltip: true } },
-  { title: '发布者', key: 'publisher', width: 100 },
-  { title: '发布时间', key: 'publishTime', width: 160, render: (row) => formatFullTime(row.publishTime) },
+const columns: DataTableColumns<NoticeListVo> = [
+  { title: '标题', key: 'title', minWidth: 200, className: 'cell-wrap' },
   {
-    title: '操作', key: 'actions', width: 100, fixed: 'right',
-    render(row) {
-      return h(NButton, {
-        size: 'tiny', secondary: true, type: 'primary',
-        onClick: () => openDetailModal(row)
-      }, { icon: () => h(EyeOutline), default: () => '详情' });
-    }
-  }
+    title: '目标类型',
+    key: 'targetType',
+    width: 110,
+    render: (row) => (row.targetType === 'CLASSES' ? '班级' : '指定用户'),
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 100,
+    render: (row) =>
+      h(
+        NTag,
+        {
+          size: 'small',
+          type: row.status === 'PUBLISHED' ? 'success' : 'warning',
+          bordered: false,
+        },
+        () => statusText(row.status),
+      ),
+  },
+  {
+    title: '发布时间',
+    key: 'publishedAt',
+    width: 170,
+    render: (row) => (row.publishedAt ? formatFullTime(row.publishedAt) : '-'),
+  },
+  {
+    title: '创建时间',
+    key: 'gmtCreate',
+    width: 170,
+    render: (row) => formatFullTime(row.gmtCreate),
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 220,
+    fixed: 'right',
+    render: (row) =>
+      h(NSpace, { size: 4 }, {
+        default: () => {
+          const buttons = [
+            h(
+              NButton,
+              {
+                size: 'tiny',
+                secondary: true,
+                onClick: () => void openDetailModal(row),
+              },
+              { default: () => (row.status === 'PUBLISHED' ? '查看' : '编辑') },
+            ),
+          ];
+          if (row.status !== 'PUBLISHED') {
+            buttons.push(
+              h(
+                NButton,
+                {
+                  size: 'tiny',
+                  type: 'primary',
+                  secondary: true,
+                  disabled: publishing.value,
+                  onClick: () => void openPublishConfirm(row),
+                },
+                { default: () => '发布' },
+              ),
+            );
+          }
+          buttons.push(
+            h(
+              NButton,
+              {
+                size: 'tiny',
+                type: 'error',
+                secondary: true,
+                disabled: deleting.value,
+                onClick: () => handleDeleteConfirm(row),
+              },
+              { default: () => '删除' },
+            ),
+          );
+          return buttons;
+        },
+      }),
+  },
 ];
+
+onMounted(() => {
+  void fetchNotices();
+  void loadColleges();
+});
 </script>
 
 <style scoped lang="less">
-.detail-content {
-  :deep(.github-markdown-body) {
-    padding: 0 !important; 
+.notice-page {
+  :deep(.n-card) {
+    width: 100%;
   }
 }
-
-.modal-body-layout {
+.search-bar {
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.pagination-wrapper {
   display: flex;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
-
-.left-panel {
-  width: 420px;
-  border-right: 1px solid #eee;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.panel-scroll-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-}
-
-.right-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  background-color: #f9f9f9;
-  overflow: hidden;
-}
-
-.editor-header {
-  font-weight: bold;
-  margin-bottom: 8px;
-  color: #333;
-  flex-shrink: 0;
-}
-
-.editor-wrapper {
-  flex: 1;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.dynamic-selection-area {
-  background-color: #fafafc;
-  border: 1px solid #eee;
-  padding: 12px;
-  border-radius: 4px;
-  min-height: 100px;
-}
-
-.scrollable-checkbox-group {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 4px;
-  background: #fff;
-  border-radius: 4px;
-  border: 1px solid #f0f0f0;
-}
-
-.user-tags-wrapper {
-  margin-top: 8px;
-  max-height: 150px;
-  overflow-y: auto;
-}
-
-.modal-footer {
-  padding: 16px 24px;
-  border-top: 1px solid #eee;
-  background: #fff;
-  flex-shrink: 0;
-  z-index: 10;
-}
-
-.staff-select-box {
-  height: 350px;
-  overflow-y: auto;
-  border: 1px solid #eee;
-  padding: 16px;
-  border-radius: 4px;
-  background: #fafafc;
-}
-
-.mb-2 {
-  margin-bottom: 8px;
-}
-
-.text-gray {
-  color: #999;
-  font-size: 12px;
-}
-
-// 详情页样式
-.detail-header {
-  .detail-title {
-    margin: 0 0 8px 0;
-    display: flex;
-    align-items: center;
-  }
-
-  .detail-meta {
-    font-size: 13px;
-    color: #999;
-    display: flex;
-    gap: 16px;
-
-    span {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-  }
-}
-
-.detail-target-section {
-  .label {
-    font-weight: bold;
-    color: #666;
-    font-size: 14px;
-  }
-
-  .target-list-box {
-    background: #f5f7fa;
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #eee;
-  }
+:deep(.cell-wrap) {
+  white-space: normal;
+  word-break: break-word;
 }
 </style>

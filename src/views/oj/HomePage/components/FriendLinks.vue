@@ -55,8 +55,8 @@
 import { LinkOutline as LinkIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 
-// TODO: 占位链接，后续替换为真实链接
-const placeholderUrl = "https://whatcanisay.man";
+// 无真实地址的链接保持占位（静态外链，不做假后端调用）
+const placeholderUrl = '#';
 const labResources = ['GitLab仓库', 'Alist云盘', 'AutoDL', 'PVE', 'NAS', 'ChatGPT', '打印机驱动'];
 </script>
 

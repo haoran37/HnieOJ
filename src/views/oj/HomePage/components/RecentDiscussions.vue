@@ -17,6 +17,12 @@
     </template>
     
     <n-spin :show="loading">
+      <n-alert v-if="error" type="error" :bordered="false" size="small" style="margin-bottom: 8px">
+        {{ error }}
+        <n-button size="tiny" secondary type="error" style="margin-left: 8px" @click="fetchDiscussions">
+          重试
+        </n-button>
+      </n-alert>
       <div class="discussion-list-container">
         <template v-if="displayList.length > 0">
           <DiscussionItem 
@@ -65,12 +71,10 @@ import { ChatboxEllipsesOutline as ChatIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 import DiscussionItem from '@/components/DiscussionItem.vue';
 import { useDiscussList } from '@/composables/oj/useDiscussList';
-import { useMessage } from 'naive-ui';
-
 const router = useRouter();
-const message = useMessage()
 const { 
   loading, 
+  error,
   displayList, 
   total, 
   page, 
@@ -85,28 +89,25 @@ const handleDetailOpen = (item: any) => {
   router.push(`/discuss/${item.id}`)
 };
 
-const handleUserJump = (username: string) => {
-  //TODO: 实现根据username查询id的api
-  message.info(`查看用户: ${username}`);
-  message.warning('TODO: 实现根据username查询id的api');
-  router.push(`/user/${username}`);
+// DiscussionItem 现在回传 uid
+const handleUserJump = (uid: string) => {
+  if (!uid) return;
+  router.push(`/user/${uid}`);
 };
 
 const handleProblemJump = (id: string | number) => {
   router.push(`/problem/${id}`);
 };
 
-// 类型过滤 (点击分类标签时，跳转到讨论列表页并筛选)
+// 类型过滤：携带真实分类参数跳转到讨论列表页
 const handleCategoryFilter = (cat: 'Site' | 'Problem') => {
-  console.log('交互：跳转到讨论页并筛选:', cat);
-  //TODO: 这里可以带参数跳转，例如 router.push({ path: '/discuss', query: { category: cat } })
-  // 目前先简单跳转
-  router.push('/discuss');
+  router.push({ path: '/discuss', query: { category: cat } });
 };
 
 const handleSizeChange = (size: number) => {
   pageSize.value = size;
-  page.value = 1; 
+  page.value = 1;
+  void fetchDiscussions();
 };
 
 onMounted(() => {

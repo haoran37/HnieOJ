@@ -16,6 +16,12 @@
       </n-button>
     </template>
 
+    <n-alert v-if="error" type="error" :bordered="false" size="small" style="margin-bottom: 8px">
+      {{ error }}
+      <n-button size="tiny" secondary type="error" style="margin-left: 8px" @click="fetchNews()">
+        重试
+      </n-button>
+    </n-alert>
     <n-data-table 
       class="custom-announcement-table"
       :bordered="false"
@@ -37,7 +43,7 @@ import BoardCard from '@/components/BoardCard.vue';
 import { useNewsList } from '@/composables/oj/useNewsList';
 
 const router = useRouter();
-const { loading, newsList, total, page, pageSize, fetchNews, handlePageChange } = useNewsList();
+const { loading, error, newsList, total, page, pageSize, fetchNews, handlePageChange } = useNewsList();
 
 pageSize.value = 3;
 

@@ -6,13 +6,19 @@
 
     <n-spin :show="loading">
       <div class="contests-content">
+        <n-alert v-if="error" type="error" :bordered="false" size="small" style="margin-bottom: 8px">
+          {{ error }}
+          <n-button size="tiny" secondary type="error" style="margin-left: 8px" @click="fetchContest">
+            重试
+          </n-button>
+        </n-alert>
         <ContestItem 
           v-if="contest" 
           v-bind="contest" 
           :compact="true"
           @click="handleJump"
         />
-        <n-empty v-else description="暂无近期比赛" />
+        <n-empty v-else-if="!error" description="暂无近期比赛" />
       </div>
     </n-spin>
 
@@ -30,27 +36,45 @@ import { useRouter } from 'vue-router';
 import { TrophyOutline as TrophyIcon } from '@vicons/ionicons5';
 import BoardCard from '@/components/BoardCard.vue';
 import ContestItem from '@/components/ContestItem.vue';
+import { getContests } from '@/utils/api';
 
 const router = useRouter();
 const loading = ref(false);
-const contest = ref<any>(null);
+const error = ref<string | null>(null);
+const contest = ref<{
+  id: string;
+  title: string;
+  tags: string[];
+  source: string;
+  beginTime: string;
+  endTime: string;
+  problemCount: number;
+} | null>(null);
 
+// 真实读取最近一场比赛（后端 /api/contests 按创建顺序分页）
 const fetchContest = async () => {
   loading.value = true;
-  
-  // TODO: 从后端获取最新的一场比赛数据
-  setTimeout(() => {
-    contest.value = {
-      id: '1024',
-      title: '第二十届湖南省大学生程序设计竞赛',
-      tags: ['省赛', 'ICPC', '团队赛'], // 字符串数组
-      source: 'HNCPC 组委会',
-      beginTime: '2026-01-05T09:00:00',
-      endTime: '2026-01-05T14:00:00',
-      participantCount: 1250 // 报名人数
-    };
+  error.value = null;
+  try {
+    const result = await getContests(1, 1);
+    const vo = result?.list?.[0];
+    contest.value = vo
+      ? {
+          id: String(vo.id),
+          title: vo.title,
+          tags: vo.customTags ?? [],
+          source: vo.source ?? '',
+          beginTime: vo.startTime ?? '',
+          endTime: vo.endTime ?? '',
+          problemCount: vo.problemCount ?? 0,
+        }
+      : null;
+  } catch (err) {
+    contest.value = null;
+    error.value = err instanceof Error ? err.message : '近期比赛加载失败';
+  } finally {
     loading.value = false;
-  }, 500);
+  }
 };
 
 const handleJump = () => {

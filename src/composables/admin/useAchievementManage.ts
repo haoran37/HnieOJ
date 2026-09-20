@@ -1,18 +1,49 @@
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive } from 'vue';
 import { useMessage, useDialog } from 'naive-ui';
+import {
+  approveAchievement,
+  downloadAchievementApplyFile,
+  getAdminAchievements,
+  getColleges,
+  rejectAchievement,
+  type AchievementApplyAdminVo,
+} from '@/utils/api';
+import { saveBlob } from '@/utils/download';
+
+export const ACHIEVEMENT_STATUS = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+} as const;
 
 export interface AchievementApplication {
-  id: string;
+  id: number;
   uid: string;
   username: string;
-  college: string;
-  class: string;
   title: string;
-  fileUrl: string;
-  fileType: 'image' | 'pdf';
+  status: string;
   description: string;
-  status: 'pending' | 'approved' | 'rejected';
+  fileUrl: string;
   submitTime: number;
+}
+
+/** 外部附件仅接受 http(s)；本地存储返回的是受保护下载路径，不能当作链接/代理地址 */
+export function isExternalFile(fileUrl: string | null | undefined): boolean {
+  return /^https?:\/\//i.test((fileUrl ?? '').trim());
+}
+
+/** 后端 AchievementApplyAdminVo -> 页面行 */
+export function toAchievementApplication(vo: AchievementApplyAdminVo): AchievementApplication {
+  return {
+    id: vo.id,
+    uid: vo.uid,
+    username: vo.username ?? '',
+    title: vo.title,
+    status: vo.status ?? ACHIEVEMENT_STATUS.PENDING,
+    description: vo.description ?? '',
+    fileUrl: vo.fileUrl ?? '',
+    submitTime: vo.submitTime ?? 0,
+  };
 }
 
 export function useAchievementManage() {
@@ -21,116 +52,113 @@ export function useAchievementManage() {
 
   const loading = ref(false);
   const submitting = ref(false);
-  const selectedIds = ref<string[]>([]);
   const showRejectModal = ref(false);
   const rejectReason = ref('');
-  const currentRejectId = ref<string | null>(null);
+  const currentRejectId = ref<number | null>(null);
 
-  const showFileModal = ref(false);
-  const previewFileUrl = ref('');
-  const previewFileType = ref<'image' | 'pdf'>('image');
+  const showDetailModal = ref(false);
+  const detailRow = ref<AchievementApplication | null>(null);
 
   const filters = reactive({
     keyword: '',
     status: null as string | null,
-    college: null as string | null
+    collegeId: null as number | null,
   });
+
+  const list = ref<AchievementApplication[]>([]);
 
   const pagination = reactive({
     page: 1,
     pageSize: 10,
+    itemCount: 0,
     showSizePicker: true,
     pageSizes: [10, 20, 50],
     onChange: (page: number) => {
       pagination.page = page;
+      void fetchList();
     },
     onUpdatePageSize: (pageSize: number) => {
       pagination.pageSize = pageSize;
       pagination.page = 1;
-    }
+      void fetchList();
+    },
   });
-
-  // Mock 数据
-  const list = ref<AchievementApplication[]>([
-    {
-      id: '1',
-      uid: '202202050231',
-      username: 'student01',
-      college: '信息科学与工程学院',
-      class: '计算机2202',
-      title: '第十四届蓝桥杯全国软件和信息技术专业人才大赛省赛一等奖',
-      fileUrl: 'https://via.placeholder.com/800x600.png?text=Certificate',
-      fileType: 'image',
-      description: 'Java软件开发大学B组',
-      status: 'pending',
-      submitTime: Date.now() - 3600000
-    },
-    {
-      id: '2',
-      uid: '202202050232',
-      username: 'student02',
-      college: '信息科学与工程学院',
-      class: '软件2201',
-      title: '2023年全国大学生计算机设计大赛国赛二等奖',
-      fileUrl: 'https://via.placeholder.com/800x600.png?text=Certificate2',
-      fileType: 'image',
-      description: 'Web应用开发',
-      status: 'approved',
-      submitTime: Date.now() - 86400000
-    },
-    {
-      id: '3',
-      uid: '202202050233',
-      username: 'student03',
-      college: '电气工程学院',
-      class: '电气2201',
-      title: '校级奖学金',
-      fileUrl: '',
-      fileType: 'pdf',
-      description: '2022-2023学年一等奖学金',
-      status: 'rejected',
-      submitTime: Date.now() - 86400000 * 2
-    }
-  ]);
 
   const statusOptions = [
-    { label: '待处理', value: 'pending' },
-    { label: '通过', value: 'approved' },
-    { label: '打回', value: 'rejected' }
+    { label: '待处理', value: ACHIEVEMENT_STATUS.PENDING },
+    { label: '通过', value: ACHIEVEMENT_STATUS.APPROVED },
+    { label: '打回', value: ACHIEVEMENT_STATUS.REJECTED },
   ];
 
-  const collegeOptions = [
-    { label: '信息科学与工程学院', value: '信息科学与工程学院' },
-    { label: '电气工程学院', value: '电气工程学院' },
-    { label: '机械工程学院', value: '机械工程学院' }
-  ];
+  const collegeOptions = ref<Array<{ label: string; value: number }>>([]);
 
-  const filteredList = computed(() => {
-    return list.value.filter(item => {
-      if (filters.keyword) {
-        const kw = filters.keyword.toLowerCase();
-        if (!item.username.toLowerCase().includes(kw) && 
-            !item.uid.includes(kw) && 
-            !item.title.toLowerCase().includes(kw)) {
-          return false;
-        }
-      }
-      if (filters.status && item.status !== filters.status) return false;
-      if (filters.college && item.college !== filters.college) return false;
-      return true;
-    });
-  });
+  const fetchColleges = async () => {
+    try {
+      const colleges = (await getColleges()) ?? [];
+      collegeOptions.value = colleges.map((c) => ({ label: c.name, value: c.id }));
+    } catch (err) {
+      collegeOptions.value = [];
+      message.error(err instanceof Error ? err.message : '加载学院列表失败');
+    }
+  };
+
+  const fetchList = async () => {
+    loading.value = true;
+    try {
+      const data = await getAdminAchievements(pagination.page, pagination.pageSize, {
+        keyword: filters.keyword,
+        status: filters.status ?? undefined,
+        collegeId: filters.collegeId,
+      });
+      list.value = (data?.list ?? []).map(toAchievementApplication);
+      pagination.itemCount = data?.total ?? 0;
+    } catch (err) {
+      list.value = [];
+      pagination.itemCount = 0;
+      message.error(err instanceof Error ? err.message : '加载成就申请失败');
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const handleSearch = () => {
+    pagination.page = 1;
+    void fetchList();
+  };
 
   const resetFilters = () => {
     filters.keyword = '';
     filters.status = null;
-    filters.college = null;
+    filters.collegeId = null;
+    pagination.page = 1;
+    void fetchList();
   };
 
-  const handlePreview = (row: AchievementApplication) => {
-    previewFileUrl.value = row.fileUrl;
-    previewFileType.value = row.fileType;
-    showFileModal.value = true;
+  const openDetailModal = (row: AchievementApplication) => {
+    detailRow.value = row;
+    showDetailModal.value = true;
+  };
+
+  // 本地附件必须携带 Bearer 通过下载接口获取 Blob
+  const handleDownloadFile = async (row: AchievementApplication) => {
+    if (!row.fileUrl) {
+      message.warning('该申请没有附件');
+      return;
+    }
+    if (isExternalFile(row.fileUrl)) {
+      window.open(row.fileUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    submitting.value = true;
+    try {
+      const blob = await downloadAchievementApplyFile(row.id);
+      saveBlob(blob, `achievement-${row.id}.bin`);
+      message.success('附件已下载');
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '附件下载失败');
+    } finally {
+      submitting.value = false;
+    }
   };
 
   const handleApprove = (row: AchievementApplication) => {
@@ -139,12 +167,18 @@ export function useAchievementManage() {
       content: `确定要通过 "${row.username}" 的 "${row.title}" 申请吗？`,
       positiveText: '确定',
       negativeText: '取消',
-      onPositiveClick: () => {
-        // TODO: API call
-        console.log('Approve:', row.id);
-        row.status = 'approved';
-        message.success('已通过');
-      }
+      onPositiveClick: async () => {
+        submitting.value = true;
+        try {
+          await approveAchievement(row.id);
+          message.success('已通过');
+          await fetchList();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : '通过成就申请失败');
+        } finally {
+          submitting.value = false;
+        }
+      },
     });
   };
 
@@ -154,69 +188,46 @@ export function useAchievementManage() {
     showRejectModal.value = true;
   };
 
-  const handleRejectSubmit = () => {
-    if (!rejectReason.value) {
+  const handleRejectSubmit = async () => {
+    if (!rejectReason.value.trim()) {
       message.warning('请输入打回原因');
       return;
     }
+    if (currentRejectId.value === null) return;
     submitting.value = true;
-    
-    // TODO: API call
-    console.log('Reject:', currentRejectId.value, rejectReason.value);
-    
-    setTimeout(() => {
-      const item = list.value.find(i => i.id === currentRejectId.value);
-      if (item) {
-        item.status = 'rejected';
-      }
-      message.success('已打回，邮件已发送');
-      submitting.value = false;
+    try {
+      await rejectAchievement(currentRejectId.value, rejectReason.value.trim());
+      message.success('已打回');
       showRejectModal.value = false;
-    }, 500);
-  };
-
-  const handleBatchApprove = () => {
-    dialog.success({
-      title: '批量通过确认',
-      content: `确定要通过选中的 ${selectedIds.value.length} 个申请吗？`,
-      positiveText: '确定',
-      negativeText: '取消',
-      onPositiveClick: () => {
-        // TODO: API call
-        console.log('Batch Approve:', selectedIds.value);
-        
-        list.value.forEach(item => {
-          if (selectedIds.value.includes(item.id) && item.status === 'pending') {
-            item.status = 'approved';
-          }
-        });
-        
-        message.success(`已通过 ${selectedIds.value.length} 个申请`);
-        selectedIds.value = [];
-      }
-    });
+      await fetchList();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '打回成就申请失败');
+    } finally {
+      submitting.value = false;
+    }
   };
 
   return {
     loading,
     submitting,
-    selectedIds,
-    showRejectModal,
-    rejectReason,
-    showFileModal,
-    previewFileUrl,
-    previewFileType,
+    list,
     filters,
     pagination,
-    list,
-    filteredList,
     statusOptions,
     collegeOptions,
+    showRejectModal,
+    rejectReason,
+    showDetailModal,
+    detailRow,
+    fetchColleges,
+    fetchList,
+    handleSearch,
     resetFilters,
-    handlePreview,
+    openDetailModal,
+    handleDownloadFile,
     handleApprove,
     openRejectModal,
     handleRejectSubmit,
-    handleBatchApprove
+    isExternalFile,
   };
 }

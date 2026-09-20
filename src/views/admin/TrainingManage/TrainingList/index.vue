@@ -11,22 +11,33 @@
         </div>
       </div>
 
-      <n-data-table
-        :columns="columns"
-        :data="tableData"
-        :loading="loading"
-        :pagination="pagination"
-        :scroll-x="1000"
-        @update:page="handlePageChange"
-        class="training-table"
-      />
+      <n-space vertical :size="16">
+        <n-input-group class="search-bar">
+          <n-input v-model:value="searchKeyword" placeholder="搜索题单..." @keyup.enter="handleSearch" />
+          <n-button type="primary" @click="handleSearch">搜索</n-button>
+        </n-input-group>
+
+        <n-data-table
+          remote
+          :columns="columns"
+          :data="tableData"
+          :loading="loading"
+          :pagination="pagination"
+          :scroll-x="1200"
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+          class="training-table"
+        />
+      </n-space>
     </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { AddOutline } from '@vicons/ionicons5';
+import { NButton, NCard, NDataTable, NInput, NInputGroup, NSpace } from 'naive-ui';
 import { useTrainingManage } from '@/composables/admin/useTrainingManage';
 
 const router = useRouter();
@@ -35,12 +46,16 @@ const {
   tableData,
   pagination,
   columns,
+  searchKeyword,
+  handleSearch,
   handlePageChange,
+  handlePageSizeChange,
   fetchTrainings
 } = useTrainingManage();
 
-// Initial fetch
-fetchTrainings();
+onMounted(() => {
+  fetchTrainings();
+});
 </script>
 
 <style scoped lang="less">
@@ -71,5 +86,9 @@ fetchTrainings();
     display: flex;
     align-items: center;
   }
+}
+
+.search-bar {
+  width: 300px;
 }
 </style>

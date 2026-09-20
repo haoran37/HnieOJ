@@ -1,7 +1,12 @@
 <template>
   <div class="training-edit-container">
     <n-card :bordered="false" title="编辑题单">
+      <n-alert v-if="detailError" type="error" class="detail-error" closable>
+        {{ detailError }}
+      </n-alert>
+      <div v-if="!loadedDetailId && !detailError" class="detail-loading">正在加载…</div>
       <n-form
+        v-if="loadedDetailId"
         ref="formRef"
         :model="formValue"
         label-placement="left"
@@ -14,9 +19,23 @@
         <n-form-item label="题单类型" path="type">
           <n-select v-model:value="formValue.type" :options="typeOptions" class="type-select" />
         </n-form-item>
+        <n-form-item label="访问权限" path="auth">
+          <n-select v-model:value="formValue.auth" :options="authOptions" class="type-select" />
+        </n-form-item>
+        <n-form-item v-if="formValue.auth === 'Private'" label="访问密码" path="privatePwd">
+          <n-input
+            v-model:value="formValue.privatePwd"
+            type="password"
+            show-password-on="click"
+            placeholder="私有题单必须设置访问密码"
+          />
+        </n-form-item>
+        <n-form-item label="排序" path="rank">
+          <n-input-number v-model:value="formValue.rank" :min="0" style="width: 200px" />
+        </n-form-item>
         <n-form-item label="题单状态" path="status">
           <n-switch v-model:value="formValue.status">
-            <template #checked>激活</template>
+            <template #checked>启用</template>
             <template #unchecked>关闭</template>
           </n-switch>
         </n-form-item>
@@ -30,14 +49,23 @@
           v-model:modelValue="problemInput"
           :problems="formValue.problems"
           :loading="loading"
+          display-id-mode="number"
           @add="handleAddProblem"
           @remove="handleRemoveProblem"
           @moveUp="handleMoveUp"
           @moveDown="handleMoveDown"
+          @updateDisplayId="handleUpdateDisplayId"
         />
 
         <div class="form-actions">
-          <n-button type="primary" @click="handleSubmit(true, route.params.id as string)" :loading="loading">保存</n-button>
+          <n-button
+            type="primary"
+            :loading="saving || detailLoading"
+            :disabled="!loadedDetailId"
+            @click="handleSubmit(true, route.params.id as string)"
+          >
+            保存
+          </n-button>
         </div>
       </n-form>
     </n-card>
@@ -45,9 +73,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { watch, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { NButton, NCard, NForm, NFormItem, NInput, NSelect, NSwitch, NDivider } from 'naive-ui';
+import { NButton, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NSwitch, NDivider, NAlert } from 'naive-ui';
 import { useTrainingForm } from '@/composables/admin/useTrainingManage';
 import ProblemConfig from '@/components/ProblemConfig.vue';
 
@@ -55,20 +83,38 @@ const route = useRoute();
 const {
   formValue,
   typeOptions,
+  authOptions,
   problemInput,
   loading,
+  saving,
+  loadedDetailId,
+  detailLoading,
+  detailError,
   handleAddProblem,
   handleRemoveProblem,
+  handleUpdateDisplayId,
   handleMoveUp,
   handleMoveDown,
   handleSubmit,
-  loadData
+  loadData,
+  reset
 } = useTrainingForm();
 
-onMounted(() => {
-  if (route.params.id) {
-    loadData(route.params.id as string);
-  }
+// 路由 id 变化时立即作废旧记录身份并按新 id 加载；无 id 时必须作废，避免退化成新增
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id) {
+      void loadData(id as string);
+    } else {
+      reset();
+    }
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  reset();
 });
 </script>
 
@@ -87,5 +133,15 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end; /* Right align */
   margin-top: 24px;
+}
+
+.detail-error {
+  margin-bottom: 16px;
+}
+
+.detail-loading {
+  padding: 48px 0;
+  text-align: center;
+  color: #999;
 }
 </style>

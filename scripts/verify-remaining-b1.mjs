@@ -121,7 +121,7 @@ const lastBody = () => JSON.parse(String(lastCall().init?.body));
 // 真实模块
 // --------------------------------------------------
 const api = await import(pathToFileURL(path.join(root, 'src/utils/api.ts')).href);
-const { useTags, toTagCategories } = await import(
+const { toTagCategories } = await import(
   pathToFileURL(path.join(root, 'src/composables/useTags.ts')).href
 );
 const { useTagManage } = await import(

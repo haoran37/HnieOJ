@@ -1,5 +1,8 @@
 <template>
   <div class="contest-problems-container">
+    <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">
+      {{ error }}
+    </n-alert>
     <div class="table-card">
       <n-data-table
         :columns="columns"
@@ -7,7 +10,7 @@
         :loading="loading"
         :row-key="(row: any) => row.id"
         :single-line="false"
-        :striped="true" 
+        :striped="true"
         class="problem-table"
       />
     </div>
@@ -15,20 +18,29 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { h, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useContestProblems } from '@/composables/oj/useContestProblems';
 import { useUserStore } from '@/stores/userStore';
 import { renderStatusIcon } from '@/utils/statusUtils';
+import type { ContestDetail } from '@/composables/oj/useContestDetail';
+import type { ContestProblemRow } from '@/composables/oj/useContestProblems';
 
-const route = useRoute();
+const props = defineProps<{ detail: ContestDetail }>();
+
 const router = useRouter();
 const userStore = useUserStore();
 
-const { loading, problems, fetchContestProblems, getProblemIndex } = useContestProblems();
+const { loading, error, problems, fetchContestProblems } = useContestProblems();
 
-const handleProblemClick = (pid: string) => {
-  router.push(`/problem/${pid}`);
+// 比赛题目内部 ID 已由 composable 经 checkProblem 换成展示编号，
+// 导航时带上 cid，提交会携带 contestId
+const handleProblemClick = (row: ContestProblemRow) => {
+  if (!row.problemCode) return;
+  router.push({
+    path: `/problem/${row.problemCode}`,
+    query: props.detail.id ? { cid: props.detail.id } : undefined,
+  });
 };
 
 const columns = [
@@ -37,61 +49,63 @@ const columns = [
     key: 'status',
     width: 80,
     align: 'center' as const,
-    render(row: any) {
-      return renderStatusIcon(userStore.getProblemStatus(row.id));
+    render(row: ContestProblemRow) {
+      return renderStatusIcon(userStore.getProblemStatus(row.problemCode));
     }
   },
   {
     title: '#',
-    key: 'index',
+    key: 'displayId',
     width: 80,
     align: 'center' as const,
-    render: (_: any, index: number) => h('span', { style: 'font-weight: bold; color: #333;' }, getProblemIndex(index))
+    render: (row: ContestProblemRow) =>
+      h('span', { style: 'font-weight: bold; color: #333;' }, row.displayId || '-')
   },
   {
     title: 'Title',
     key: 'title',
-    render(row: any) {
+    render(row: ContestProblemRow) {
       return h('a', {
-        style: { 
-          textDecoration: 'none', 
-          color: '#2080f0', 
-          fontWeight: '500', 
+        style: {
+          textDecoration: 'none',
+          color: '#2080f0',
+          fontWeight: '500',
           cursor: 'pointer',
           fontSize: '16px',
         },
         onClick: (e: MouseEvent) => {
           e.preventDefault();
-          handleProblemClick(row.id);
+          handleProblemClick(row);
         }
-      }, row.title);
+      }, row.title || row.problemCode || '-');
     }
   },
   {
-    title: 'Ratio (AC / Submit)',
-    key: 'ratio',
-    width: 200,
-    align: 'right' as const,
-    render(row: any) {
-      const ratio = row.submitted === 0 ? 0 : (row.accepted / row.submitted * 100).toFixed(1);
-      return `${ratio}% (${row.accepted} / ${row.submitted})`;
-    }
+    title: '编号',
+    key: 'problemCode',
+    width: 140,
+    align: 'center' as const,
+    render: (row: ContestProblemRow) => row.problemCode || '-'
   }
 ];
 
-onMounted(() => {
-  const cid = route.params.contestId as string;
-  fetchContestProblems(cid);
-});
+watch(
+  () => props.detail,
+  (detail) => {
+    if (detail?.id) {
+      void fetchContestProblems(detail.problems ?? []);
+    }
+  },
+  { immediate: true, deep: false },
+);
 </script>
 
 <style scoped lang="less">
 .contest-problems-container {
-  // 响应式边距：默认有点边距，大屏更宽
   width: 100%;
   box-sizing: border-box;
-  padding: 0 16px; 
-  
+  padding: 0 16px;
+
   @media (min-width: 1200px) {
     padding: 0 48px;
   }
@@ -104,7 +118,7 @@ onMounted(() => {
 
 :deep(.problem-table) {
   .n-data-table-th {
-    background-color: #fafafc; 
+    background-color: #fafafc;
     font-weight: bold;
     font-size: 15px;
     height: 48px;

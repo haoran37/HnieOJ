@@ -60,102 +60,49 @@
             :component="PeopleIcon"
             size="18"
           />
-          <span>{{ participantCount }}</span>
+          <span>{{ problemCount }} 题</span>
         </div>
-
-        <n-tooltip trigger="hover" v-if="showFollow">
-          <template #trigger>
-            <button
-              class="star-btn"
-              type="button"
-              :aria-label="isFollowed ? '取消关注比赛' : '关注比赛'"
-              @click.stop="handleToggleFollow"
-            >
-               <n-icon 
-                 size="18" 
-                 :component="isFollowed ? StarFilled : StarOutline" 
-                 :color="isFollowed ? '#f0a020' : '#999'" 
-               />
-            </button>
-          </template>
-          {{ isFollowed ? '点击取消关注' : '关注后会邮件通知您' }}
-        </n-tooltip>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { 
   TimeOutline as TimeIcon, 
-  PeopleOutline as PeopleIcon,
-  StarOutline,
-  Star as StarFilled
+  PeopleOutline as PeopleIcon
 } from '@vicons/ionicons5';
-import { useNotification } from 'naive-ui';
 import { useStatusTime } from '@/composables/useTime';
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
-import { useUserStore } from '@/stores/userStore';
 
 const props = withDefaults(defineProps<{
   title: string;
-  tags: string[];
+  tags?: string[];
   source: string;
   beginTime: string;
   endTime: string;
-  participantCount: number;
+  problemCount?: number;
   compact?: boolean; // 是否开启紧凑模式
-  showFollow?: boolean; // 是否开启关注按钮
 }>(), {
+  tags: () => [],
+  problemCount: 0,
   compact: false,
-  showFollow: true,
 });
 
 const emit = defineEmits<{
   (event: 'click'): void
 }>()
-const notification = useNotification();
-const userStore = useUserStore();
 
 const handleClick = () => {
   emit('click')
-}
-
-const isFollowed = ref(false);
-
-const handleToggleFollow = () => {
-  if (!userStore.isEmailBound) {
-    notification.error({
-      content: '关注失败',
-      meta: '您尚未绑定邮箱，无法接收比赛通知。请前往个人中心设置。',
-      duration: 3000,
-      keepAliveOnHover: true
-    });
-    return;
-  }
-
-  isFollowed.value = !isFollowed.value;
-
-  if (isFollowed.value) {
-    console.log('Event: Follow Contest Success');
-    notification.success({
-      content: '关注成功',
-      meta: '比赛开始前将通过邮件通知您',
-      duration: 2500
-    });
-  } else {
-    console.log('Event: Unfollow Contest');
-    notification.info({
-      content: '已取消关注',
-      duration: 2000
-    });
-  }
 };
 
+// 传入 getter 而非快照值：同一 ContestItem 实例被复用（如首页 RecentContests
+// 替换 contest 对象）时，props 变化必须重新计算状态，否则时间/状态停留在旧值。
 const { contestStatus, timeText } = useStatusTime(
-  props.beginTime,
-  props.endTime
+  () => props.beginTime,
+  () => props.endTime,
 );
 
 const statusStyle = computed(() => {

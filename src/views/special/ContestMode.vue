@@ -20,11 +20,11 @@
       <div class="status-group">
         <div class="status-item">
           <span class="status-dot"></span>
-          <span>Server_Online: {{ contestInfo.serverNode }}</span>
+          <span>Server_Online: 暂未开放</span>
         </div>
         
         <div class="latency-item">
-          LATENCY: <span class="latency-value">{{ contestInfo.latency }}</span>
+          LATENCY: <span class="latency-value">--</span>
         </div>
         
         <div class="status-divider"></div>
@@ -40,31 +40,12 @@
     <main class="main-content">
       <n-spin :show="loading">
         <div class="title-section">
-          <h1 class="main-title">{{ contestInfo.title }}</h1>
-          <p class="subtitle">
-            {{ contestInfo.subtitle }}
-          </p>
+          <h1 class="main-title">{{ unavailableMessage }}</h1>
+          <p class="subtitle">比赛模式相关信息暂未开放</p>
         </div>
 
         <div class="timer-section">
-          <div class="timer-display">
-            <div class="timer-block">
-              <span class="timer-value">{{ timeRemaining.hours }}</span>
-              <span class="timer-label">Hours</span>
-            </div>
-            <span class="timer-separator">:</span>
-            <div class="timer-block">
-              <span class="timer-value">{{ timeRemaining.minutes }}</span>
-              <span class="timer-label">Minutes</span>
-            </div>
-            <span class="timer-separator">:</span>
-            <div class="timer-block">
-              <span class="timer-value accent">{{ timeRemaining.seconds }}</span>
-              <span class="timer-label accent">Seconds</span>
-            </div>
-          </div>
-          
-          <p class="timer-footer">距离比赛开始仅剩</p>
+          <n-empty description="比赛模式暂未开放" />
         </div>
 
         <div class="action-section">
@@ -111,9 +92,9 @@
 <script setup lang="ts">
 import { useContestMode } from '@/composables/admin/useContestMode';
 import { ArrowForward } from '@vicons/ionicons5';
-import { NSpin, NIcon } from 'naive-ui';
+import { NSpin, NIcon, NEmpty } from 'naive-ui';
 
-const { contestInfo, loading, timeRemaining, systemTime } = useContestMode();
+const { loading, unavailableMessage, systemTime } = useContestMode();
 </script>
 
 <style lang="less" scoped>

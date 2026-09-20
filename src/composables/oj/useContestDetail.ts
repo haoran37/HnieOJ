@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue';
 import { useStatusTime, useTimer } from '@/composables/useTime';
+import { getContestDetail, type ContestProblemVo } from '@/utils/api';
 
 export interface ContestDetail {
   id: string;
@@ -9,30 +10,45 @@ export interface ContestDetail {
   type: string;
   creator: string;
   description: string;
+  status: string;
+  isPublic: boolean;
+  openRank: boolean;
+  problemCount: number;
+  problems: ContestProblemVo[];
 }
 
-export function useContestDetail() {
-  const loading = ref(false);
-  const detail = ref<ContestDetail>({
+function emptyDetail(): ContestDetail {
+  return {
     id: '',
     title: '',
     beginTime: '',
     endTime: '',
-    type: 'ACM',
+    type: '',
     creator: '',
-    description: ''
-  });
+    description: '',
+    status: '',
+    isPublic: true,
+    openRank: false,
+    problemCount: 0,
+    problems: [],
+  };
+}
+
+export function useContestDetail() {
+  const loading = ref(false);
+  const error = ref<string | null>(null);
+  const detail = ref<ContestDetail>(emptyDetail());
 
   const { now } = useTimer();
 
   const { contestStatus, timeText } = useStatusTime(
     () => detail.value.beginTime,
-    () => detail.value.endTime
+    () => detail.value.endTime,
   );
 
   const progressPercentage = computed(() => {
     if (!detail.value.beginTime || !detail.value.endTime) return 0;
-    
+
     const current = now.value.getTime();
     const start = new Date(detail.value.beginTime).getTime();
     const end = new Date(detail.value.endTime).getTime();
@@ -40,51 +56,51 @@ export function useContestDetail() {
 
     if (total <= 0) return 100; // 避免除以0
     const elapsed = current - start;
-    
+
     if (elapsed < 0) return 0;
     if (elapsed > total) return 100;
     return (elapsed / total) * 100;
   });
 
-  //TODO: 替换真实api
+  // 局部请求序号：异步路由切换时旧响应不得覆盖新比赛
+  let seq = 0;
   const fetchContestDetail = async (cid: string) => {
+    const current = ++seq;
     loading.value = true;
-    setTimeout(() => {
-      const nowTime = new Date();
-      const start = new Date(nowTime.getTime() + 3600);
-      const end = new Date(nowTime.getTime() + 3600 * 5);
-
+    error.value = null;
+    try {
+      const vo = await getContestDetail(cid);
+      if (current !== seq) return;
       detail.value = {
-        id: cid,
-        title: 'HNIE 2026 新年欢乐赛 (ACM Mode)',
-        beginTime: start.toISOString(),
-        endTime: end.toISOString(),
-        type: 'ACM',
-        creator: 'Admin',
-        description: `
-# 比赛规则
-
-1.  本场比赛为 **ACM 赛制**。
-2.  比赛期间请勿与他人交流代码。
-3.  提交错误会有 **20分钟** 罚时。
-
-## 奖励
-- Rank 1: 1000￥
-- Rank 2-3: 500￥
-- Rank 4-10: 100￥
-- Rank 11-20: 50￥
-        `
+        id: String(vo.id),
+        title: vo.title,
+        beginTime: vo.startTime ?? '',
+        endTime: vo.endTime ?? '',
+        type: vo.type ?? '',
+        creator: vo.author ?? '',
+        description: vo.description ?? '',
+        status: vo.status ?? '',
+        isPublic: (vo.auth ?? 'Public') !== 'Private',
+        openRank: vo.openRank ?? false,
+        problemCount: vo.problemCount ?? 0,
+        problems: vo.problems ?? [],
       };
-      loading.value = false;
-    }, 300);
+    } catch (err) {
+      if (current !== seq) return;
+      detail.value = emptyDetail();
+      error.value = err instanceof Error ? err.message : '比赛详情加载失败';
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
   return {
     loading,
+    error,
     detail,
     contestStatus,
     timeText,
     progressPercentage,
-    fetchContestDetail
+    fetchContestDetail,
   };
 }

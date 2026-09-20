@@ -4,57 +4,60 @@
     <div class="filter-header">
       <div 
         class="filter-card internal" 
-        :class="{ active: activeTab === 'INTERNAL' }"
+        :class="{ active: activeTab === 'ALL' }"
         role="button"
         tabindex="0"
-        @click="handleTabChange('INTERNAL')"
-        @keydown.enter="handleTabChange('INTERNAL')"
-        @keydown.space.prevent="handleTabChange('INTERNAL')"
+        @click="handleTabChange('ALL')"
+        @keydown.enter="handleTabChange('ALL')"
+        @keydown.space.prevent="handleTabChange('ALL')"
       >
         <div class="icon-box"><n-icon :component="SchoolIcon" /></div>
         <div class="text-box">
-          <div class="title">校内比赛</div>
-          <div class="desc">Official Contest</div>
+          <div class="title">全部比赛</div>
+          <div class="desc">All Contests</div>
         </div>
         <div class="bg-shape"></div>
       </div>
 
       <div 
         class="filter-card external" 
-        :class="{ active: activeTab === 'EXTERNAL' }"
+        :class="{ active: activeTab === 'ACM' }"
         role="button"
         tabindex="0"
-        @click="handleTabChange('EXTERNAL')"
-        @keydown.enter="handleTabChange('EXTERNAL')"
-        @keydown.space.prevent="handleTabChange('EXTERNAL')"
+        @click="handleTabChange('ACM')"
+        @keydown.enter="handleTabChange('ACM')"
+        @keydown.space.prevent="handleTabChange('ACM')"
       >
         <div class="icon-box"><n-icon :component="PlanetIcon" /></div>
         <div class="text-box">
-          <div class="title">校外比赛</div>
-          <div class="desc">External OJ</div>
+          <div class="title">ACM 赛制</div>
+          <div class="desc">ACM</div>
         </div>
         <div class="bg-shape"></div>
       </div>
 
       <div 
         class="filter-card user" 
-        :class="{ active: activeTab === 'USER' }"
+        :class="{ active: activeTab === 'OI' }"
         role="button"
         tabindex="0"
-        @click="handleTabChange('USER')"
-        @keydown.enter="handleTabChange('USER')"
-        @keydown.space.prevent="handleTabChange('USER')"
+        @click="handleTabChange('OI')"
+        @keydown.enter="handleTabChange('OI')"
+        @keydown.space.prevent="handleTabChange('OI')"
       >
         <div class="icon-box"><n-icon :component="PersonIcon" /></div>
         <div class="text-box">
-          <div class="title">自主创建赛</div>
-          <div class="desc">User Created</div>
+          <div class="title">OI 赛制</div>
+          <div class="desc">OI</div>
         </div>
         <div class="bg-shape"></div>
       </div>
     </div>
 
     <div class="list-wrapper">
+      <n-alert v-if="error" type="error" :bordered="false" style="margin-bottom: 12px">
+        {{ error }}
+      </n-alert>
       <n-spin :show="loading">
         <div class="contest-grid">
           <template v-if="contestList.length > 0">
@@ -66,7 +69,7 @@
               :source="contest.source"
               :begin-time="contest.beginTime"
               :end-time="contest.endTime"
-              :participant-count="contest.participantCount"
+              :problem-count="contest.problemCount"
               :compact="false"
               @click="handleItemClick(contest.id)"
             />
@@ -78,7 +81,7 @@
       <div class="pagination-footer">
         <n-pagination
           v-model:page="page"
-          :page-count="Math.ceil(total / 10)"
+          :page-count="Math.ceil(total / pageSize)"
           size="large"
           @update:page="handlePageChange"
         />
@@ -100,9 +103,9 @@ import ContestItem from '@/components/ContestItem.vue';
 import { useContests } from '@/composables/oj/useContests';
 
 const router = useRouter();
-const { 
-  loading, activeTab, page, total, contestList,
-  fetchContests, handleTabChange, handlePageChange 
+const {
+  loading, error, activeTab, page, pageSize, total, contestList,
+  fetchContests, handleTabChange, handlePageChange
 } = useContests();
 
 const handleItemClick = (id: string) => {

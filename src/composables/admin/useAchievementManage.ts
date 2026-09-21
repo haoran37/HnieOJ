@@ -52,6 +52,8 @@ export function useAchievementManage() {
 
   const loading = ref(false);
   const submitting = ref(false);
+  // 审批等不可逆写操作的独立在途状态：与附件下载的 submitting 分离
+  const mutating = ref(false);
   const showRejectModal = ref(false);
   const rejectReason = ref('');
   const currentRejectId = ref<number | null>(null);
@@ -182,9 +184,10 @@ export function useAchievementManage() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起审批请求
-        if (submitting.value) return;
-        submitting.value = true;
+        // 双击确认按钮不得重复发起审批请求；使用独立 mutation 状态，
+        // 不复用附件下载的 submitting，否则下载中确认审批会被静默拦截
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await approveAchievement(row.id);
           message.success('已通过');
@@ -192,7 +195,7 @@ export function useAchievementManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '通过成就申请失败');
         } finally {
-          submitting.value = false;
+          mutating.value = false;
         }
       },
     });

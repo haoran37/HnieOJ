@@ -1,4 +1,4 @@
-import { ref, reactive } from 'vue';
+import { ref, reactive, watch } from 'vue';
 import { useMessage, useDialog } from 'naive-ui';
 import {
   batchRevokePermissions,
@@ -64,6 +64,8 @@ export function usePermissionManage() {
   const loading = ref(false);
   const searchLoading = ref(false);
   const submitting = ref(false);
+  // 不可逆写操作的独立在途状态：与列表 loading 分离，避免「列表读取中确认删除」被静默拦截
+  const mutating = ref(false);
 
   // 模态框状态
   const showAddModal = ref(false);
@@ -180,7 +182,18 @@ export function usePermissionManage() {
   };
 
   // 打开添加模态框（不自动搜索，避免空 query 触发后端 400）
+  // 弹窗关闭即作废在途搜索并复位加载态：旧响应不得落到下一次打开的空查询弹窗上
+  watch(showAddModal, (visible) => {
+    if (!visible) {
+      ++searchSeq;
+      searchLoading.value = false;
+    }
+  });
+
   const openAddModal = () => {
+    // 重开必须作废上一次搜索：否则关闭前的 alice 结果会在新的空查询弹窗里显示出来
+    ++searchSeq;
+    searchLoading.value = false;
     searchQuery.value = '';
     searchResultList.value = [];
     searchPagination.page = 1;
@@ -249,9 +262,9 @@ export function usePermissionManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起不可逆请求
-        if (loading.value) return;
-        loading.value = true;
+        // 双击确认按钮不得重复发起不可逆请求；使用独立 mutation 状态而非列表 loading
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await revokeUserPermission(user.uid);
           message.success('权限已删除，用户回归 STUDENT 身份');
@@ -259,7 +272,7 @@ export function usePermissionManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '权限删除失败');
         } finally {
-          loading.value = false;
+          mutating.value = false;
         }
       },
     });
@@ -278,9 +291,9 @@ export function usePermissionManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起不可逆请求
-        if (loading.value) return;
-        loading.value = true;
+        // 双击确认按钮不得重复发起不可逆请求；使用独立 mutation 状态而非列表 loading
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await batchRevokePermissions([...selectedUserIds.value]);
           selectedUserIds.value = [];
@@ -289,7 +302,7 @@ export function usePermissionManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '批量删除权限失败');
         } finally {
-          loading.value = false;
+          mutating.value = false;
         }
       },
     });

@@ -133,7 +133,10 @@ export function useNotice() {
 
   const openCreateModal = () => {
     if (saving.value || publishing.value) return;
+    // 作废在途详情，并同步清掉它的加载态：旧请求的 finally 因序号过期不会再清理，
+    // 否则「详情加载中 → 新建」会停在 detailLoading=true，新建弹窗无法操作
     ++detailSeq;
+    detailLoading.value = false;
     resetForm();
     modalMode.value = 'create';
     showModal.value = true;
@@ -165,6 +168,7 @@ export function useNotice() {
     // 保存/发布期间禁止关闭，避免在途结果写入或关闭新表单
     if (saving.value || publishing.value) return;
     ++detailSeq;
+    detailLoading.value = false;
     showModal.value = false;
   };
 

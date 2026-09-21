@@ -89,6 +89,9 @@ export function useUserManage() {
 
   const loading = ref(false);
   const submitting = ref(false);
+  // 不可逆写操作的独立在途状态：与列表 loading 分离，避免「列表读取中确认删除」被静默拦截，
+  // 也避免列表请求结束清除写操作的加载态。
+  const mutating = ref(false);
   const checking = ref(false);
 
   // 模态框状态
@@ -591,9 +594,9 @@ export function useUserManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起不可逆请求
-        if (loading.value) return;
-        loading.value = true;
+        // 双击确认按钮不得重复发起不可逆请求；使用独立 mutation 状态而非列表 loading
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await deleteUser(user.uid);
           message.success('用户已删除');
@@ -601,7 +604,7 @@ export function useUserManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '删除用户失败');
         } finally {
-          loading.value = false;
+          mutating.value = false;
         }
       },
     });
@@ -619,9 +622,9 @@ export function useUserManage() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起不可逆请求
-        if (loading.value) return;
-        loading.value = true;
+        // 双击确认按钮不得重复发起不可逆请求；使用独立 mutation 状态而非列表 loading
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await batchDisableUsers(uids);
           message.success(`已禁用 ${uids.length} 个用户`);
@@ -630,7 +633,7 @@ export function useUserManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '批量禁用失败');
         } finally {
-          loading.value = false;
+          mutating.value = false;
         }
       },
     });
@@ -648,9 +651,9 @@ export function useUserManage() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起不可逆请求
-        if (loading.value) return;
-        loading.value = true;
+        // 双击确认按钮不得重复发起不可逆请求；使用独立 mutation 状态而非列表 loading
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await batchEnableUsers(uids);
           message.success(`已激活 ${uids.length} 个用户`);
@@ -659,7 +662,7 @@ export function useUserManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '批量激活失败');
         } finally {
-          loading.value = false;
+          mutating.value = false;
         }
       },
     });
@@ -677,9 +680,9 @@ export function useUserManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起不可逆请求
-        if (loading.value) return;
-        loading.value = true;
+        // 双击确认按钮不得重复发起不可逆请求；使用独立 mutation 状态而非列表 loading
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await batchDeleteUsers(uids);
           message.success(`已删除 ${uids.length} 个用户`);
@@ -688,7 +691,7 @@ export function useUserManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '批量删除失败');
         } finally {
-          loading.value = false;
+          mutating.value = false;
         }
       },
     });
@@ -832,8 +835,8 @@ export function useUserManage() {
       negativeText: '取消',
       onPositiveClick: async () => {
         // 双击确认按钮不得重复发起删除请求
-        if (submitting.value) return;
-        submitting.value = true;
+        if (mutating.value) return false;
+        mutating.value = true;
         try {
           await deleteUserAchievement(achievementForm.uid, id);
           message.success('成就删除成功');
@@ -841,7 +844,7 @@ export function useUserManage() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : '删除成就失败');
         } finally {
-          submitting.value = false;
+          mutating.value = false;
         }
       },
     });

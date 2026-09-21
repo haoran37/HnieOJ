@@ -10,6 +10,7 @@ import {
   getAdminHomeworkDetail,
   getAdminHomeworks,
   getClasses,
+  getClassesByIds,
   getColleges,
   getGrades,
   updateAdminHomework,
@@ -332,28 +333,14 @@ export function useHomeworkForm() {
     })();
   };
 
-  /** 依据已选班级 id 反查名称（后端无班级 by-id 接口，遍历真实学院/年级/班级） */
+  /** 依据已选班级 id 反查名称：一次批量请求，未命中的 id 保留原 id 展示 */
   const resolveClassNames = async (ids: number[]) => {
     const missing = ids.filter((id) => !classMap.value.has(id));
     if (missing.length === 0) return;
     try {
-      // 学院之间、年级之间并发，避免按「学院×年级×班级」串行发出上百次请求
-      const colleges = (await getColleges()) ?? [];
-      const gradeLists = await Promise.all(
-        colleges.map(async (college) => ({
-          collegeId: college.id,
-          grades: (await getGrades(college.id)) ?? [],
-        })),
-      );
-      const classLists = await Promise.all(
-        gradeLists.flatMap(({ collegeId, grades }) =>
-          grades.map(async (grade) => (await getClasses(collegeId, grade.grade)) ?? []),
-        ),
-      );
-      for (const classes of classLists) {
-        for (const item of classes) {
-          classMap.value.set(item.id, item.name);
-        }
+      const list = await getClassesByIds(missing);
+      for (const item of list ?? []) {
+        classMap.value.set(item.id, item.name);
       }
     } catch {
       // 反查失败时保留 id 展示，不阻断编辑

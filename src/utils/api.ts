@@ -342,6 +342,18 @@ export function getClasses(collegeId: number, grade: string): Promise<ClassOptio
 }
 
 /**
+ * 按 id 批量反查班级（需登录）。
+ *
+ * 替代「遍历学院 × 年级 × 班级」的反查：一次请求拿到全部已选班级的名称，
+ * 请求数不再随学院/年级数量线性放大（约 80 → 1）。
+ * 库中不存在的 id 会被后端跳过，调用方对未命中的 id 保留原 id 展示即可。
+ */
+export function getClassesByIds(ids: number[]): Promise<ClassOption[]> {
+  if (ids.length === 0) return Promise.resolve([])
+  return get<ClassOption[]>('/api/classes', { ids: ids.join(',') })
+}
+
+/**
  * 下载用户导入模板（xlsx）。
  * 注意：该方法需要 USER_MANAGE 权限；后端源码已提供 GET /api/users/import/template，
  * 但冻结的 backend-routes.json 尚未收录，后续后端批会补齐。

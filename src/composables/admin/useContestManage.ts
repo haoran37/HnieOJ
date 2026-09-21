@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 import { NButton, NTag, NSpace, useMessage, NPopconfirm, type DataTableColumns } from 'naive-ui';
 import { formatFullTime } from '@/composables/useTime';
 import { stringToColor, stringToTextColor } from '@/utils/colorUtils';
+import { buildDisplayIdByIndex } from '@/utils/displayId';
 import {
   checkProblem,
   checkUser,
@@ -30,18 +31,6 @@ export interface ContestProblemRow {
 export interface ContestAccountRow {
   uid: string;
   username: string;
-}
-
-/** 生成 A/B/.../Z/AA 形式的展示编号 */
-export function buildDisplayIdByIndex(index: number): string {
-  let value = index + 1;
-  let result = '';
-  while (value > 0) {
-    const remainder = (value - 1) % 26;
-    result = String.fromCharCode(65 + remainder) + result;
-    value = Math.floor((value - 1) / 26);
-  }
-  return result;
 }
 
 /** 比赛运行态（后端 ContestRuntimeStatusConstant）→ 简洁产品文案 */

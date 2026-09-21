@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { checkProblem, type ContestProblemVo } from '@/utils/api';
+import { buildDisplayIdByIndex } from '@/utils/displayId';
 
 export interface ContestProblemRow {
   id: number; // 内部 problemId，用于下载测试点等内部接口
@@ -7,17 +8,6 @@ export interface ContestProblemRow {
   displayId: string; // 比赛内题目序号（A/B/C...）
   title: string;
   color: string;
-}
-
-// 生成题号 A, B, C... AA
-export function getProblemIndex(index: number) {
-  let res = '';
-  let n = index;
-  do {
-    res = String.fromCharCode((n % 26) + 65) + res;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return res;
 }
 
 // problemId -> problemCode 在同一会话内可复用
@@ -49,7 +39,7 @@ export function useContestProblems() {
           return {
             id: p.problemId,
             problemCode,
-            displayId: p.displayId ?? getProblemIndex(index),
+            displayId: p.displayId ?? buildDisplayIdByIndex(index),
             title,
             color: p.color ?? '',
           };
@@ -71,6 +61,5 @@ export function useContestProblems() {
     error,
     problems,
     fetchContestProblems,
-    getProblemIndex,
   };
 }

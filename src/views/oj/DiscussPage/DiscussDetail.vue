@@ -74,7 +74,7 @@
                 v-for="ans in sortedAnswers"
                 :key="ans.id"
                 :answer="ans"
-                :submit-comment="submitComment"
+                :submit-comment="submitCommentForRoute"
                 @vote="(dir) => handleVote('answer', ans.id, dir)"
               />
             </div>
@@ -184,6 +184,8 @@ const relatedDiscussions = ref<{ id: number; title: string }[]>([]);
 const relatedError = ref<string | null>(null);
 // 局部序号：切换题目/帖子后作废更早的在途相关讨论请求
 let relatedSeq = 0;
+// 路由加载世代：loadByRoute 每次递增，用于识别陈旧的写入完成回调
+let loadSeq = 0;
 
 const fetchRelatedDiscussions = async (problemCode: string) => {
   const current = ++relatedSeq;
@@ -208,16 +210,33 @@ const retryRelated = () => {
 };
 
 
-// 只有确认写入成功才清空草稿；失败时保留内容供用户重试
+// 只有确认写入成功、且路由世代与目标都未变化时才清空草稿：
+// 失败保留内容供用户重试；切换路由（含 A->B->A）后旧写入完成不得清空新路由草稿。
 const handlePostAnswer = async () => {
   const content = answerDraft.value;
   if (!content.trim()) {
     message.warning('回答内容不能为空');
     return;
   }
+  // B 加载中而 post 仍为 A 时，回答不能提交到错误的目标 A
+  const targetId = String(route.params.id);
+  if (!post.value || post.value.id !== targetId) return;
+  const generation = loadSeq;
   const submitted = await submitAnswer(content);
   if (!submitted) return;
+  if (generation !== loadSeq || String(route.params.id) !== targetId) return;
   answerDraft.value = '';
+};
+
+// 评论写入完成时若路由世代已变化，返回 false 让子组件保留新路由的草稿并保持编辑框打开
+const submitCommentForRoute = async (answerId: number, content: string): Promise<boolean> => {
+  const targetId = String(route.params.id);
+  // B 加载中而 post 仍为 A 时，评论不能写到 A 的旧回答上：成功后的刷新会作废 B
+  if (!post.value || post.value.id !== targetId) return false;
+  const generation = loadSeq;
+  const submitted = await submitComment(answerId, content);
+  if (!submitted) return false;
+  return generation === loadSeq && String(route.params.id) === targetId;
 };
 
 const scrollToEditor = () => {
@@ -226,12 +245,13 @@ const scrollToEditor = () => {
 
 // 路由参数变化（点击“相关讨论”在同一组件内跳转）时立即重新加载并作废旧请求
 const loadByRoute = async (id: string) => {
+  const generation = ++loadSeq;
   answerDraft.value = '';
   relatedSeq += 1;
   relatedDiscussions.value = [];
   relatedError.value = null;
   const ok = await fetchDetail(id);
-  if (!ok || String(route.params.id) !== id) return;
+  if (!ok || generation !== loadSeq || String(route.params.id) !== id) return;
   if (post.value?.problemCode) {
     void fetchRelatedDiscussions(post.value.problemCode);
   }

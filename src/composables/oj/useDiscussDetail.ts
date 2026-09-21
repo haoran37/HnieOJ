@@ -135,11 +135,21 @@ export function useDiscussDetail() {
     return fetchDetail(post.value.id, { keepOnError: true });
   };
 
+  // 写入类操作（回答/评论/投票）在发起前捕获目标帖子身份与当前请求世代，
+  // 写入完成后两者都未变化时才刷新：避免陈旧完成回调读取到已切换的 post.id
+  // 去刷新错误的目标，或让切换后仍在途的请求作废。
+  const refreshOwnedDetail = async (targetId: string | null, generation: number): Promise<boolean> => {
+    if (!targetId || generation !== seq || post.value?.id !== targetId) return false;
+    return fetchDetail(targetId, { keepOnError: true });
+  };
+
   // 真实投票：成功后重新拉取详情
   const handleVote = async (targetType: 'post' | 'answer', id: string | number, direction: 'up' | 'down') => {
+    const targetId = post.value?.id ?? null;
+    const generation = seq;
     try {
       await voteDiscussion(targetType, id, direction);
-      await reload();
+      await refreshOwnedDetail(targetId, generation);
     } catch (err) {
       message.error(err instanceof Error ? err.message : '投票失败');
     }
@@ -149,6 +159,8 @@ export function useDiscussDetail() {
   // submittingComment 必须覆盖“写入 + 刷新”全过程，避免刷新期间再次点击造成重复评论。
   const submitComment = async (answerId: number, content: string): Promise<boolean> => {
     if (submittingComment.value) return false;
+    const targetId = post.value?.id ?? null;
+    const generation = seq;
     submittingComment.value = true;
     try {
       try {
@@ -159,7 +171,7 @@ export function useDiscussDetail() {
       }
       message.success('评论发表成功');
       // 写入已成功：刷新失败只提示重试，不能让用户以为写入失败而重发
-      await reload();
+      await refreshOwnedDetail(targetId, generation);
       return true;
     } finally {
       submittingComment.value = false;
@@ -171,17 +183,19 @@ export function useDiscussDetail() {
   const submitAnswer = async (content: string): Promise<boolean> => {
     if (!post.value) return false;
     if (submittingAnswer.value) return false;
+    const targetId = post.value.id;
+    const generation = seq;
     submittingAnswer.value = true;
     try {
       try {
-        await createDiscussionAnswer(post.value.id, content);
+        await createDiscussionAnswer(targetId, content);
       } catch (err) {
         message.error(err instanceof Error ? err.message : '回答提交失败');
         return false;
       }
       message.success('回答提交成功');
       // 写入已成功：刷新失败只提示重试，不能让用户以为写入失败而重发
-      await reload();
+      await refreshOwnedDetail(targetId, generation);
       return true;
     } finally {
       submittingAnswer.value = false;

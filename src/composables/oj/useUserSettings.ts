@@ -9,6 +9,7 @@ import {
   getProfile,
   submitProfileChangeRequest,
   updateUserProfile,
+  type ProfileChangePayload,
   type ProfileChangeVo,
   type UserProfileUpdatePayload,
 } from '@/utils/api';
@@ -48,7 +49,7 @@ export interface UseUserSettingsOptions {
 }
 
 /**
- * 本人自助资料 / 密码 / 身份变更申请。
+ * 本人自助资料 / 密码 / 资料变更申请（身份 + 联系/社交字段，合并后的唯一审批流程）。
  *
  * - 普通资料只提交白名单字段；uid/email 只读；
  * - 密码独立表单，不 trim，成功由调用方清理会话并跳转登录；
@@ -74,6 +75,8 @@ export function useUserSettings(options: UseUserSettingsOptions = {}) {
     username: '',
     avatar: '',
     qq: '',
+    phone: '',
+    cfUsername: '',
     github: '',
     blog: '',
     realname: '',
@@ -92,6 +95,8 @@ export function useUserSettings(options: UseUserSettingsOptions = {}) {
     profile.username = data.username ?? '';
     profile.avatar = data.avatar ?? '';
     profile.qq = data.qq ?? '';
+    profile.phone = data.phone ?? '';
+    profile.cfUsername = data.cfUsername ?? '';
     profile.github = data.github ?? '';
     profile.blog = data.blog ?? '';
     profile.realname = data.realname ?? '';
@@ -246,13 +251,20 @@ export function useUserSettings(options: UseUserSettingsOptions = {}) {
     }
   };
 
-  // ---------------- 身份变更申请 ----------------
+  // ---------------- 资料变更申请（合并后的唯一资料变更流程） ----------------
   const identity = reactive({
     realname: '',
     collegeId: null as number | null,
     grade: '',
     classId: null as number | null,
     reason: '',
+    // 联系/社交字段：留空表示本次不修改该字段（合并前这些字段由另一套「按 uid 审」的流程受理）
+    email: '',
+    phone: '',
+    qq: '',
+    cfUsername: '',
+    github: '',
+    blog: '',
   });
   const identityCollegeOptions = ref<SelectOption<number>[]>([]);
   const identityGradeOptions = ref<SelectOption<string>[]>([]);
@@ -378,14 +390,58 @@ export function useUserSettings(options: UseUserSettingsOptions = {}) {
     void fetchMyRequests();
   };
 
+  /** 与当前资料比对后，本次申请真正要改的字段（与后端 changedFields 口径一致） */
+  const changedProfileFields = (): ProfileChangePayload | null => {
+    const payload: ProfileChangePayload = { reason: identity.reason.trim() };
+    const realname = identity.realname.trim();
+    if (realname && realname !== profile.realname) payload.realname = realname;
+    if (identity.collegeId != null && identity.collegeId !== profile.collegeId) {
+      payload.collegeId = identity.collegeId;
+    }
+    if (identity.grade && identity.grade !== profile.grade) payload.grade = identity.grade;
+    if (identity.classId != null && identity.classId !== profile.classId) {
+      payload.classId = identity.classId;
+    }
+    if (identity.email.trim() && identity.email.trim() !== profile.email) {
+      payload.email = identity.email.trim();
+    }
+    if (identity.phone.trim() && identity.phone.trim() !== profile.phone) {
+      payload.phone = identity.phone.trim();
+    }
+    if (identity.qq.trim() && identity.qq.trim() !== profile.qq) payload.qq = identity.qq.trim();
+    if (identity.cfUsername.trim() && identity.cfUsername.trim() !== profile.cfUsername) {
+      payload.cfUsername = identity.cfUsername.trim();
+    }
+    if (identity.github.trim() && identity.github.trim() !== profile.github) {
+      payload.github = identity.github.trim();
+    }
+    if (identity.blog.trim() && identity.blog.trim() !== profile.blog) {
+      payload.blog = identity.blog.trim();
+    }
+    return Object.keys(payload).length > 1 ? payload : null;
+  };
+
   const validateIdentity = (): string | null => {
-    if (!identity.realname.trim()) return '请填写实名';
-    if (identity.realname.trim().length > 50) return '实名长度不能超过 50';
-    if (identity.collegeId == null) return '请选择学院';
-    if (!identity.grade) return '请选择年级';
-    if (identity.classId == null) return '请选择班级';
     if (!identity.reason.trim()) return '请填写变更原因';
     if (identity.reason.trim().length > 1000) return '变更原因长度不能超过 1000';
+
+    const payload = changedProfileFields();
+    if (!payload) return '请至少修改一个字段后再提交';
+
+    // 身份字段只要有一项要改，就要求四项齐全（后端同样按整体校验归属关系）
+    const identityChanged =
+      payload.realname !== undefined ||
+      payload.collegeId !== undefined ||
+      payload.grade !== undefined ||
+      payload.classId !== undefined;
+    if (identityChanged) {
+      if (!identity.realname.trim()) return '请填写实名';
+      if (identity.realname.trim().length > 50) return '实名长度不能超过 50';
+      if (identity.collegeId == null) return '请选择学院';
+      if (!identity.grade) return '请选择年级';
+      if (identity.classId == null) return '请选择班级';
+    }
+    if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return '邮箱格式不正确';
     return null;
   };
 
@@ -401,19 +457,24 @@ export function useUserSettings(options: UseUserSettingsOptions = {}) {
       message.warning(invalid);
       return false;
     }
+    const payload = changedProfileFields();
+    if (!payload) {
+      message.warning('请至少修改一个字段后再提交');
+      return false;
+    }
     const gen = generation;
     submittingIdentity.value = true;
     try {
-      await submitProfileChangeRequest({
-        realname: identity.realname.trim(),
-        collegeId: identity.collegeId as number,
-        grade: identity.grade,
-        classId: identity.classId as number,
-        reason: identity.reason.trim(),
-      });
+      await submitProfileChangeRequest(payload);
       if (gen !== generation || !active()) return false;
       message.success('变更申请已提交');
       identity.reason = '';
+      identity.email = '';
+      identity.phone = '';
+      identity.qq = '';
+      identity.cfUsername = '';
+      identity.github = '';
+      identity.blog = '';
       requestsPage.value = 1;
       await Promise.all([fetchMyRequests(), detectPending()]);
       return true;

@@ -6,13 +6,14 @@ import {
   getClasses,
   getColleges,
   rejectProfileChangeRequest,
+  PROFILE_CHANGE_FIELDS,
+  type ProfileChangeSnapshot,
   type ProfileChangeStatus,
   type ProfileChangeVo,
-  type ProfileIdentityVo,
 } from '@/utils/api';
 
 /**
- * 管理端身份资料变更审核。
+ * 管理端资料变更审核（合并两套流程后的唯一入口，按申请 id 审批）。
  *
  * - 列表走真实分页/状态/关键字；行 key 为申请 id（同一用户可有历史申请）；
  * - 仅 PENDING 可审核；批准确认与驳回都必须填写原因（≤1000）；
@@ -218,12 +219,38 @@ export function useUserChange() {
     return classMap.value[id] ?? `班级 #${id}`;
   };
 
-  const identityFields = (identity: ProfileIdentityVo | null): Record<string, string> => ({
-    realname: identity?.realname || '未填写',
-    college: collegeLabel(identity?.collegeId),
-    grade: identity?.grade || '未填写',
-    class: classLabel(identity?.classId),
-  });
+  /**
+   * 本次申请真正发生变化的字段（口径与后端 ProfileChangeField.changedFields 一致）：
+   * 只展示 original 与 proposed 不同的字段，避免把整份快照 12 个字段全铺出来噪声过大。
+   */
+  const changedFields = (
+    original: ProfileChangeSnapshot | null,
+    proposed: ProfileChangeSnapshot | null,
+  ): { label: string; from: string; to: string }[] => {
+    if (!proposed) return [];
+    const rows: { label: string; from: string; to: string }[] = [];
+    for (const field of PROFILE_CHANGE_FIELDS) {
+      const before = original ? original[field.key] : null;
+      const after = proposed[field.key];
+      if (before === after) continue;
+      rows.push({ label: field.label, from: displayValue(field.key, before), to: displayValue(field.key, after) });
+    }
+    return rows;
+  };
+
+  const displayValue = (key: keyof ProfileChangeSnapshot, value: string | number | null): string => {
+    if (value === null || value === undefined || value === '') return '未填写';
+    if (key === 'collegeId') return collegeLabel(Number(value));
+    if (key === 'classId') return classLabel(Number(value));
+    return String(value);
+  };
+
+  /** 单行摘要，用于表格里的「变更内容」列 */
+  const changedSummary = (row: ProfileChangeVo): string => {
+    const rows = changedFields(row.original, row.proposed);
+    if (rows.length === 0) return '无字段变更';
+    return rows.map((item) => `${item.label}：${item.from} → ${item.to}`).join('；');
+  };
 
   return {
     listLoading,
@@ -248,6 +275,7 @@ export function useUserChange() {
     closeReview,
     handleReviewShowChange,
     submitReview,
-    identityFields,
+    changedFields,
+    changedSummary,
   };
 }

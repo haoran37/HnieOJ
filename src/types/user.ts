@@ -40,6 +40,13 @@ export interface UserProfile {
   grade?: string | null
   qq?: string | null
   phone?: string | null
+  /**
+   * 后端 UserProfileVo 的真实字段名（camelCase）。
+   *
+   * 注意：下面的 `cf_username` 是历史遗留的错拼（后端从不返回该键，`UserList.vue` 的 CF 用户名
+   * 因此一直显示 '-'）。此处不改动它以免顺带扩大本次改动范围，仅新增真实字段供资料变更申请使用。
+   */
+  cfUsername?: string | null
   cf_username?: string | null
   github?: string | null
   blog?: string | null

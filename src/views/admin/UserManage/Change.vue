@@ -60,7 +60,7 @@
     <n-modal
       :show="showReviewModal"
       preset="card"
-      :title="reviewMode === 'approve' ? '通过身份变更申请' : '驳回身份变更申请'"
+      :title="reviewMode === 'approve' ? '通过资料变更申请' : '驳回资料变更申请'"
       :mask-closable="false"
       :style="{ width: 'auto', minWidth: '520px', maxWidth: '90vw' }"
       @update:show="handleReviewShowChange"
@@ -128,7 +128,7 @@ const {
   closeReview,
   handleReviewShowChange,
   submitReview,
-  identityFields,
+  changedFields,
 } = useUserChange();
 
 const statusOptions = [
@@ -149,22 +149,17 @@ const statusText = (status: string | null) => {
   return '待处理';
 };
 
-const FIELD_LABELS: Array<[string, string]> = [
-  ['realname', '实名'],
-  ['college', '学院'],
-  ['grade', '年级'],
-  ['class', '班级'],
-];
-
-// 原值 → 目标值，仅 4 项身份字段（UID 不可变更）
+// 原值 → 目标值：只列出本次申请真正变化的字段（合并两套流程后可为身份或联系/社交字段）
 const renderDiff = (row: ProfileChangeVo) => {
-  const original = identityFields(row.original);
-  const proposed = identityFields(row.proposed);
+  const rows = changedFields(row.original, row.proposed);
+  if (rows.length === 0) {
+    return h('div', { class: 'diff-cell' }, [h('div', { key: 'none' }, '无字段变更')]);
+  }
   return h(
     'div',
     { class: 'diff-cell' },
-    FIELD_LABELS.map(([key, label]) =>
-      h('div', { key }, `${label}：${original[key]} → ${proposed[key]}`),
+    rows.map((item) =>
+      h('div', { key: item.label }, `${item.label}：${item.from} → ${item.to}`),
     ),
   );
 };

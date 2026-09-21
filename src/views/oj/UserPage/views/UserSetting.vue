@@ -79,7 +79,7 @@
           </div>
         </div>
         <n-alert type="info" :bordered="false" style="margin: 12px 0">
-          实名、学院、年级、班级不可直接编辑，需通过下方「身份变更申请」提交审核。
+          实名、学院、年级、班级不可直接编辑，需通过下方「资料变更申请」提交审核。
         </n-alert>
         <div class="form-actions">
           <n-button
@@ -93,16 +93,16 @@
         </div>
       </div>
 
-      <!-- 身份变更申请 -->
+      <!-- 资料变更申请（合并后的唯一资料变更流程：身份 + 联系/社交字段） -->
       <div class="setting-card">
         <div class="card-header">
-          <div class="title">身份变更申请</div>
+          <div class="title">资料变更申请</div>
         </div>
         <n-alert v-if="hasPending" type="warning" :bordered="false" style="margin-bottom: 12px">
           已有待审核的变更申请，请等待管理员处理后再提交新的申请。
         </n-alert>
         <n-alert v-else type="info" :bordered="false" style="margin-bottom: 12px">
-          仅支持实名、学院、年级、班级变更；提交后需管理员审核，UID 不可变更。
+          可申请变更实名、学院、年级、班级与联系/社交信息；提交后需管理员审核，UID 不可变更。
         </n-alert>
         <n-form label-placement="left" label-width="90" size="small">
           <n-form-item label="实名" required>
@@ -137,6 +137,30 @@
               @update:value="(value: number | null) => (identity.classId = value)"
             />
           </n-form-item>
+
+          <n-divider style="margin: 4px 0 12px">
+            <span style="font-size: 12px; color: #888">以下选填，留空表示不修改</span>
+          </n-divider>
+
+          <n-form-item label="邮箱">
+            <n-input v-model:value="identity.email" :maxlength="255" placeholder="留空表示不修改邮箱" />
+          </n-form-item>
+          <n-form-item label="手机号">
+            <n-input v-model:value="identity.phone" :maxlength="20" placeholder="留空表示不修改手机号" />
+          </n-form-item>
+          <n-form-item label="QQ">
+            <n-input v-model:value="identity.qq" :maxlength="20" placeholder="留空表示不修改 QQ" />
+          </n-form-item>
+          <n-form-item label="Codeforces">
+            <n-input v-model:value="identity.cfUsername" :maxlength="100" placeholder="留空表示不修改" />
+          </n-form-item>
+          <n-form-item label="GitHub">
+            <n-input v-model:value="identity.github" :maxlength="255" placeholder="留空表示不修改" />
+          </n-form-item>
+          <n-form-item label="博客">
+            <n-input v-model:value="identity.blog" :maxlength="255" placeholder="留空表示不修改" />
+          </n-form-item>
+
           <n-form-item label="变更原因" required>
             <n-input
               v-model:value="identity.reason"
@@ -275,7 +299,7 @@
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage, type DataTableColumns, type UploadFileInfo } from 'naive-ui';
-import { submitAchievementApply } from '@/utils/api';
+import { submitAchievementApply, PROFILE_CHANGE_FIELDS } from '@/utils/api';
 import type { ProfileChangeVo } from '@/utils/api';
 import { formatFullTime } from '@/composables/useTime';
 import { useUserSettings } from '@/composables/oj/useUserSettings';
@@ -403,15 +427,26 @@ const requestStatusText = (status: string | null) => {
   return '待处理';
 };
 
+/**
+ * 只展示本次申请真正发生变化的字段（口径与后端 changedFields 一致）。
+ * 历史申请（合并前只含 4 个身份字段）的其余字段两侧同为 null，不会被列出来。
+ */
 const identityText = (row: ProfileChangeVo) => {
   const original = row.original;
   const proposed = row.proposed;
-  return [
-    `实名：${original?.realname || '未填写'} → ${proposed?.realname || '未填写'}`,
-    `学院：${original?.collegeId ?? '未填写'} → ${proposed?.collegeId ?? '未填写'}`,
-    `年级：${original?.grade || '未填写'} → ${proposed?.grade || '未填写'}`,
-    `班级：${original?.classId ?? '未填写'} → ${proposed?.classId ?? '未填写'}`,
-  ];
+  const lines: string[] = [];
+  for (const field of PROFILE_CHANGE_FIELDS) {
+    const before = original ? original[field.key] : null;
+    const after = proposed ? proposed[field.key] : null;
+    if (before === after) continue;
+    lines.push(`${field.label}：${displaySnapshotValue(before)} → ${displaySnapshotValue(after)}`);
+  }
+  return lines.length > 0 ? lines : ['无字段变更'];
+};
+
+const displaySnapshotValue = (value: string | number | null) => {
+  if (value === null || value === undefined || value === '') return '未填写';
+  return String(value);
 };
 
 const requestColumns: DataTableColumns<ProfileChangeVo> = [

@@ -2063,7 +2063,7 @@ export function updateAdminHomeworkStatus(id: number | string, status: boolean):
 }
 
 // --------------------------------------------------
-// B2 批次：管理通知 / 本人站内消息 / 自助资料 / 身份变更申请（user 服务）
+// B2 批次：管理通知 / 本人站内消息 / 自助资料 / 资料变更申请（user 服务）
 // 契约见 backend-api-b2.md。字段以后端 DTO/VO 为准。
 // --------------------------------------------------
 
@@ -2198,23 +2198,52 @@ export function changeUserPassword(payload: {
   return put<null>('/api/user/password', payload)
 }
 
-/** B2-5 身份变更申请状态 */
+/** B2-5 资料变更申请状态 */
 export type ProfileChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
-/** 对应后端 ProfileIdentityVo：仅实名/学院/年级/班级（UID 不可变更） */
-export interface ProfileIdentityVo {
+/**
+ * 对应后端 ProfileSnapshotVo：资料变更申请的原值/目标值快照。
+ *
+ * 合并两套「资料变更」流程（BE-03.6）后，同一个按 id 审批的流程受理身份字段与联系/社交字段；
+ * 历史申请（只含 4 个身份字段）的其余字段为 null，两侧同为 null 表示「未申请变更」。
+ */
+export interface ProfileChangeSnapshot {
   realname: string | null
   collegeId: number | null
   grade: string | null
   classId: number | null
+  username: string | null
+  email: string | null
+  phone: string | null
+  avatar: string | null
+  qq: string | null
+  cfUsername: string | null
+  github: string | null
+  blog: string | null
 }
+
+/** 快照字段清单与中文名：列表/详情只展示「真正发生变化的字段」，顺序与后端 ProfileChangeField 一致 */
+export const PROFILE_CHANGE_FIELDS: { key: keyof ProfileChangeSnapshot; label: string }[] = [
+  { key: 'realname', label: '实名' },
+  { key: 'collegeId', label: '学院' },
+  { key: 'grade', label: '年级' },
+  { key: 'classId', label: '班级' },
+  { key: 'username', label: '用户名' },
+  { key: 'email', label: '邮箱' },
+  { key: 'phone', label: '手机号' },
+  { key: 'avatar', label: '头像' },
+  { key: 'qq', label: 'QQ' },
+  { key: 'cfUsername', label: 'Codeforces' },
+  { key: 'github', label: 'GitHub' },
+  { key: 'blog', label: '博客' },
+]
 
 /** 对应后端 ProfileChangeVo */
 export interface ProfileChangeVo {
   id: number
   uid: string
-  original: ProfileIdentityVo | null
-  proposed: ProfileIdentityVo | null
+  original: ProfileChangeSnapshot | null
+  proposed: ProfileChangeSnapshot | null
   reason: string
   status: ProfileChangeStatus | null
   reviewerUid: string | null
@@ -2224,12 +2253,23 @@ export interface ProfileChangeVo {
   gmtModified: string | null
 }
 
-/** 对应后端 ProfileChangeCreateRequest */
+/**
+ * 对应后端 ProfileChangeCreateRequest：**只提交需要变更的字段**，未提交或与当前值相同的字段不进入申请。
+ * 身份字段在「确实要改身份字段」时才需要成组出现。
+ */
 export interface ProfileChangePayload {
-  realname: string
-  collegeId: number
-  grade: string
-  classId: number
+  realname?: string
+  collegeId?: number
+  grade?: string
+  classId?: number
+  username?: string
+  email?: string
+  phone?: string
+  avatar?: string
+  qq?: string
+  cfUsername?: string
+  github?: string
+  blog?: string
   reason: string
 }
 
@@ -2276,4 +2316,11 @@ export function rejectProfileChangeRequest(id: number | string, reason: string):
   return post<null>(`/api/admin/profile-change-requests/${encodeURIComponent(String(id))}/reject`, {
     reason,
   })
+}
+
+/** 批量审核通过（按申请 id）；单条失败不影响其它条目，结果里分别返回成功数与失败原因 */
+export function batchApproveProfileChangeRequests(
+  ids: number[],
+): Promise<{ successCount: number; failedCount: number; failures: { id: string; reason: string }[] }> {
+  return post('/api/admin/profile-change-requests/batch-approve', { ids })
 }

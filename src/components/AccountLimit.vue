@@ -45,7 +45,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:inputValue', value: string): void;
   (e: 'add', value: string): void;
-  (e: 'remove', index: number): void;
+  (e: 'remove', uid: string): void;
 }>();
 
 const handleAdd = () => {
@@ -62,13 +62,14 @@ const columns: DataTableColumns<Account> = [
     title: '操作',
     key: 'actions',
     width: 100,
-    render(_row, index) {
+    render(row) {
       return h(
         NButton,
         {
           size: 'small',
           type: 'error',
-          onClick: () => emit('remove', index)
+          // 表格为本地分页，render 的 index 是页内序号，必须按 uid 定位
+          onClick: () => emit('remove', row.uid)
         },
         { default: () => '删除' }
       );

@@ -22,7 +22,7 @@ interface SelectOption<T> {
 }
 
 /**
- * 管理通知（B2-1）：草稿 CRUD + 发布。
+ * 管理通知：草稿 CRUD + 发布。
  *
  * - 列表/详情/保存/发布使用独立状态与请求序号，旧筛选/页/记录响应会被作废；
  * - 创建与保存都只写草稿，发布前必须确认收件目标，发布成功后重新读取列表；
@@ -122,15 +122,19 @@ export function useNotice() {
     form.targetIds = (detail.targetIds ?? []).map(String);
   };
 
-  const openCreateModal = () => {
-    if (saving.value || publishing.value) return;
-    ++detailSeq;
+  const resetForm = () => {
     form.id = 0;
     form.title = '';
     form.content = '';
     form.targetType = 'USERS';
     form.targetIds = [];
     resetRecipientPickers();
+  };
+
+  const openCreateModal = () => {
+    if (saving.value || publishing.value) return;
+    ++detailSeq;
+    resetForm();
     modalMode.value = 'create';
     showModal.value = true;
   };
@@ -139,12 +143,15 @@ export function useNotice() {
     if (saving.value || publishing.value) return;
     const seq = ++detailSeq;
     detailLoading.value = true;
-    showModal.value = true;
+    // 详情返回前不开弹窗并先清空表单：避免加载间隙保存把上一条通知 PUT 回后端
+    showModal.value = false;
+    resetForm();
     try {
       const detail = await getAdminNoticeDetail(row.id);
       if (seq !== detailSeq) return;
       applyDetail(detail);
       modalMode.value = readonly || detail.status === 'PUBLISHED' ? 'view' : 'edit';
+      showModal.value = true;
     } catch (err) {
       if (seq !== detailSeq) return;
       showModal.value = false;

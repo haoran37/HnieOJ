@@ -1,5 +1,5 @@
 <template>
-  <BoardCard title="近期比赛">
+  <BoardCard title="最新比赛">
     <template #icon>
       <n-icon size="20"><TrophyIcon /></n-icon>
     </template>
@@ -18,7 +18,7 @@
           :compact="true"
           @click="handleJump"
         />
-        <n-empty v-else-if="!error" description="暂无近期比赛" />
+        <n-empty v-else-if="!error" description="暂无比赛" />
       </div>
     </n-spin>
 
@@ -51,7 +51,8 @@ const contest = ref<{
   problemCount: number;
 } | null>(null);
 
-// 真实读取最近一场比赛（后端 /api/contests 按创建顺序分页）
+// 读取开始时间最晚的一场比赛：后端 /api/contests 按 startTime 倒序分页，取第一页第一条
+// 注意这不是「距当前时间最近」的比赛，可能是很久以后的未来比赛；按时间段筛选需后端新增查询能力
 const fetchContest = async () => {
   loading.value = true;
   error.value = null;

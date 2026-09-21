@@ -84,7 +84,11 @@ export function useRegistration() {
     },
   });
 
+  // 请求序号：迟到的旧响应不得覆盖新筛选/新分页的结果
+  let listSeq = 0;
+
   const fetchRegistrations = async () => {
+    const current = ++listSeq;
     loading.value = true;
     try {
       const data = await getRegistrations(
@@ -93,16 +97,25 @@ export function useRegistration() {
         statusFilter.value ?? undefined,
         keyword.value,
       );
-      registrationList.value = (data?.list ?? []).map(toRegistrationItem);
+      if (current !== listSeq) return;
+      const rows = (data?.list ?? []).map(toRegistrationItem);
+      // 审批后当前页可能被清空：回退上一页重读，不停留在空页
+      if (rows.length === 0 && pagination.page > 1) {
+        pagination.page -= 1;
+        void fetchRegistrations();
+        return;
+      }
+      registrationList.value = rows;
       totalCount.value = data?.total ?? 0;
       pagination.itemCount = totalCount.value;
     } catch (err) {
+      if (current !== listSeq) return;
       registrationList.value = [];
       totalCount.value = 0;
       pagination.itemCount = 0;
       message.error(err instanceof Error ? err.message : '加载注册申请失败');
     } finally {
-      loading.value = false;
+      if (current === listSeq) loading.value = false;
     }
   };
 
@@ -120,6 +133,8 @@ export function useRegistration() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起审批请求
+        if (submitting.value) return;
         submitting.value = true;
         try {
           await approveRegistration(item.uid);
@@ -148,6 +163,7 @@ export function useRegistration() {
       return;
     }
 
+    if (submitting.value) return;
     submitting.value = true;
     try {
       await rejectRegistration(rejectForm.uid, rejectForm.reason.trim());
@@ -173,6 +189,8 @@ export function useRegistration() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起批量审批请求
+        if (submitting.value) return;
         submitting.value = true;
         try {
           const summary = await batchApproveRegistrations([...selectedIds.value]);

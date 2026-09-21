@@ -144,7 +144,12 @@ export function useRejudge() {
   const currentDetailList = ref<RejudgeDetail[]>([]);
   const currentTask = ref<RejudgeTask | null>(null);
 
+  // 请求序号：迟到的旧响应不得覆盖新分页的结果
+  let listSeq = 0;
+  let detailSeq = 0;
+
   const fetchRejudgeList = async () => {
+    const current = ++listSeq;
     loading.value = true;
     error.value = null;
     try {
@@ -152,14 +157,16 @@ export function useRejudge() {
         page: pagination.page,
         pageSize: pagination.pageSize,
       });
+      if (current !== listSeq) return;
       rejudgeList.value = (result?.list ?? []).map(toRejudgeTask);
       pagination.itemCount = result?.total ?? 0;
     } catch (err) {
+      if (current !== listSeq) return;
       rejudgeList.value = [];
       pagination.itemCount = 0;
       error.value = err instanceof Error ? err.message : '重判任务加载失败';
     } finally {
-      loading.value = false;
+      if (current === listSeq) loading.value = false;
     }
   };
 
@@ -201,9 +208,11 @@ export function useRejudge() {
   };
 
   const fetchRejudgeDetails = async (taskId: number) => {
+    const current = ++detailSeq;
     detailLoading.value = true;
     try {
       const list = await get<RejudgeTaskDetailVo[]>(`/api/admin/rejudge/${taskId}/details`);
+      if (current !== detailSeq) return;
       currentDetailList.value = (list ?? []).map((item) => ({
         runId: item.runId || item.submissionId || '',
         uid: item.uid ?? '',
@@ -213,10 +222,11 @@ export function useRejudge() {
         language: item.language ?? '',
       }));
     } catch (err) {
+      if (current !== detailSeq) return;
       currentDetailList.value = [];
       message.error(err instanceof Error ? err.message : '重判详情加载失败');
     } finally {
-      detailLoading.value = false;
+      if (current === detailSeq) detailLoading.value = false;
     }
   };
 

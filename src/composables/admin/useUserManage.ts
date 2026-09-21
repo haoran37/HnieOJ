@@ -192,10 +192,6 @@ export function useUserManage() {
   });
 
   // 导入：后端无上传接口，仅支持模板下载
-  const importForm = reactive({
-    file: null as File | null,
-  });
-  const importAvailable = false;
   const importUnavailableMessage =
     '后端未提供用户批量导入上传接口，本页仅支持下载模板，导入操作暂不可用。';
 
@@ -224,7 +220,11 @@ export function useUserManage() {
   };
 
   // ---- 用户列表 ----
+  // 请求序号：迟到的旧响应不得覆盖新筛选/新分页的结果
+  let listSeq = 0;
+
   const fetchUsers = async () => {
+    const current = ++listSeq;
     loading.value = true;
     try {
       const data = await getUsers({
@@ -235,14 +235,16 @@ export function useUserManage() {
         page: pagination.page,
         pageSize: pagination.pageSize,
       });
+      if (current !== listSeq) return;
       userList.value = (data?.list ?? []).map(toUserItem);
       pagination.itemCount = data?.total ?? 0;
     } catch (err) {
+      if (current !== listSeq) return;
       userList.value = [];
       pagination.itemCount = 0;
       message.error(err instanceof Error ? err.message : '加载用户列表失败');
     } finally {
-      loading.value = false;
+      if (current === listSeq) loading.value = false;
     }
   };
 
@@ -457,21 +459,28 @@ export function useUserManage() {
     classTas.value = [];
     classStaffError.value = null;
     // 打开表单时作废上一次在途的年级/班级/师资请求，避免继承旧响应
-    ++editGradeSeq;
-    ++editClassSeq;
+    const gradeSeq = ++editGradeSeq;
+    const classSeq = ++editClassSeq;
     ++classStaffSeq;
 
     try {
       await fetchColleges();
       if (user.collegeId) {
-        editGradeOptions.value = await fetchGrades(user.collegeId);
+        const gradeOptions = await fetchGrades(user.collegeId);
+        // 快速连点两个用户时，A 的响应不得落到 B 的表单上
+        if (gradeSeq !== editGradeSeq) return;
+        editGradeOptions.value = gradeOptions;
       }
       if (user.collegeId && user.grade) {
-        editClassOptions.value = await fetchClasses(user.collegeId, user.grade);
+        const classOptions = await fetchClasses(user.collegeId, user.grade);
+        if (classSeq !== editClassSeq) return;
+        editClassOptions.value = classOptions;
       }
     } catch (err) {
+      if (gradeSeq !== editGradeSeq) return;
       message.error(err instanceof Error ? err.message : '加载学院/年级/班级失败');
     }
+    if (gradeSeq !== editGradeSeq) return;
     if (user.classId) {
       void loadClassStaff(user.classId);
     }
@@ -506,6 +515,10 @@ export function useUserManage() {
   };
 
   // ---- 密码 ----
+  // 与后端 hnieoj-user.yaml 的 password-min-length / password-max-length 保持一致
+  const PASSWORD_MIN_LENGTH = 6;
+  const PASSWORD_MAX_LENGTH = 32;
+
   const openPasswordModal = (user: UserItem) => {
     passwordForm.uid = user.uid;
     passwordForm.username = user.username;
@@ -514,8 +527,9 @@ export function useUserManage() {
   };
 
   const handlePasswordSubmit = async () => {
-    if (!passwordForm.newPassword || passwordForm.newPassword.length < 6) {
-      message.warning('密码长度至少为6位');
+    const passwordLength = passwordForm.newPassword.length;
+    if (passwordLength < PASSWORD_MIN_LENGTH || passwordLength > PASSWORD_MAX_LENGTH) {
+      message.warning(`密码长度应在 ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} 位之间`);
       return;
     }
     submitting.value = true;
@@ -531,16 +545,23 @@ export function useUserManage() {
   };
 
   // ---- 用户详情（按 uid 真实读取） ----
+  // 详情请求序号：快速连点两个用户时，先发起的响应不得覆盖后选的用户
+  let detailSeq = 0;
+
   const openDetailModal = async (user: UserItem) => {
+    const current = ++detailSeq;
     detail.value = null;
     showDetailModal.value = true;
     detailLoading.value = true;
     try {
-      detail.value = await getUserDetail(user.uid);
+      const data = await getUserDetail(user.uid);
+      if (current !== detailSeq) return;
+      detail.value = data;
     } catch (err) {
+      if (current !== detailSeq) return;
       message.error(err instanceof Error ? err.message : '加载用户详情失败');
     } finally {
-      detailLoading.value = false;
+      if (current === detailSeq) detailLoading.value = false;
     }
   };
 
@@ -570,6 +591,8 @@ export function useUserManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起不可逆请求
+        if (loading.value) return;
         loading.value = true;
         try {
           await deleteUser(user.uid);
@@ -596,6 +619,8 @@ export function useUserManage() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起不可逆请求
+        if (loading.value) return;
         loading.value = true;
         try {
           await batchDisableUsers(uids);
@@ -623,6 +648,8 @@ export function useUserManage() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起不可逆请求
+        if (loading.value) return;
         loading.value = true;
         try {
           await batchEnableUsers(uids);
@@ -650,6 +677,8 @@ export function useUserManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起不可逆请求
+        if (loading.value) return;
         loading.value = true;
         try {
           await batchDeleteUsers(uids);
@@ -802,12 +831,17 @@ export function useUserManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起删除请求
+        if (submitting.value) return;
+        submitting.value = true;
         try {
           await deleteUserAchievement(achievementForm.uid, id);
           message.success('成就删除成功');
           await fetchAchievements();
         } catch (err) {
           message.error(err instanceof Error ? err.message : '删除成就失败');
+        } finally {
+          submitting.value = false;
         }
       },
     });
@@ -833,8 +867,6 @@ export function useUserManage() {
     passwordForm,
     achievementForm,
     addUserForm,
-    importForm,
-    importAvailable,
     importUnavailableMessage,
     collegeOptions,
     filterGradeOptions,

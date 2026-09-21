@@ -157,12 +157,12 @@
 
       <template #footer>
         <n-space justify="end">
-          <n-button :disabled="saving || publishing" @click="closeModal">关闭</n-button>
+          <n-button :disabled="saving || publishing || detailLoading" @click="closeModal">关闭</n-button>
           <n-button
             v-if="modalMode !== 'view'"
             type="primary"
             :loading="saving"
-            :disabled="saving || publishing"
+            :disabled="saving || publishing || detailLoading"
             @click="handleSubmit"
           >
             保存草稿

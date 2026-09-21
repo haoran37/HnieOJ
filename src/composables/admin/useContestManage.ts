@@ -382,8 +382,9 @@ export function useContestForm() {
 
   const handleAddAccount = (input: string) => addAccount(input);
 
-  const handleRemoveAccount = (index: number) => {
-    formValue.accountList.splice(index, 1);
+  const handleRemoveAccount = (uid: string) => {
+    // 表格为本地分页，页内序号不等于完整数组下标，按 uid 过滤
+    formValue.accountList = formValue.accountList.filter((item) => item.uid !== uid);
   };
 
   const handleAddProblem = async () => {

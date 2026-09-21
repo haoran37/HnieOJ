@@ -102,7 +102,11 @@ export function useAchievementManage() {
     }
   };
 
+  // 请求序号：迟到的旧响应不得覆盖新筛选/新分页的结果
+  let listSeq = 0;
+
   const fetchList = async () => {
+    const current = ++listSeq;
     loading.value = true;
     try {
       const data = await getAdminAchievements(pagination.page, pagination.pageSize, {
@@ -110,14 +114,23 @@ export function useAchievementManage() {
         status: filters.status ?? undefined,
         collegeId: filters.collegeId,
       });
-      list.value = (data?.list ?? []).map(toAchievementApplication);
+      if (current !== listSeq) return;
+      const rows = (data?.list ?? []).map(toAchievementApplication);
+      // 审批后当前页可能被清空：回退上一页重读，不停留在空页
+      if (rows.length === 0 && pagination.page > 1) {
+        pagination.page -= 1;
+        void fetchList();
+        return;
+      }
+      list.value = rows;
       pagination.itemCount = data?.total ?? 0;
     } catch (err) {
+      if (current !== listSeq) return;
       list.value = [];
       pagination.itemCount = 0;
       message.error(err instanceof Error ? err.message : '加载成就申请失败');
     } finally {
-      loading.value = false;
+      if (current === listSeq) loading.value = false;
     }
   };
 
@@ -151,8 +164,9 @@ export function useAchievementManage() {
     }
     submitting.value = true;
     try {
-      const blob = await downloadAchievementApplyFile(row.id);
-      saveBlob(blob, `achievement-${row.id}.bin`);
+      const { blob, filename } = await downloadAchievementApplyFile(row.id);
+      // 使用后端 Content-Disposition 的真实文件名，保留扩展名以便直接打开 PDF/图片
+      saveBlob(blob, filename ?? `achievement-${row.id}.bin`);
       message.success('附件已下载');
     } catch (err) {
       message.error(err instanceof Error ? err.message : '附件下载失败');
@@ -168,6 +182,8 @@ export function useAchievementManage() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起审批请求
+        if (submitting.value) return;
         submitting.value = true;
         try {
           await approveAchievement(row.id);

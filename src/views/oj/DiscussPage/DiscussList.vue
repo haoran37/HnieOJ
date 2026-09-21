@@ -144,7 +144,9 @@ const userStore = useUserStore();
 const {
   loading, error, displayList, total, page, pageSize,
   activeCategory, searchText, sortBy,
-  fetchDiscussions, handlePageChange
+  fetchDiscussions, handlePageChange,
+  // 排序/分类切换必须触发重查：直接使用 composable 内已重置页码并重新请求的处理器
+  handleSortChange, handleCategoryChange
 } = useDiscussList();
 
 const renderIcon = (icon: any) => () => h(NIcon, null, { default: () => h(icon) });
@@ -153,16 +155,6 @@ const menuOptions = [
   { label: '站内事务', key: 'Site', icon: renderIcon(SiteIcon) },
   { label: '题目讨论', key: 'Problem', icon: renderIcon(ProblemIcon) }
 ];
-
-// 处理排序切换
-const handleSortChange = (value: string | number) => {
-  sortBy.value = value as 'Latest' | 'Hot';
-};
-
-// 处理分类切换
-const handleCategoryChange = (key: string | number) => {
-  activeCategory.value = key as 'All' | 'Site' | 'Problem';
-};
 
 const handleDetail = (id: number) => {
   router.push(`/discuss/${id}`);
@@ -188,10 +180,7 @@ onMounted(() => {
 
 <style scoped lang="less">
 .discuss-list-container {
-  // width: 100%;
-  // max-width: 1200px;
   margin: 0 auto;
-  // padding: 0 16px 40px;
   display: flex;
   flex-direction: column;
   gap: 20px;

@@ -83,11 +83,16 @@ export const useDashboard = () => {
     { key: 'totalSubmissions', label: '提交', load: () => getSubmissions({ page: 1, pageSize: 1 }) },
   ]
 
+  // 请求序号：重复触发（如快速重试）时，先发起的响应不得覆盖后发起的结果
+  let fetchSeq = 0
+
   const fetchData = async () => {
+    const current = ++fetchSeq
     loading.value = true
     error.value = null
     try {
       const results = await Promise.allSettled(metricLoaders.map((metric) => metric.load()))
+      if (current !== fetchSeq) return
       const nextTotals = emptyTotals()
       const nextFailed = emptyFailed()
       const failedLabels: string[] = []
@@ -109,7 +114,7 @@ export const useDashboard = () => {
         error.value = `${failedLabels.join('、')}数据加载失败，请重试`
       }
     } finally {
-      loading.value = false
+      if (current === fetchSeq) loading.value = false
     }
   }
 

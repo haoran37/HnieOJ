@@ -119,19 +119,33 @@ export function usePermissionManage() {
     { label: '管理员 (ADMIN)', value: 'ADMIN' },
   ];
 
+  // 请求序号：迟到的旧响应不得覆盖新分页/新搜索的结果
+  let permissionSeq = 0;
+  let searchSeq = 0;
+
   // 获取权限用户列表
   const fetchPermissionUsers = async () => {
+    const current = ++permissionSeq;
     loading.value = true;
     try {
       const data = await getPermissionUsers(pagination.page, pagination.pageSize);
-      permissionUserList.value = (data?.list ?? []).map(toPermissionUserItem);
+      if (current !== permissionSeq) return;
+      const rows = (data?.list ?? []).map(toPermissionUserItem);
+      // 删除权限后当前页可能被清空：回退上一页重读，不停留在空页
+      if (rows.length === 0 && pagination.page > 1) {
+        pagination.page -= 1;
+        void fetchPermissionUsers();
+        return;
+      }
+      permissionUserList.value = rows;
       pagination.itemCount = data?.total ?? 0;
     } catch (err) {
+      if (current !== permissionSeq) return;
       permissionUserList.value = [];
       pagination.itemCount = 0;
       message.error(err instanceof Error ? err.message : '加载权限用户失败');
     } finally {
-      loading.value = false;
+      if (current === permissionSeq) loading.value = false;
     }
   };
 
@@ -142,17 +156,20 @@ export function usePermissionManage() {
       message.warning('请输入 UID 或姓名');
       return;
     }
+    const current = ++searchSeq;
     searchLoading.value = true;
     try {
       const data = await searchAdminUsers(query, searchPagination.page, searchPagination.pageSize);
+      if (current !== searchSeq) return;
       searchResultList.value = (data?.list ?? []).map(toSearchUserItem);
       searchPagination.itemCount = data?.total ?? 0;
     } catch (err) {
+      if (current !== searchSeq) return;
       searchResultList.value = [];
       searchPagination.itemCount = 0;
       message.error(err instanceof Error ? err.message : '搜索用户失败');
     } finally {
-      searchLoading.value = false;
+      if (current === searchSeq) searchLoading.value = false;
     }
   };
 
@@ -232,6 +249,8 @@ export function usePermissionManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起不可逆请求
+        if (loading.value) return;
         loading.value = true;
         try {
           await revokeUserPermission(user.uid);
@@ -259,6 +278,8 @@ export function usePermissionManage() {
       positiveText: '确定删除',
       negativeText: '取消',
       onPositiveClick: async () => {
+        // 双击确认按钮不得重复发起不可逆请求
+        if (loading.value) return;
         loading.value = true;
         try {
           await batchRevokePermissions([...selectedUserIds.value]);

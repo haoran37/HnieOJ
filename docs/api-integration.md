@@ -116,7 +116,7 @@
 | 104 | DELETE `/api/admin/discussions/{id}` | useDiscussManage.ts handleDelete() | AdminDiscussionController | 已接线 | 成功后重读列表 |
 | 105 | GET `/api/announcements` | src/composables/oj/useNewsList.ts（NewsList.vue 传 `category=NEWS`；AnnouncementCard.vue 不传 category 保持旧行为） | AnnouncementController | 已接线 | keyword 分页 + 可选 category（ANNOUNCEMENT/NEWS）；无浏览量字段 |
 | 106 | GET `/api/announcements/{id}` | src/composables/oj/useNewsDetail.ts（NewsDetail.vue） | AnnouncementController | 已接线 | 只读；admin 编辑删除属另一批 |
-| 107 | GET `/api/admin/announcements` | src/composables/admin/useAnnouncement.ts（ContentManage/Announcement.vue 固定 ANNOUNCEMENT；ContentManage/News.vue 经 useAdminNews 固定 NEWS，remote 分页 + keyword/status/category） | AdminAnnouncementController | 已接线 | 字段 title/content/status（0 下线/1 上线）+ category（缺省 ANNOUNCEMENT） |
+| 107 | GET `/api/admin/announcements` | src/composables/admin/useAnnouncement.ts（ContentManage/ContentManagePage.vue；Announcement.vue 传 category=ANNOUNCEMENT，News.vue 传 category=NEWS；remote 分页 + keyword/status/category） | AdminAnnouncementController | 已接线 | 字段 title/content/status（0 下线/1 上线）+ category（缺省 ANNOUNCEMENT） |
 | 108 | POST `/api/admin/announcements` | useAnnouncement.ts handleSubmit()（Announcement.vue / News.vue 新建） | AdminAnnouncementController | 已接线 | {title,content,status,category} 带对应分类 |
 | 109 | PUT `/api/admin/announcements/{id}` | useAnnouncement.ts handleSubmit()（Announcement.vue / News.vue 编辑） | AdminAnnouncementController | 已接线 | 编辑前经 GET /api/admin/announcements/{id} 读取 content/status/category（下线公告也可编辑）；保存带对应 category；成功后重读列表 |
 | 110 | DELETE `/api/admin/announcements/{id}` | useAnnouncement.ts handleDelete() | AdminAnnouncementController | 已接线 | 成功后重读列表 |
@@ -153,9 +153,9 @@
 | PUT `/api/user/profile` | `useUserSettings.ts`（UserSetting.vue 普通资料表单） | **B2 新增（不计入 117 项）**：只提交 `username/avatar/qq/github/blog` 五个白名单字段（空串表示清空可选项）；`uid/email` 不可改 |
 | PUT `/api/user/password` | `useUserSettings.ts`（UserSetting.vue 密码表单） | **B2 新增（不计入 117 项）**：`UpdatePasswordRequest{oldPassword,newPassword}`，新密码 6–32 位且不 trim；旧密码错误返回 `PASSWORD_ERROR`；成功后后端失效全部旧会话，前端清理本地 token 并跳转登录 |
 | PUT `/api/user/profile/password` | 前端不使用 | 并存的另一个人工改密入口，请求体是 `ChangeCurrentPasswordRequest{oldPassword,password}`，且旧密码错误返回 `UNAUTHORIZED`。**与 `PUT /api/user/password` 字段名和错误码都不同，不是等价路径**，新代码不要替换为它 |
-| POST/GET `/api/user/profile-change-requests` | `useUserSettings.ts`（UserSetting.vue 身份变更申请） | **B2 新增（不计入 117 项）**：身份流程（`ProfileChangeService`），独占受理实名/学院/年级/班级，按申请 id 审批，含原值一致性校验。**与下面通用流程那行是两套独立契约** |
-| POST/GET `/api/user/profile/change-requests` | 前端不使用（契约保留） | 通用资料流程（`UserProfileChangeService`）的历史路由：受理 username/email/phone/avatar/qq/cf/github/blog，按 uid 审批，且**拒绝携带身份字段的请求**。**与身份流程不是等价路径**，替换调用会收到拒绝或误解审批模型 |
-| GET `/api/admin/profile-change-requests`、POST `/{id}/approve`、POST `/{id}/reject` | `useUserChange.ts`（UserManage/Change.vue） | **B2 新增（不计入 117 项）**：ADMIN/ROOT；按申请 id 审批，仅 PENDING 可操作，通过/驳回均要求原因（≤1000），审批时校验申请原值与用户当前资料一致 |
+| POST/GET `/api/user/profile-change-requests` | `useUserSettings.ts`（UserSetting.vue 资料变更申请） | **B2 新增（不计入 117 项）**：项目内唯一的资料变更申请流程（`ProfileChangeService`），按申请 id 审批，可申请 12 个字段（身份字段 realname/collegeId/grade/classId + 联系/社交字段 username/email/phone/avatar/qq/cfUsername/github/blog），只提交需要变更的字段，含逐字段原值一致性校验 |
+| GET `/api/admin/profile-change-requests`、POST `/{id}/approve`、POST `/{id}/reject`、POST `/batch-approve` | `useUserChange.ts`（UserManage/Change.vue） | **B2 新增（不计入 117 项）**：ADMIN/ROOT；按申请 id 审批，仅 PENDING 可操作，通过/驳回均要求原因（≤1000），审批时逐字段校验申请原值与用户当前资料一致；批量审批按 id 列表逐条独立事务，单条失败不影响其它条目 |
+| POST/GET `/api/user/profile/change-requests`、GET `/api/users/changes`、PUT `/api/users/{uid}/changes/approve`、PUT `/api/users/{uid}/changes/reject`、PUT `/api/users/changes/batch-approve` | 已退役 | **这些接口已不存在**（返回 404）。资料变更统一走上一行的单一流程；原按 uid 审批的通用资料流程及其 `user_profile_change_apply` 表已删除，不要再按旧文档接入 |
 
 ## C. 无文档且后端无 API 的缺失能力（AC6，保留页面并禁用/空状态）
 
@@ -169,7 +169,7 @@
 | 用户个人题单/比赛/作业/讨论 | 后端列表接口不支持 uid 过滤；UserTraining/UserContest/UserHomework/UserDiscuss 标注「暂未开放」，不用全站数据冒充 |
 | 用户消息 | **已接线（B2）**：`useUserMessages.ts` + `UserMessage.vue` 支持分页、全部/未读过滤、未读数、单条/全部已读、删除确认；仅本人可见（route uid 与本人 uid 比较，非本人不可访问），失败不伪 0 |
 | 收藏/评分/历史统计 | 后端无自助接口；UserHome/UserSideBar 统计区标注「暂未开放」，UserHome「已通过/尝试过的题目」不再显示 0 题或「暂无本地记录」 |
-| 自助资料/密码/身份变更申请 | **已接线（B2）**：`useUserSettings.ts` + `UserSetting.vue` 真实加载 `GET /api/user/profile`，只提交白名单字段；密码走 `PUT /api/user/password`，成功后清理本地会话并跳转登录；实名/学院/年级/班级走变更申请并展示本人申请分页。收藏/评分仍暂未开放 |
+| 自助资料/密码/身份变更申请 | **已接线（B2）**：`useUserSettings.ts` + `UserSetting.vue` 真实加载 `GET /api/user/profile`，只提交白名单字段；密码走 `PUT /api/user/password`，成功后清理本地会话并跳转登录；身份与联系/社交字段走同一个变更申请并展示本人申请分页。收藏/评分仍暂未开放 |
 | 用户信息变更审核（「变动申请」页） | **已接线（B2）**：`useUserChange.ts` + `Change.vue` 走真实分页/状态/关键字，行 key 为申请 id，仅 PENDING 可审核、原因必填，冲突保留错误并刷新真实状态；已移除 disabled 占位批量按钮 |
 | 成就附件本地/外部区分 | 本地存储：`fileUrl` 为受保护路径 `/api/admin/achievements/{id}/file`，前端 Bearer 下载为 Blob；外部仅 http(s) 以链接打开，不把 local key 当链接、也不走服务端代理 |
 | 注册开关/注册模式执行缺口 | `registerMode` 已按后端合法枚举（OPEN/EMAIL_SUFFIX/INVITE_CODE）保存与回读，但 user 模块未读取 allowRegister/registerMode，RegisterRequest 无 inviteCode；Config.vue 明确提示该设置当前不影响实际注册，不虚构邀请码注册已生效 |

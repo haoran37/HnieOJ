@@ -48,7 +48,7 @@ export interface UseUserSettingsOptions {
 }
 
 /**
- * 本人自助资料 / 密码 / 身份变更申请（B2-3 ~ B2-5）。
+ * 本人自助资料 / 密码 / 身份变更申请。
  *
  * - 普通资料只提交白名单字段；uid/email 只读；
  * - 密码独立表单，不 trim，成功由调用方清理会话并跳转登录；

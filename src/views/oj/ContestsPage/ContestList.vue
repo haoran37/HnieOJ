@@ -198,16 +198,6 @@ onMounted(() => {
       border-color: currentColor;
 
       .bg-shape { transform: scale(3); } // 放大背景装饰
-      
-      // .text-box {
-      //   .title { color: #fff; }
-      //   .desc { color: rgba(255, 255, 255, 0.8); }
-      // }
-      
-      // .icon-box {
-      //   background: rgba(255, 255, 255, 0.2);
-      //   color: #fff;
-      // }
     }
 
     // 颜色定义

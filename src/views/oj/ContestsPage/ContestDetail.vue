@@ -124,7 +124,6 @@ const durationText = computed(() => {
   return formatDuration(end - start);
 });
 
-//INFO: 后端记得实现比赛未开始时无法请求problem和rank
 // 路由守卫，监听加载状态、比赛状态和当前路由的变化
 watch(
   [() => loading.value, () => contestStatus.value, () => route.name],

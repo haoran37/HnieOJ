@@ -1,9 +1,8 @@
 # HNIEOJ 全业务 API 对接清单（117 项 Apifox 文档）
 
-本清单逐条覆盖冻结的 `all-apis.json` 117 项接口，并补充后端已有增补路由。
+本清单逐条覆盖冻结的 117 项接口需求，并补充后端已有增补路由。
 字段以后端当前 DTO/VO 为准（文档 response schema 多为空）。
 
-- 生成来源：`all-apis.json` / `api-inventory.json` / `backend-routes.json`（只读冻结输入）。
 - 状态含义：**已接线** = 前端真实页面/请求已对接；**部分接线** = 仅局部；**未接线** = 本批未覆盖；**节点/内部** = 非浏览器调用；**已废弃** = 后端已移除；**已退休** = 旧流程停用（旧 controller 可能仍保留路由并显式拒绝，或仅余无消费方的空写路径），能力由 Bootstrap + Ed25519 + WSS 取代；**后端缺失** = 文档有但后端无实现。
 - 后端网关目前除登录/注册/system 公开接口外均要求登录；页面避免对受保护数据反复请求造成重定向。
 
@@ -34,7 +33,7 @@
 | 21 | POST `/api/registrations/{uid}/approve` | useRegistration.ts handleApprove() | RegistrationReviewController | 已接线 |  |
 | 22 | POST `/api/registrations/{uid}/reject` | useRegistration.ts handleRejectSubmit() | RegistrationReviewController | 已接线 | {reason} 真实原因 |
 | 23 | POST `/api/registrations/batch/approve` | useRegistration.ts handleBatchApprove() | RegistrationReviewController | 已接线 | {uids}，返回成功/失败汇总 |
-| 24 | GET `/api/users/import/template` | `src/composables/admin/useUserManage.ts handleDownloadTemplate()`（鉴权 Blob 下载） | UserManageController（源码已提供；冻结 backend-routes.json 未收录） | 已接线 | 后端源码已有该路由（xlsx，需 USER_MANAGE）；冻结路由清单缺失，后续后端批补齐 |
+| 24 | GET `/api/users/import/template` | `src/composables/admin/useUserManage.ts handleDownloadTemplate()`（鉴权 Blob 下载） | UserManageController | 已接线 | 后端源码已有该路由（xlsx，需 USER_MANAGE） |
 | 25 | GET `/api/users/{uid}/achievements` | src/utils/api.ts getUserAchievements()（UserSideBar.vue） | UserAchievementController | 已接线 | 成就列表分页 |
 | 26 | POST `/api/achievements/apply` | src/utils/api.ts submitAchievementApply()（UserSetting.vue） | AchievementApplyController | 已接线 | multipart title/description/file，真实报错 |
 | 27 | POST `/api/admin/users/{uid}/achievements` | useUserManage.ts handleAddAchievement()（UserList 成就弹窗）、ContestManage/Achievement.vue | AdminUserAchievementController | 已接线 | {title?,content,proofUrl?,achieveTime?} |
@@ -149,6 +148,12 @@
 | POST/PUT/DELETE `/api/admin/tags` | `useTagManage.ts`（ProblemManage/Tag.vue） | **B1 新增（不计入 117 项）**：ADMIN/ROOT + `problem:create/update/delete`；名称必填 ≤50、color ≤20、category ≤50；删除被引用标签返回业务错误并原样提示 |
 | GET `/api/problems/{problemCode}/recommendations?limit=5` | `ProblemDetail.vue` 推荐题目侧栏 | **B1 新增（不计入 117 项）**：公开题按标签/难度推荐；空显示「暂无推荐」，失败可重试；按 problemCode 导航，旧响应作废 |
 | POST/PUT/DELETE `/api/admin/judge/account`、`/{id}` | `useSystemConfig.ts`（Config.vue 远程评测账号） | **B1 新增（不计入 117 项）**：账号 CRUD；密码只写不读，编辑初始为空、留空保留、非空原样提交；仅账号管理，不代表已实现外站代交 |
+| GET/POST `/api/admin/notices`、GET/PUT/DELETE `/{id}`、POST `/{id}/publish` | `useNotice.ts`（ContentManage/Notice.vue） | **B2 新增（不计入 117 项）**：ADMIN/ROOT；分页 `page/pageSize/keyword/status`；新建与编辑只写草稿，`publish` 展开收件人并投递，`DELETE /{id}` 只删管理记录、不撤回已投递消息 |
+| GET `/api/user/messages`、GET `/unread-count`、PUT `/{id}/read`、PUT `/read-all`、DELETE `/{id}` | `useUserMessages.ts`（UserPage/views/UserMessage.vue） | **B2 新增（不计入 117 项）**：uid 一律取自服务端登录态，前端不传 ownerUid；未读数响应非数字时前端保持原值并记错，不伪 0 |
+| PUT `/api/user/profile` | `useUserSettings.ts`（UserSetting.vue 普通资料表单） | **B2 新增（不计入 117 项）**：只提交 `username/avatar/qq/github/blog` 五个白名单字段（空串表示清空可选项）；`uid/email` 不可改 |
+| PUT `/api/user/password` | `useUserSettings.ts`（UserSetting.vue 密码表单） | **B2 新增（不计入 117 项）**：`{oldPassword,newPassword}`，新密码 6–32 位且不 trim；成功后后端失效全部旧会话，前端清理本地 token 并跳转登录。`PUT /api/user/profile/password` 为等价旧路径 |
+| POST/GET `/api/user/profile-change-requests` | `useUserSettings.ts`（UserSetting.vue 身份变更申请） | **B2 新增（不计入 117 项）**：本人身份（实名/学院/年级/班级）变更申请提交与本人分页。身份字段由本流程独占；通用资料流程拒绝携带身份字段的请求。`POST/GET /api/user/profile/change-requests` 为等价旧路径 |
+| GET `/api/admin/profile-change-requests`、POST `/{id}/approve`、POST `/{id}/reject` | `useUserChange.ts`（UserManage/Change.vue） | **B2 新增（不计入 117 项）**：ADMIN/ROOT；按申请 id 审批，仅 PENDING 可操作，通过/驳回均要求原因（≤1000），审批时校验申请原值与用户当前资料一致 |
 
 ## C. 无文档且后端无 API 的缺失能力（AC6，保留页面并禁用/空状态）
 
@@ -196,39 +201,3 @@
 - 作业 `classIds` 为数字数组（后端 `@Min(1)`）；作业表单的学院→年级→班级选项来自 `GET /api/colleges`、`/api/colleges/{id}/grades`、`/api/colleges/{id}/grades/{grade}/classes`，没有“专业”维度。
 - 比赛限定账号请求为 `accountList: string[]`（uid），详情返回 `accountList[{uid,username}]`；账号查验使用 `GET /api/user/check?query=`。
 
-## E. 本批行为回归
-
-- `scripts/verify-admin-content.mjs`：真实实例化 `useProblemForm`/`useAnnouncement`/`useDiscussManage`/`useDiscussAdd`，受控 HTTP 覆盖草稿保护、旧响应隔离、管理端详情映射、空 examples 保存、`total>pageSize` 第二页与创建不发送 `isTop`。运行：`node scripts/verify-admin-content.mjs`。
-- `scripts/verify-admin-business.mjs`：真实实例化本批 `useContestForm`/`useContestList`/`useTrainingForm`/`useHomeworkForm`/`useTeamManage`，受控 HTTP 覆盖题目按 `problemId` 数字查验、比赛/作业 String(A/B) 与训练 Integer displayId、账号重复/401 保留输入、PUT 失败保留表单、作业数字 classIds 与旧年级响应隔离、队伍成员 UID 与批量删除 body、`total>pageSize` 第二页，并回归记录切换竞态（详情元数据迟到、失败详情不得保存旧表单、迟到题目添加不跨记录、旧保存不得卡住新记录保存态）、题目的上/下移交换 `displayId` 后按编号排序持久化与仅改标题不重排、队伍迟到查验/A→B→A 不清空当前列表、公开 check 无效时回退管理详情（停用比赛仍可管理，404 才停止）、关闭弹窗后延迟校验不得提交、编辑表单详情未加载完成前不渲染、比赛模式系统时间本地时区格式化。运行：`node scripts/verify-admin-business.mjs`。
-- `scripts/verify-final-status.mjs`：实例化真实 `userStore` 与 `useDashboard`，覆盖未查询到做题记录返回未知（不伪称「未开始」/0 题、AC/WA 映射保留）、仪表盘真实 `total=0` 显示 0、接口读取失败标记 error 且不沿用旧成功值、重新加载成功后恢复。运行：`node scripts/verify-final-status.mjs`。
-- `scripts/verify-judge-nodes.mjs`（节点安全批次新增）：受控 HTTP 覆盖正式/临时节点统一 `POST /api/admin/judge/nodes/bootstrap-tokens` 的严格 DTO、`/tokens/{tokenId}/drain` 与 `/enable`、`/revoke` 生命周期路由、会话代号作废在途旧响应、同一会话并发列表读取「最新响应才可写入」，并真实转译 `Service.vue` 的 `<script setup>` 做组件级行为回归：切换账号/关闭签发弹窗作废迟到凭据、切会话后迟到的排空与吊销确认不再刷新或发请求、旧签发 `finally` 不得清除新签发提交态、生命周期成功但回读失败时提示「已提交但刷新失败」而非谎报成功；同时做源码级约束：不得再调用已退休 `formal-token`/`auth-codes`/`draining` 路由，列表只读 `maxConcurrency`/`expireTime`、排空以 `status === draining` 判定，注册凭据不写浏览器存储、不打印。运行：`node scripts/verify-judge-nodes.mjs`。
-- `scripts/verify-auth.mjs`、`scripts/verify-business.mjs` 同样以受控 HTTP 桩（替换 `globalThis.fetch`）验证认证/业务请求契约，不依赖真实后端；`scripts/verify-admin-users.mjs`、`scripts/verify-oj-composables.mjs`、`scripts/verify-oj-rework.mjs`、`scripts/verify-final-status.mjs` 也均为仓库内可直接运行的受控 HTTP 或源码回归。真实后端联调需另行启动服务，不属于以上脚本。
-- `scripts/verify-remaining-b1.mjs`（B1 批次新增）：受控 HTTP 覆盖标签目录/管理、推荐、远程评测账号、公告/新闻的真实 API 路径与参数、推荐旧响应作废、密码 payload 空保留/非空原样、分类、加载失败不伪空、保存期间重复提交防护；并编译 `ProblemDetail.vue` 的 `<script setup>` 直接实例化，验证推荐请求竞态。运行：`node scripts/verify-remaining-b1.mjs`。
-
-## F. 本轮（用户查询 / 比赛成就）记录
-
-本轮完成两项前端接线：`UserSearchBox.vue` 在既有 `keyword`/`page`/`pageSize` 基础上支持 `collegeId`/`grade`/`classId` 联动筛选、服务端分页与显式用户选择；`ContestManage/Achievement.vue` 支持真实用户查询与显式选择、成就列表分页、新增/删除，并保留前往成就申请审核入口，用户绑定、竞态与失败保留按组件回归覆盖。以上已做组件/API 契约测试（`scripts/verify-user-search.mjs`、`scripts/verify-contest-achievement.mjs`）和类型检查/lint，均在受控 HTTP 桩下运行、不依赖真实后端；本轮未进行真实浏览器联调与真实后端新功能验收。所有其他剩余功能待 API/schema/dependency 方案授权后再实施，不虚构完成。
-
-## G. B1 批次（标签/推荐/远程账号/新闻）
-
-本批接通四项剩余能力，均使用后端已实现的 B1 接口（见 `backend-api-b1.md`），不新增依赖、不改后端：
-
-- 标签目录/管理：`TagSelectModal.vue` 读取真实 `GET /api/tags` 并按 category 分组（source 映射「来源」，空分类「未分类」）；`ProblemManage/Tag.vue` 完成真实 CRUD、本地分页（真实条数，不伪造 total）、删除确认与被引用错误提示；加载失败显示错误并可重试，不被当成空目录。
-- 推荐题目：`ProblemDetail.vue` 调用 `GET /api/problems/{encodedCode}/recommendations?limit=5`；独立的加载/空/错误状态，切换题目同步清空并作废旧请求，按 problemCode 导航且可用键盘操作；题目详情成功不再清掉推荐。
-- 远程评测账号：`SystemManage/Config.vue` 增加新建/编辑/删除确认；密码只写不读，编辑初始为空、留空保留、非空原样提交（不 trim），保存期间禁用切换与重复提交并捕获 id/payload 快照；删除后重读列表，列表失败明确报错。
-- 新闻：`ContentManage/News.vue` 复用 `useAnnouncement('NEWS')`（`useAdminNews.ts` 薄封装），`Announcement.vue` 固定 ANNOUNCEMENT；前台 `NewsList.vue` 只请求 `category=NEWS` 且搜索后翻页保留关键词，`NewsDetail.vue` 真实读取并沿用现有 Markdown 呈现；首页 `AnnouncementCard.vue` 不传 category，旧调用行为不变。
-
-自测：`node scripts/verify-remaining-b1.mjs`、`node scripts/verify-business.mjs`、`node scripts/verify-admin-content.mjs`、`node scripts/verify-admin-users.mjs` 通过；`./node_modules/.bin/vue-tsc --build` 与 `./node_modules/.bin/eslint [changed]`（无 `--fix`）通过。未进行真实后端/浏览器联调；Codeforces/POJ 外站代交仍未实现（本批仅为账号管理）。
-
-## H. B2 批次（管理通知 / 本人消息 / 自助资料与密码 / 身份变更审核）
-
-本批接通后端 B2 接口（见 `backend-api-b2.md`），不新增依赖、不改后端；用户身份一律取自服务端登录态，前端不传 ownerUid。
-
-- 管理通知：`ContentManage/Notice.vue` + `useNotice.ts`。真实分页 `page/pageSize/keyword/status`；列表展示标题/目标类型/状态/创建时间/发布时间。新建与保存均为草稿；编辑前经受保护 `GET /api/admin/notices/{id}` 回填正文与已保存 `targetIds`。收件方式 `USERS` 用现有用户查询（`GET /api/user/users`）显式多选，`CLASSES` 用现有学院→年级→班级级联查询，已保存但未解析的 ID 以原值展示且可删除，最多 1000；不手造名单、不默认全校。发布前确认收件目标且不可撤回，发布成功才刷新为已发布；重复点击禁用。已发布详情只读、无编辑按钮；删除确认明确只删管理记录、不撤回已投递消息，删除期间 `deleting` 并发锁保护、按钮禁用且重复点击只发一次 `DELETE`。正文以纯文本展示，不使用 `v-html`。
-- 本人消息：`UserMessage.vue` + `useUserMessages.ts`。分页、全部/未读过滤、未读数、单条已读/全部已读、删除确认；数据来自 `/api/user/messages` 系列。消息展示标题/正文/时间/`readAt`，正文纯文本。route uid 与本人 uid 比较，非本人页面不可访问且 `isActive=false` 时组合式不发任何请求；刷新/读/删后更新未读数，工具栏刷新同时重读列表与未读数，删除最后一页最后一条回退页码，失败可重试且未读数失败保持 `null` 不伪 0。账号/路由切换同步 `reset()` 作废在途列表/未读数/读删并清空详情、计数、错误与页码，卸载同样作废。首页 `UserSidePanel.vue` 与个人侧栏 `UserSideBar.vue` 仅对本人显示真实未读数，带请求序号作废旧响应，并订阅收件箱读/删成功事件刷新计数。
-- 自助资料：`UserSetting.vue` + `useUserSettings.ts`。`GET /api/user/profile` 真实加载；普通表单只编辑 `username/avatar/qq/github/blog`，保存只提交这 5 个白名单字段（空串清空可选项），成功后重新读取 profile 并同步 `userStore`（顶部用户名）。`uid/email` 只读展示，实名/学院/年级/班级通过独立身份变更申请表修改。头像仅允许 http(s) 或站内 `/` 路径，空/空白头像视为合法清除（与 payload 归一一致，非空仍拒绝 `javascript:`/`data:`/协议相对）；客户端同时校验用户名/QQ/GitHub/博客长度与格式；保存失败保留表单。保存/密码/身份提交均按 generation 快照，账号切换后旧 mutation 不重载资料、不清空/不返回成功。
-- 密码：独立旧/新/确认表单（`type=password`，新密码 6–32 位、不 trim、两次一致），只调用 `PUT /api/user/password`，不使用管理员改密接口。失败保留输入不打印秘密；成功清空字段、`userStore.logout()` 清理本地 token 并导航登录（服务端已失效全部旧会话）；旧密码错误不清会话。密码不写 localStorage。
-- 身份变更审核：`Change.vue` + `useUserChange.ts`。真实 `page/pageSize/status/keyword` 分页；行 key 为申请 id（同一用户可有历史申请）；按「原值 → 目标值」展示实名/学院/年级/班级 4 项，不提供 UID 变更。仅 `PENDING` 可操作，通过/驳回均要求原因（≤1000），调用 `/{id}/approve`、`/{id}/reject`；审核期间锁定申请 id，冲突保留错误并刷新真实状态；已移除 disabled 占位批量按钮。
-- 成就认证 multipart 上传与受控 `fileList` 行为保持不变（回归见 `verify-oj-rework.mjs`）。
-
-自测：`node scripts/verify-remaining-b2.mjs`（52 项契约/行为/源码约束，覆盖页筛选/uid 隔离/旧响应作废/身份 id/失败保留/密码成功退出与失败不退出/白名单 payload/空头像清除/删除并发锁/未读事件）、独立探针 `node <frozen>/frontend_b2_edge.mjs`（空头像 `isValidAvatar('')`、reset 后旧未读数丢弃）、`node scripts/verify-admin-users.mjs`、`node scripts/verify-admin-content.mjs`、`node scripts/verify-oj-rework.mjs`、`node scripts/verify-oj-composables.mjs`、`node scripts/verify-remaining-b1.mjs`、`node scripts/verify-business.mjs`、`node scripts/verify-user-search.mjs`、`node scripts/verify-contest-achievement.mjs`、`node scripts/verify-final-status.mjs`、`node scripts/verify-auth.mjs`；`./node_modules/.bin/vue-tsc --build` 与 `./node_modules/.bin/eslint [changed]`（无 `--fix`，退出码 0）与 `git diff --check`。未进行真实后端/浏览器联调；Codeforces/POJ 外站代交、收藏、注册策略/邀请码/Excel 等其余批次仍未完成。

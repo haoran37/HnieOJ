@@ -147,14 +147,18 @@ const handleRetry = async (row: JudgeTaskOutboxVo) => {
     message.warning('已发送的任务不能重试');
     return;
   }
+  // 全局互斥：retryingId 覆盖「POST + 刷新」全过程，同/不同行连点都不得重复提交
+  if (retryingId.value !== null) return;
   retryingId.value = row.id;
   try {
     await retryJudgeOutbox(row.id);
     message.success('重试已提交，正在刷新状态');
+    // 刷新结束前保持互斥，避免并发重试串扰列表与按钮状态
     await fetchOutbox();
   } catch (error) {
     message.error(error instanceof Error ? error.message : '重试失败');
   } finally {
+    // 失败/完成后释放互斥，允许重新重试
     retryingId.value = null;
   }
 };
@@ -237,7 +241,7 @@ const columns = [
           size: 'small',
           type: 'primary',
           secondary: true,
-          disabled: isSent,
+          disabled: isSent || retryingId.value !== null,
           loading: retryingId.value === row.id,
           onClick: () => handleRetry(row)
         },

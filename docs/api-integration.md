@@ -151,8 +151,10 @@
 | GET/POST `/api/admin/notices`、GET/PUT/DELETE `/{id}`、POST `/{id}/publish` | `useNotice.ts`（ContentManage/Notice.vue） | **B2 新增（不计入 117 项）**：ADMIN/ROOT；分页 `page/pageSize/keyword/status`；新建与编辑只写草稿，`publish` 展开收件人并投递，`DELETE /{id}` 只删管理记录、不撤回已投递消息 |
 | GET `/api/user/messages`、GET `/unread-count`、PUT `/{id}/read`、PUT `/read-all`、DELETE `/{id}` | `useUserMessages.ts`（UserPage/views/UserMessage.vue） | **B2 新增（不计入 117 项）**：uid 一律取自服务端登录态，前端不传 ownerUid；未读数响应非数字时前端保持原值并记错，不伪 0 |
 | PUT `/api/user/profile` | `useUserSettings.ts`（UserSetting.vue 普通资料表单） | **B2 新增（不计入 117 项）**：只提交 `username/avatar/qq/github/blog` 五个白名单字段（空串表示清空可选项）；`uid/email` 不可改 |
-| PUT `/api/user/password` | `useUserSettings.ts`（UserSetting.vue 密码表单） | **B2 新增（不计入 117 项）**：`{oldPassword,newPassword}`，新密码 6–32 位且不 trim；成功后后端失效全部旧会话，前端清理本地 token 并跳转登录。`PUT /api/user/profile/password` 为等价旧路径 |
-| POST/GET `/api/user/profile-change-requests` | `useUserSettings.ts`（UserSetting.vue 身份变更申请） | **B2 新增（不计入 117 项）**：本人身份（实名/学院/年级/班级）变更申请提交与本人分页。身份字段由本流程独占；通用资料流程拒绝携带身份字段的请求。`POST/GET /api/user/profile/change-requests` 为等价旧路径 |
+| PUT `/api/user/password` | `useUserSettings.ts`（UserSetting.vue 密码表单） | **B2 新增（不计入 117 项）**：`UpdatePasswordRequest{oldPassword,newPassword}`，新密码 6–32 位且不 trim；旧密码错误返回 `PASSWORD_ERROR`；成功后后端失效全部旧会话，前端清理本地 token 并跳转登录 |
+| PUT `/api/user/profile/password` | 前端不使用 | 并存的另一个人工改密入口，请求体是 `ChangeCurrentPasswordRequest{oldPassword,password}`，且旧密码错误返回 `UNAUTHORIZED`。**与 `PUT /api/user/password` 字段名和错误码都不同，不是等价路径**，新代码不要替换为它 |
+| POST/GET `/api/user/profile-change-requests` | `useUserSettings.ts`（UserSetting.vue 身份变更申请） | **B2 新增（不计入 117 项）**：身份流程（`ProfileChangeService`），独占受理实名/学院/年级/班级，按申请 id 审批，含原值一致性校验。**与下面通用流程那行是两套独立契约** |
+| POST/GET `/api/user/profile/change-requests` | 前端不使用（契约保留） | 通用资料流程（`UserProfileChangeService`）的历史路由：受理 username/email/phone/avatar/qq/cf/github/blog，按 uid 审批，且**拒绝携带身份字段的请求**。**与身份流程不是等价路径**，替换调用会收到拒绝或误解审批模型 |
 | GET `/api/admin/profile-change-requests`、POST `/{id}/approve`、POST `/{id}/reject` | `useUserChange.ts`（UserManage/Change.vue） | **B2 新增（不计入 117 项）**：ADMIN/ROOT；按申请 id 审批，仅 PENDING 可操作，通过/驳回均要求原因（≤1000），审批时校验申请原值与用户当前资料一致 |
 
 ## C. 无文档且后端无 API 的缺失能力（AC6，保留页面并禁用/空状态）

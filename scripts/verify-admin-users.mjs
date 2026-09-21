@@ -267,13 +267,45 @@ await checkAsync('成就：列表/approve/reject/本地附件下载/用户成就
   assert.equal(lastCall().url, '/api/admin/achievements/7/reject');
   assert.deepEqual(lastBody(), { reason: '不符合' });
 
-  // 本地附件：受保护路径 + Bearer，且响应为二进制不算业务错误
+  // 本地附件：受保护路径 + Bearer，响应为二进制不算业务错误。
+  // 返回结构为 { blob, filename }：文件名取自 Content-Disposition，前端据此保留真实扩展名
   responder = async () =>
-    new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'Content-Type': 'application/octet-stream' } });
-  const blob = await downloadAchievementApplyFile(7);
+    new Response(new Uint8Array([1, 2, 3]), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': 'attachment; filename="proof.pdf"',
+      },
+    });
+  const downloaded = await downloadAchievementApplyFile(7);
   assert.equal(lastCall().url, '/api/admin/achievements/7/file');
   assert.equal(lastCall().init.headers.get('Authorization'), 'Bearer real-token');
-  assert.ok(blob.size > 0);
+  assert.ok(downloaded.blob.size > 0);
+  assert.equal(downloaded.filename, 'proof.pdf');
+
+  // RFC 5987 的 filename* 优先，并按 UTF-8 解码中文名
+  responder = async () =>
+    new Response(new Uint8Array([1]), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': "attachment; filename*=UTF-8''%E8%AF%81%E6%98%8E.pdf",
+      },
+    });
+  const utf8Named = await downloadAchievementApplyFile(7);
+  assert.equal(utf8Named.filename, '证明.pdf');
+  assert.ok(utf8Named.blob.size > 0);
+
+  // 后端未给 Content-Disposition 时 filename 为 null，由调用方回退命名
+  responder = async () =>
+    new Response(new Uint8Array([1, 2]), { status: 200, headers: { 'Content-Type': 'application/octet-stream' } });
+  const unnamed = await downloadAchievementApplyFile(7);
+  assert.equal(unnamed.filename, null);
+  assert.ok(unnamed.blob.size > 0);
+
+  // 业务错误仍必须抛错：绝不能把错误 JSON 当成文件保存为“下载成功”
+  responder = async () => json({ code: 500, msg: '附件不存在' });
+  await assert.rejects(() => downloadAchievementApplyFile(7), /附件不存在/);
 
   responder = async () => json({ code: 200, msg: 'ok', data: null });
   await addUserAchievement('u1', { title: 't', content: 'c', proofUrl: 'https://x', achieveTime: 123 });

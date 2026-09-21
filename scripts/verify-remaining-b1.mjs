@@ -130,9 +130,6 @@ const { useTagManage } = await import(
 const { useAnnouncement } = await import(
   pathToFileURL(path.join(root, 'src/composables/admin/useAnnouncement.ts')).href
 );
-const { useAdminNews } = await import(
-  pathToFileURL(path.join(root, 'src/composables/admin/useAdminNews.ts')).href
-);
 const { useSystemConfig } = await import(
   pathToFileURL(path.join(root, 'src/composables/admin/useSystemConfig.ts')).href
 );
@@ -383,14 +380,15 @@ await test('公告管理：NEWS 分类进入列表查询与保存载荷', async 
   assert.equal(body.category, 'NEWS');
 });
 
-await test('新闻管理：useAdminNews 固定 NEWS，编辑详情保留原分类', async () => {
+await test('新闻管理：category=NEWS，编辑详情保留原分类', async () => {
   calls = [];
   responder = async (url, init) => {
     if (init?.method === 'PUT') return json(null);
     if (url.endsWith('/5')) return json({ id: 5, title: 'n', content: 'c', status: 0, category: 'NEWS' });
     return json({ list: [], total: 0 });
   };
-  const news = useAdminNews();
+  // 新闻页现在是共用组件的薄包装，固定传 category=NEWS
+  const news = useAnnouncement('NEWS');
   assert.equal(news.formModel.category, 'NEWS', '新建新闻默认 NEWS');
   await news.openEditModal({ id: 5, title: 'n' });
   assert.equal(news.formModel.category, 'NEWS');
@@ -443,7 +441,7 @@ await test('公告管理：保存进行中禁止换 form、开详情请求或关
   assert.equal(state.showModal.value, false, '保存完成后才允许关闭');
 });
 
-await test('新闻管理：useAdminNews 保存进行中同样禁止换 form 或重复提交', async () => {
+await test('新闻管理：category=NEWS 时保存进行中同样禁止换 form 或重复提交', async () => {
   calls = [];
   let releasePut;
   responder = async (url, init) => {
@@ -451,7 +449,7 @@ await test('新闻管理：useAdminNews 保存进行中同样禁止换 form 或�
     if (url.endsWith('/5')) return json({ id: 5, title: 'n', content: 'c', status: 1, category: 'NEWS' });
     return json({ list: [], total: 0 });
   };
-  const news = useAdminNews();
+  const news = useAnnouncement('NEWS');
   await news.openEditModal({ id: 5, title: 'n' });
   const first = news.handleSubmit();
   const second = news.handleSubmit();

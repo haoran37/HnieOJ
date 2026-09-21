@@ -384,7 +384,7 @@ check('服务端分页表格必须设置 remote（否则 Naive UI 忽略 total�
   const files = [
     '../src/views/admin/ProblemManage/ProblemList/index.vue',
     '../src/views/admin/DiscussManage/DiscussList.vue',
-    '../src/views/admin/ContentManage/Announcement.vue',
+    '../src/views/admin/ContentManage/ContentManagePage.vue',
     '../src/views/admin/SystemManage/Status.vue',
   ]
   for (const file of files) {
@@ -405,7 +405,7 @@ check('本批文件无 mock 数据/模拟延时/占位上传地址', () => {
     '../src/views/admin/ProblemManage/ProblemList/components/ProblemEdit.vue',
     '../src/views/admin/ProblemManage/Tag.vue',
     '../src/views/admin/DiscussManage/DiscussList.vue',
-    '../src/views/admin/ContentManage/Announcement.vue',
+    '../src/views/admin/ContentManage/ContentManagePage.vue',
     '../src/views/admin/SystemManage/Status.vue',
   ]
   for (const file of files) {

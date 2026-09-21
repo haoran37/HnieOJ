@@ -334,6 +334,15 @@ await test('作业：classIds 数字数组、null description 归一为字符串
         { id: 4, name: '计科2班' },
       ]);
     }
+    // 编辑页按已选班级 id 反查名称走批量端点（GET /api/classes?ids=3,4）
+    if (url.startsWith('/api/classes?')) {
+      const wanted = (queryOf(url).get('ids') || '').split(',').filter(Boolean);
+      const known = {
+        '3': '计科1班',
+        '4': '计科2班',
+      };
+      return json(wanted.filter((id) => known[id]).map((id) => ({ id: Number(id), name: known[id] })));
+    }
     if (init?.method === 'PUT') return json(null);
     return json(null);
   };

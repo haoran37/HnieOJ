@@ -59,6 +59,22 @@ export const getMyProfileChangeRequests = (...a) => call('getMyProfileChangeRequ
 export const getProfile = (...a) => call('getProfile', a);
 export const submitProfileChangeRequest = (...a) => call('submitProfileChangeRequest', a);
 export const updateUserProfile = (...a) => call('updateUserProfile', a);
+// 资料变更申请的字段清单（UserSetting.vue 在模块初始化时读取，因此不能走 __api 转发）。
+// 它必须与 src/utils/api.ts 的真实导出一致：下方有断言逐一比对 key/label，防止桩漂移。
+export const PROFILE_CHANGE_FIELDS = [
+  { key: 'realname', label: '实名' },
+  { key: 'collegeId', label: '学院' },
+  { key: 'grade', label: '年级' },
+  { key: 'classId', label: '班级' },
+  { key: 'username', label: '用户名' },
+  { key: 'email', label: '邮箱' },
+  { key: 'phone', label: '手机号' },
+  { key: 'avatar', label: '头像' },
+  { key: 'qq', label: 'QQ' },
+  { key: 'cfUsername', label: 'Codeforces' },
+  { key: 'github', label: 'GitHub' },
+  { key: 'blog', label: '博客' },
+];
 `);
 
 const messageStub = moduleStub('export const useMessage = () => globalThis.__message;');
@@ -137,6 +153,8 @@ const { useRejudge } = await import(
 const { useStatusTime } = await import(
   pathToFileURL(path.join(root, 'src/composables/useTime.ts'))
 );
+// 通过 resolve 钩子拿到的是上面的 api 桩模块（模块级常量无法用 __api 转发）
+const { PROFILE_CHANGE_FIELDS } = await import('@/utils/api');
 
 function detailVo() {
   return {
@@ -252,6 +270,17 @@ async function check(name, fn) {
   passed += 1;
   console.log(`PASS ${name}`);
 }
+
+// 桩自检：PROFILE_CHANGE_FIELDS 是模块级常量（不能像函数那样转发到 __api），
+// 必须与 src/utils/api.ts 的真实导出逐项一致，否则用例验证的是一份过期清单。
+await check('桩自检：PROFILE_CHANGE_FIELDS 与真实导出一致', async () => {
+  const apiSource = fs.readFileSync(path.join(root, 'src/utils/api.ts'), 'utf8');
+  const realPairs = [...apiSource.matchAll(/\{ key: '(\w+)', label: '([^']+)' \}/g)]
+    .map((match) => `${match[1]}:${match[2]}`);
+  const stubPairs = PROFILE_CHANGE_FIELDS.map((field) => `${field.key}:${field.label}`);
+  assert.ok(realPairs.length > 0, '未能从 src/utils/api.ts 解析出字段清单');
+  assert.deepEqual(stubPairs, realPairs, 'PROFILE_CHANGE_FIELDS 桩已与真实导出漂移');
+});
 
 // ---- R1：写入 + 刷新全过程互斥；刷新失败不产生重复写入 ----
 await check('R1 回答互斥覆盖刷新：双击只写一次，刷新结束前 flag 保持', async () => {

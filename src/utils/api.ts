@@ -342,10 +342,7 @@ export function getClasses(collegeId: number, grade: string): Promise<ClassOptio
 }
 
 /**
- * 按 id 批量反查班级（需登录）。
- *
- * 替代「遍历学院 × 年级 × 班级」的反查：一次请求拿到全部已选班级的名称，
- * 请求数不再随学院/年级数量线性放大（约 80 → 1）。
+ * 按 id 批量反查班级（需登录）：一次请求拿到全部已选班级的名称，请求数不随学院/年级数量增长。
  * 库中不存在的 id 会被后端跳过，调用方对未命中的 id 保留原 id 展示即可。
  */
 export function getClassesByIds(ids: number[]): Promise<ClassOption[]> {
@@ -2204,8 +2201,8 @@ export type ProfileChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 /**
  * 对应后端 ProfileSnapshotVo：资料变更申请的原值/目标值快照。
  *
- * 合并两套「资料变更」流程（BE-03.6）后，同一个按 id 审批的流程受理身份字段与联系/社交字段；
- * 历史申请（只含 4 个身份字段）的其余字段为 null，两侧同为 null 表示「未申请变更」。
+ * 同一个按 id 审批的流程受理身份字段与联系/社交字段；快照里缺失的字段为 null，
+ * 两侧同为 null 表示「未申请变更」。
  */
 export interface ProfileChangeSnapshot {
   realname: string | null

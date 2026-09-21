@@ -52,7 +52,7 @@ const contest = ref<{
 } | null>(null);
 
 // 取「距当前时间最近」的一场比赛：后端 window=recent 按 |start_time - now| 升序，
-// 过去刚结束的与即将开始的都参与，不再等于「开始时间最晚」（那可能是很久以后的未来比赛）
+// 过去刚结束的与即将开始的都参与
 const fetchContest = async () => {
   loading.value = true;
   error.value = null;

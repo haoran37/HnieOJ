@@ -49,7 +49,7 @@ export interface UseUserSettingsOptions {
 }
 
 /**
- * 本人自助资料 / 密码 / 资料变更申请（身份 + 联系/社交字段，合并后的唯一审批流程）。
+ * 本人自助资料 / 密码 / 资料变更申请（身份与联系/社交字段走同一个审批流程）。
  *
  * - 普通资料只提交白名单字段；uid/email 只读；
  * - 密码独立表单，不 trim，成功由调用方清理会话并跳转登录；
@@ -258,7 +258,7 @@ export function useUserSettings(options: UseUserSettingsOptions = {}) {
     grade: '',
     classId: null as number | null,
     reason: '',
-    // 联系/社交字段：留空表示本次不修改该字段（合并前这些字段由另一套「按 uid 审」的流程受理）
+    // 联系/社交字段：留空表示本次不修改该字段
     email: '',
     phone: '',
     qq: '',

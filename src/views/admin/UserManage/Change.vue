@@ -149,7 +149,7 @@ const statusText = (status: string | null) => {
   return '待处理';
 };
 
-// 原值 → 目标值：只列出本次申请真正变化的字段（合并两套流程后可为身份或联系/社交字段）
+// 原值 → 目标值：只列出本次申请真正变化的字段（可能是身份字段，也可能是联系/社交字段）
 const renderDiff = (row: ProfileChangeVo) => {
   const rows = changedFields(row.original, row.proposed);
   if (rows.length === 0) {

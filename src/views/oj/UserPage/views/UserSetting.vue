@@ -93,7 +93,7 @@
         </div>
       </div>
 
-      <!-- 资料变更申请（合并后的唯一资料变更流程：身份 + 联系/社交字段） -->
+      <!-- 资料变更申请：身份与联系/社交字段走同一个审批流程 -->
       <div class="setting-card">
         <div class="card-header">
           <div class="title">资料变更申请</div>
@@ -429,7 +429,7 @@ const requestStatusText = (status: string | null) => {
 
 /**
  * 只展示本次申请真正发生变化的字段（口径与后端 changedFields 一致）。
- * 历史申请（合并前只含 4 个身份字段）的其余字段两侧同为 null，不会被列出来。
+ * 快照里缺失的字段两侧同为 null，不会被列出来。
  */
 const identityText = (row: ProfileChangeVo) => {
   const original = row.original;

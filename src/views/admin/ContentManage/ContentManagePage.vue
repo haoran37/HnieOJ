@@ -102,11 +102,8 @@ import { formatFullTime } from '@/composables/useTime';
 import { AddOutline } from '@vicons/ionicons5';
 
 /**
- * 管理端「资讯管理」共用页面：公告（ANNOUNCEMENT）与新闻（NEWS）只差 category 与文案名词。
- *
- * 抽共用组件的原因（FE-03）：原 Announcement.vue 与 News.vue 5736B / 5679B，通篇只有 6 处不同
- * （根节点 class、卡片标题、新建按钮、搜索占位符、弹窗标题与占位符、删除确认文案）以及
- * `useAnnouncement('ANNOUNCEMENT')` vs `useAdminNews()`。任何一处交互改动都要改两遍。
+ * 管理端「资讯管理」共用页面：公告（ANNOUNCEMENT）与新闻（NEWS）只差 category 与文案名词，
+ * 两个页面（Announcement.vue / News.vue）都是本组件的薄包装。
  *
  * 名词由 category 推导而不是单独传一个 prop：否则可以传 category="NEWS" + noun="公告"，
  * 出现「接口按新闻查、界面写公告」的不一致。

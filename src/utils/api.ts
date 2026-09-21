@@ -553,17 +553,33 @@ export interface ContestCheckVo {
   title: string | null
 }
 
+/** 比赛列表排序口径：recent = 按「距当前时间由近到远」排序（首页「近期比赛」用） */
+export type ContestListWindow = 'recent'
+
+export interface ContestListOptions {
+  /** 开始时间下界（epoch 毫秒，含） */
+  startFrom?: number
+  /** 开始时间上界（epoch 毫秒，含） */
+  startTo?: number
+  /** 排序口径；不传则后端按开始时间倒序 */
+  window?: ContestListWindow
+}
+
 export function getContests(
   page: number,
   pageSize: number,
   type?: string,
   auth?: string,
+  options: ContestListOptions = {},
 ): Promise<PageVo<ContestListVo>> {
   return get<PageVo<ContestListVo>>('/api/contests', {
     page,
     pageSize,
     type: type || undefined,
     auth: auth || undefined,
+    startFrom: options.startFrom,
+    startTo: options.startTo,
+    window: options.window,
   })
 }
 

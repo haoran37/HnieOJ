@@ -1,5 +1,5 @@
 <template>
-  <BoardCard title="最新比赛">
+  <BoardCard title="近期比赛">
     <template #icon>
       <n-icon size="20"><TrophyIcon /></n-icon>
     </template>
@@ -51,13 +51,13 @@ const contest = ref<{
   problemCount: number;
 } | null>(null);
 
-// 读取开始时间最晚的一场比赛：后端 /api/contests 按 startTime 倒序分页，取第一页第一条
-// 注意这不是「距当前时间最近」的比赛，可能是很久以后的未来比赛；按时间段筛选需后端新增查询能力
+// 取「距当前时间最近」的一场比赛：后端 window=recent 按 |start_time - now| 升序，
+// 过去刚结束的与即将开始的都参与，不再等于「开始时间最晚」（那可能是很久以后的未来比赛）
 const fetchContest = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const result = await getContests(1, 1);
+    const result = await getContests(1, 1, undefined, undefined, { window: 'recent' });
     const vo = result?.list?.[0];
     contest.value = vo
       ? {

@@ -1,8 +1,17 @@
 // 业务接线最小回归：真实请求参数/路径 + 纯映射函数。
-// 运行：node scripts/verify-business.mjs
+// 运行：node scripts/verify-business.mjs（Node 20.19/22.12 无原生 TS 类型剥离时也可直接执行）
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import {
+import { fileURLToPath } from 'node:url'
+import { createJiti } from 'jiti'
+import { parse } from 'vue/compiler-sfc'
+
+// Node 20.19/22.12 没有原生 TS stripping，不能静态 import .ts。
+// 用已有依赖 jiti 在脚本内转译这三个 TS 模块，保持直接 node 调用、engines 与依赖不变。
+const jiti = createJiti(import.meta.url, {
+  alias: { '@': fileURLToPath(new URL('../src', import.meta.url)) },
+})
+const {
   getProblemList,
   getProblemDetail,
   checkProblem,
@@ -33,13 +42,13 @@ import {
   updateAdminAnnouncementStatus,
   getJudgeOutbox,
   retryJudgeOutbox,
-} from '../src/utils/api.ts'
-import { toProblemRow, difficultyLabel } from '../src/types/problem.ts'
-import {
-  submissionStatusText,
-  isJudgingStatus,
-  SUBMISSION_STATUS,
-} from '../src/types/submission.ts'
+} = await jiti.import(fileURLToPath(new URL('../src/utils/api.ts', import.meta.url)))
+const { toProblemRow, difficultyLabel } = await jiti.import(
+  fileURLToPath(new URL('../src/types/problem.ts', import.meta.url)),
+)
+const { submissionStatusText, isJudgingStatus, SUBMISSION_STATUS } = await jiti.import(
+  fileURLToPath(new URL('../src/types/submission.ts', import.meta.url)),
+)
 
 let passed = 0
 function check(name, fn) {
@@ -380,6 +389,32 @@ await checkAsync('错误不假成功：outbox 重试已发送记录后端 400 �
   )
 })
 
+// 用 vue/compiler-sfc 把 SFC 编译成模板 AST，只查 n-data-table 元素节点上的 remote 属性：
+// 裸 remote 或 :remote="true" 才算；文件别处的 remote、remote-data、data-remote、:data="remoteList" 都不算。
+// compiler-sfc 入口未导出 NodeTypes 枚举，6=ATTRIBUTE、7=DIRECTIVE 为 compiler-core 的稳定节点类型值。
+const isRemoteProp = (prop) =>
+  (prop.type === 6 && prop.name === 'remote') ||
+  (prop.type === 7 &&
+    prop.name === 'bind' &&
+    prop.arg?.content === 'remote' &&
+    prop.exp?.content?.trim() === 'true')
+
+function hasRemoteDataTable(source) {
+  const { descriptor, errors } = parse(source)
+  assert.equal(errors.length, 0, 'SFC 应能编译出模板 AST')
+  let found = false
+  const visit = (node) => {
+    if (node.tag === 'n-data-table' && node.props.some(isRemoteProp)) found = true
+    for (const child of node.children ?? []) visit(child)
+    for (const branch of node.branches ?? []) visit(branch)
+  }
+  if (descriptor.template) visit(descriptor.template.ast)
+  return found
+}
+
+// 上面的检查针对 SFC 文件；下面正反例是模板片段，套一层 <template> 后走同一条 AST 路径
+const templateFragment = (content) => `<template>\n${content}\n</template>`
+
 check('服务端分页表格必须设置 remote（否则 Naive UI 忽略 total）', () => {
   const files = [
     '../src/views/admin/ProblemManage/ProblemList/index.vue',
@@ -389,8 +424,23 @@ check('服务端分页表格必须设置 remote（否则 Naive UI 忽略 total�
   ]
   for (const file of files) {
     const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
-    assert.match(source, /remote/, `${file} 的 n-data-table 应使用 remote`)
+    assert.match(source, /<n-data-table\b/, `${file} 应包含 n-data-table`)
+    assert.ok(hasRemoteDataTable(source), `${file} 的 n-data-table 起始标签应使用 remote`)
   }
+})
+
+check('remote 断言范围：只认 n-data-table 起始标签上的 remote 属性', () => {
+  const remote = (content) => hasRemoteDataTable(templateFragment(content))
+  assert.equal(remote('<n-data-table remote :columns="columns" />'), true)
+  assert.equal(remote('<n-data-table\n  :remote="true"\n  :columns="columns"\n/>'), true)
+  assert.equal(
+    remote('<div class="remote">remote</div>\n<n-data-table :columns="columns" />'),
+    false,
+  )
+  assert.equal(remote('<n-data-table remote-data :columns="columns" />'), false)
+  assert.equal(remote('<n-data-table data-remote :columns="columns" />'), false)
+  assert.equal(remote('<n-data-table :data="remoteList" :columns="columns" />'), false)
+  assert.equal(remote('<n-data-table :remote="false" :columns="columns" />'), false)
 })
 
 check('本批文件无 mock 数据/模拟延时/占位上传地址', () => {

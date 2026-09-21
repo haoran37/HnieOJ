@@ -914,7 +914,8 @@ export interface UserDetailVo {
   grade: string | null
   classId: number | null
   majorClass: string | null
-  cf_username: string | null
+  /** 与后端 UserInfo 返回的 camelCase 字段名一致 */
+  cfUsername: string | null
   github: string | null
   blog: string | null
   roles: string[] | null

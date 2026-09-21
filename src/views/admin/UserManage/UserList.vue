@@ -361,7 +361,7 @@
           <n-descriptions-item label="年级">{{ detail.grade || '-' }}</n-descriptions-item>
           <n-descriptions-item label="班级">{{ detail.majorClass || '-' }}</n-descriptions-item>
           <n-descriptions-item label="角色">{{ normalizeRoles(detail.roles || []).join(' / ') || '—' }}</n-descriptions-item>
-          <n-descriptions-item label="CF 用户名">{{ detail.cf_username || '-' }}</n-descriptions-item>
+          <n-descriptions-item label="CF 用户名">{{ detail.cfUsername || '-' }}</n-descriptions-item>
           <n-descriptions-item label="GitHub">{{ detail.github || '-' }}</n-descriptions-item>
           <n-descriptions-item label="博客">{{ detail.blog || '-' }}</n-descriptions-item>
         </n-descriptions>

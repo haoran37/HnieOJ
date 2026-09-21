@@ -25,8 +25,7 @@ export interface RegisterPayload {
   qq: string
 }
 
-// GET /api/user/profile 返回 data
-// B2 起新增 collegeId/classId（原 college/class 名称字段保留）与 github/blog/cf_username
+// GET /api/user/profile 返回 data；字段名与后端 UserProfileVo 一致（collegeId/classId 与 cfUsername 等均为 camelCase）
 export interface UserProfile {
   uid: string
   username: string
@@ -40,14 +39,8 @@ export interface UserProfile {
   grade?: string | null
   qq?: string | null
   phone?: string | null
-  /**
-   * 后端 UserProfileVo 的真实字段名（camelCase）。
-   *
-   * 注意：下面的 `cf_username` 是历史遗留的错拼（后端从不返回该键，`UserList.vue` 的 CF 用户名
-   * 因此一直显示 '-'）。此处不改动它以免顺带扩大本次改动范围，仅新增真实字段供资料变更申请使用。
-   */
+  // 后端 UserProfileVo 的 CF 用户名
   cfUsername?: string | null
-  cf_username?: string | null
   github?: string | null
   blog?: string | null
   roles?: string[] | null

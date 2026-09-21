@@ -119,7 +119,7 @@
               </div>
               <div class="info-item">
                 <span class="label">所属板块</span>
-                <span class="val">{{ post.category }}</span>
+                <span class="val">{{ CATEGORY_LABEL[post.category] }}</span>
               </div>
 
               <n-divider style="margin: 16px 0;" />
@@ -166,7 +166,7 @@ import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { CaretUpOutline as CaretUp, CaretDownOutline as CaretDown } from '@vicons/ionicons5';
-import { useDiscussDetail } from '@/composables/oj/useDiscussDetail';
+import { useDiscussDetail, CATEGORY_LABEL } from '@/composables/oj/useDiscussDetail';
 import { getRelatedDiscussions } from '@/utils/api';
 import DiscussAnswerItem from './components/DiscussAnswerItem.vue';
 

@@ -74,7 +74,6 @@
                 v-for="ans in sortedAnswers"
                 :key="ans.id"
                 :answer="ans"
-                :can-delete="isAdmin"
                 :submit-comment="submitComment"
                 @vote="(dir) => handleVote('answer', ans.id, dir)"
               />
@@ -163,11 +162,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
 import { CaretUpOutline as CaretUp, CaretDownOutline as CaretDown } from '@vicons/ionicons5';
-import { useUserStore } from '@/stores/userStore';
 import { useDiscussDetail } from '@/composables/oj/useDiscussDetail';
 import { getRelatedDiscussions } from '@/utils/api';
 import DiscussAnswerItem from './components/DiscussAnswerItem.vue';
@@ -175,7 +173,6 @@ import DiscussAnswerItem from './components/DiscussAnswerItem.vue';
 const route = useRoute();
 const router = useRouter();
 const message = useMessage();
-const userStore = useUserStore();
 
 const {
   loading, error, post, sortedAnswers, submittingAnswer,
@@ -210,7 +207,6 @@ const retryRelated = () => {
   if (post.value?.problemCode) void fetchRelatedDiscussions(post.value.problemCode);
 };
 
-const isAdmin = computed(() => userStore.isAdmin);
 
 // 只有确认写入成功才清空草稿；失败时保留内容供用户重试
 const handlePostAnswer = async () => {

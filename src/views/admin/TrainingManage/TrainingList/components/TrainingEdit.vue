@@ -27,8 +27,11 @@
             v-model:value="formValue.privatePwd"
             type="password"
             show-password-on="click"
-            placeholder="私有题单必须设置访问密码"
+            placeholder="留空表示保留原密码"
           />
+        </n-form-item>
+        <n-form-item v-if="formValue.auth === 'Private'" label=" " :show-feedback="true">
+          <span class="pwd-hint">出于安全考虑不回显原密码；留空提交即保留原密码。</span>
         </n-form-item>
         <n-form-item label="排序" path="rank">
           <n-input-number v-model:value="formValue.rank" :min="0" style="width: 200px" />
@@ -137,6 +140,11 @@ onUnmounted(() => {
 
 .detail-error {
   margin-bottom: 16px;
+}
+
+.pwd-hint {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 
 .detail-loading {

@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, h } from 'vue';
+import { ref, reactive, h, onMounted } from 'vue';
 import { NTag, NButton, NSpace, NTooltip, useMessage } from 'naive-ui';
 import { formatFullTime } from '@/composables/useTime';
 import {
@@ -257,7 +257,9 @@ const columns = [
   }
 ];
 
-void fetchOutbox();
+onMounted(() => {
+  void fetchOutbox();
+});
 </script>
 
 <style scoped lang="less">

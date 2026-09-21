@@ -348,14 +348,22 @@ export function useHomeworkForm() {
     const missing = ids.filter((id) => !classMap.value.has(id));
     if (missing.length === 0) return;
     try {
+      // 学院之间、年级之间并发，避免按「学院×年级×班级」串行发出上百次请求
       const colleges = (await getColleges()) ?? [];
-      for (const college of colleges) {
-        const grades = (await getGrades(college.id)) ?? [];
-        for (const grade of grades) {
-          const classes = (await getClasses(college.id, grade.grade)) ?? [];
-          for (const item of classes) {
-            classMap.value.set(item.id, item.name);
-          }
+      const gradeLists = await Promise.all(
+        colleges.map(async (college) => ({
+          collegeId: college.id,
+          grades: (await getGrades(college.id)) ?? [],
+        })),
+      );
+      const classLists = await Promise.all(
+        gradeLists.flatMap(({ collegeId, grades }) =>
+          grades.map(async (grade) => (await getClasses(collegeId, grade.grade)) ?? []),
+        ),
+      );
+      for (const classes of classLists) {
+        for (const item of classes) {
+          classMap.value.set(item.id, item.name);
         }
       }
     } catch {

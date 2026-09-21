@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => {
   const repo = process.env.GITHUB_REPOSITORY?.split('/')[1]
   const isGhPages = process.env.GITHUB_ACTIONS === 'true'
 
-  const env = loadEnv(mode, process.cwd(), '')
+  // 只暴露 VITE_ 前缀变量，避免把 CI/进程环境中的全部变量注入前端配置
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
   // 开发代理的后端地址，默认走本地网关 8800
   const backendUrl = env.VITE_BACKEND_URL || 'http://localhost:8800'
 

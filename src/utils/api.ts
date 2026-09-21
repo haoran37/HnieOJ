@@ -245,7 +245,28 @@ export function del<T>(
  * 后端出错时会返回统一 Result 的 JSON（含 HTTP 200 业务错误），
  * 因此命中 JSON 必须先按 Result 解析并抛错，绝不能把错误 JSON 当成文件保存为“成功”。
  */
-export async function download(url: string, query?: Record<string, QueryValue>): Promise<Blob> {
+export interface DownloadedBlob {
+  blob: Blob
+  /** 后端 Content-Disposition 中的原始文件名；未提供时为 null */
+  filename: string | null
+}
+
+/** 解析 Content-Disposition，优先 RFC 5987 的 filename*，退回 filename */
+function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1].trim())
+    } catch {
+      return null
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header)
+  return plain?.[1]?.trim() || null
+}
+
+export async function downloadFile(url: string, query?: Record<string, QueryValue>): Promise<DownloadedBlob> {
   const response = await send(url, { method: 'GET', query })
   const contentType = response.headers.get('Content-Type') ?? ''
 
@@ -284,7 +305,12 @@ export async function download(url: string, query?: Record<string, QueryValue>):
     throw error
   }
 
-  return response.blob()
+  const blob = await response.blob()
+  return { blob, filename: filenameFromDisposition(response.headers.get('Content-Disposition')) }
+}
+
+export async function download(url: string, query?: Record<string, QueryValue>): Promise<Blob> {
+  return (await downloadFile(url, query)).blob
 }
 
 // --------------------------------------------------
@@ -840,7 +866,7 @@ export function getAnnouncements(
     page,
     pageSize,
     keyword: keyword?.trim() || undefined,
-    // 不传/空白保持旧的全部公告行为
+    // 不传/空白时不带 category，返回全部分类
     category: category || undefined,
   })
 }
@@ -1182,8 +1208,8 @@ export function rejectAchievement(id: number, reason: string): Promise<null> {
 }
 
 /** 本地附件需 Bearer 鉴权下载（blob） */
-export function downloadAchievementApplyFile(id: number): Promise<Blob> {
-  return download(`/api/admin/achievements/${id}/file`)
+export function downloadAchievementApplyFile(id: number): Promise<DownloadedBlob> {
+  return downloadFile(`/api/admin/achievements/${id}/file`)
 }
 
 /** 对应后端 AddUserAchievementRequest */

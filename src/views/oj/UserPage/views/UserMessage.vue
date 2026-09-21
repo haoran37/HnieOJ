@@ -61,13 +61,12 @@
           :row-key="(row: UserMessageVo) => row.id"
           :pagination="false"
           :row-props="rowProps"
-        />
-
-        <n-empty
-          v-if="!loading && !error && messages.length === 0"
-          description="暂无消息"
-          style="padding: 40px 0"
-        />
+        >
+          <!-- 空态交给表格自身的 #empty 插槽，避免表格空态与外部 n-empty 叠加 -->
+          <template #empty>
+            <n-empty description="暂无消息" style="padding: 40px 0" />
+          </template>
+        </n-data-table>
 
         <div class="pagination-wrapper">
           <n-pagination

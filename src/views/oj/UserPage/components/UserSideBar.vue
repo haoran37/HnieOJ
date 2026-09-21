@@ -87,6 +87,7 @@ import { getUserAchievements, getUserDetail, getUserMessageUnreadCount, type Use
 import { onUserMessagesChanged } from '@/composables/oj/useUserMessages';
 import { formatFullTime } from '@/composables/useTime';
 import { useUserStore } from '@/stores/userStore';
+import { normalizeRoles, primaryRole } from '@/types/user';
 
 const route = useRoute();
 const router = useRouter();
@@ -161,9 +162,10 @@ const load = async (uid: string) => {
 };
 
 const roleText = computed(() => {
-  const roles = profile.value?.roles ?? [];
+  const roles = normalizeRoles(profile.value?.roles ?? []);
   if (roles.length === 0) return '';
-  return (roles[roles.length - 1] ?? '').toUpperCase();
+  // 主角色按统一优先级判定，不能取数组末位（顺序由后端决定，不保证稳定）
+  return primaryRole(roles).toUpperCase();
 });
 
 const roleType = computed<'error' | 'info' | 'warning' | 'success'>(() => {

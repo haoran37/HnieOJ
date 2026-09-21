@@ -19,7 +19,7 @@
           </div>
 
           <div class="filter-item">
-            <n-button size="small" :loading="tagLoading" @click="showTagModal = true">
+            <n-button size="small" @click="showTagModal = true">
               高级筛选 / 标签
             </n-button>
           </div>
@@ -99,10 +99,13 @@
       </n-card>
     </div>
 
+    <!-- 题目列表接口只支持 keyword/tags/difficulty，没有来源筛选，
+         因此用 algorithm 模式只展示标签，不提供会被丢弃的「来源」分组 -->
     <TagSelectModal
       v-model:show="showTagModal"
-      v-model:tags="localSearch.tags"
-      mode="all"
+      v-model="localSearch.tags"
+      mode="algorithm"
+      multiple
     />
   </div>
 </template>
@@ -114,7 +117,6 @@ import { ChevronDownOutline as ChevronDown, SearchOutline as SearchIcon } from '
 import type { DropdownOption } from 'naive-ui'
 import { useUserStore } from '@/stores/userStore'
 import { useProblemsList } from '@/composables/oj/useProblemsList'
-import { useTags } from '@/composables/useTags'
 import { createColumns } from '@/utils/problemColumns'
 import TagSelectModal from '@/components/TagSelectModal.vue'
 import type { ProblemRow, ProblemSearchParams } from '@/types/problem'
@@ -123,7 +125,6 @@ import { difficultyLabel } from '@/types/problem'
 const router = useRouter()
 const userStore = useUserStore()
 const { tableData, loading, error, total, page, pageSize, updateSearch, handlePageChange, fetchProblems } = useProblemsList()
-const { loading: tagLoading, fetchTags } = useTags()
 
 const showTagModal = ref(false)
 const columns = createColumns(
@@ -157,8 +158,8 @@ const triggerSearch = () => {
   updateSearch({ ...localSearch })
 }
 
+// 标签目录由 TagSelectModal 在打开时按需加载，此处不再重复拉取
 onMounted(() => {
-  void fetchTags()
   void fetchProblems()
 })
 </script>

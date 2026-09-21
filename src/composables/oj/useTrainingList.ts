@@ -11,12 +11,6 @@ export interface TrainingSheet {
   categories: string[];
   creator: string;
   gmtCreate: string;
-  // 以下字段后端 TrainingListVo 未提供，仅为兼容既有列定义保留，列表页不再渲染
-  completion: number;
-  acCount: number;
-  totalCount: number;
-  favoriteCount: number;
-  rating: number;
 }
 
 function toType(raw: string | null): TrainingTypeFilter {
@@ -32,11 +26,6 @@ function toSheet(vo: TrainingListVo): TrainingSheet {
     categories: vo.categories ?? [],
     creator: vo.author ?? '',
     gmtCreate: vo.gmtCreate ?? '',
-    completion: 0,
-    acCount: 0,
-    totalCount: vo.problemCount ?? 0,
-    favoriteCount: 0,
-    rating: 0,
   };
 }
 

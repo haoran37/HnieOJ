@@ -107,7 +107,7 @@
       <div class="pagination-footer">
         <n-pagination
           v-model:page="page"
-          :page-count="Math.ceil(total / 10)"
+          :page-count="Math.ceil(total / pageSize)"
           size="large"
           @update:page="handlePageChange"
         />
@@ -134,6 +134,7 @@ const {
   listData, 
   total, 
   page, 
+  pageSize,
   fetchHomeworks 
 } = useHomeworkList();
 

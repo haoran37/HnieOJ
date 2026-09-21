@@ -35,7 +35,7 @@ export interface UseUserMessagesOptions {
 }
 
 /**
- * 本人站内消息收件箱（B2-2）。
+ * 本人站内消息收件箱。
  *
  * - 数据一律来自 /api/user/messages 系列，uid 由服务端登录态决定，前端不传 ownerUid；
  * - 列表/未读数/单条已读/全部已读/删除使用独立状态，重复提交有 guard；
@@ -110,8 +110,13 @@ export function useUserMessages(options: UseUserMessagesOptions = {}) {
     try {
       const count = await getUserMessageUnreadCount();
       if (gen !== generation || seq !== unreadSeq) return;
-      unreadCount.value = typeof count === 'number' ? count : 0;
-      unreadError.value = null;
+      if (typeof count === 'number') {
+        unreadCount.value = count;
+        unreadError.value = null;
+      } else {
+        // 成功但响应不含数字：保留原值（从未成功过则仍为 null），绝不当 0，并记录异常
+        unreadError.value = '未读数响应格式异常';
+      }
     } catch (err) {
       if (gen !== generation || seq !== unreadSeq) return;
       // 保留上一次成功值；从未成功过则保持 null，不伪 0

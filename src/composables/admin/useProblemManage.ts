@@ -100,16 +100,32 @@ export function useProblemManage() {
     }
   };
 
+  // 可见范围切换：按行做 in-flight 保护，连续切换时不重复发请求、旧响应不覆盖新状态
+  const authUpdatingIds = ref<Set<number>>(new Set());
+
+  const markAuthUpdating = (id: number, updating: boolean) => {
+    const next = new Set(authUpdatingIds.value);
+    if (updating) next.add(id);
+    else next.delete(id);
+    authUpdatingIds.value = next;
+  };
+
   const handleAuthChange = async (row: AdminProblemListVo, auth: number) => {
+    if (authUpdatingIds.value.has(row.id)) return;
     const previous = row.auth ?? 1;
+    if (auth === previous) return;
+    markAuthUpdating(row.id, true);
     try {
       await updateAdminProblemAuth(row.id, auth);
       row.auth = auth;
       message.success('可见范围已更新');
     } catch (error) {
-      // 失败时保持原值，不伪造成功
+      // 失败时不伪造成功：回退展示值并重读列表（同值赋值不触发更新，无法仅靠赋值还原控件）
       row.auth = previous;
       message.error(error instanceof Error ? error.message : '可见范围更新失败');
+      await fetchProblems();
+    } finally {
+      markAuthUpdating(row.id, false);
     }
   };
 
@@ -174,6 +190,7 @@ export function useProblemManage() {
           value: row.auth ?? 1,
           options: AUTH_OPTIONS,
           consistentMenuWidth: false,
+          disabled: authUpdatingIds.value.has(row.id),
           onUpdateValue: (value: number) => handleAuthChange(row, value),
         });
       }
@@ -224,7 +241,7 @@ export function useProblemManage() {
     }
   ];
 
-  // 初始化加载第一页（与旧行为一致）
+  // 初始化时加载第一页
   void fetchProblems();
 
   return {

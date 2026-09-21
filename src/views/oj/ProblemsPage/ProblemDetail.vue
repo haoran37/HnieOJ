@@ -212,7 +212,7 @@
                           @click.prevent="handleRecClick(rec.problemCode)"
                         >
                           <div class="status-icon">
-                            <component :is="renderStatusIcon(userStore.getProblemStatus(rec.id), 16)" />
+                            <component :is="renderStatusIcon(userStore.getProblemStatus(rec.problemCode), 16)" />
                           </div>
                           <span class="rec-id">{{ rec.problemCode }}</span>
                           <span class="rec-title" :title="rec.title">{{ rec.title }}</span>

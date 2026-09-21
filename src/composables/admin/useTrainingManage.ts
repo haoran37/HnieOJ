@@ -361,7 +361,8 @@ export function useTrainingForm() {
       message.warning('请输入题单名称');
       return;
     }
-    if (formValue.auth === 'Private' && !formValue.privatePwd.trim()) {
+    // 编辑时后端不回显原密码：留空表示保留原密码，只有新建私有题单必须显式设置
+    if (!isEdit && formValue.auth === 'Private' && !formValue.privatePwd.trim()) {
       message.warning('私有题单必须设置访问密码');
       return;
     }
@@ -375,7 +376,8 @@ export function useTrainingForm() {
       title: formValue.title.trim(),
       type: formValue.type,
       auth: formValue.auth,
-      privatePwd: formValue.auth === 'Private' ? formValue.privatePwd.trim() : null,
+      // 留空传 null，由后端按「保留原密码」处理，不把空串写成新密码
+      privatePwd: formValue.auth === 'Private' ? formValue.privatePwd.trim() || null : null,
       description: formValue.description || null,
       status: formValue.status,
       rank: formValue.rank,

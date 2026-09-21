@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useTags } from '@/composables/useTags';
 
 const props = defineProps<{
@@ -147,10 +147,6 @@ const handleConfirm = () => {
   emit('confirm');
   emit('update:show', false);
 };
-
-onMounted(() => {
-  fetchTags();
-});
 </script>
 
 <style scoped lang="less">

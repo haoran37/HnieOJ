@@ -63,7 +63,6 @@ import DiscussComments from './DiscussComments.vue';
 
 const props = defineProps<{
   answer: any;
-  canDelete?: boolean;
   submitComment?: (answerId: number, text: string) => Promise<boolean>;
 }>();
 

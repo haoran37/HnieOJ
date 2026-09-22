@@ -31,7 +31,7 @@
           />
         </n-form-item>
         <n-form-item v-if="formValue.auth === 'Private'" label=" " :show-feedback="true">
-          <span class="pwd-hint">当前访问密码已从管理端详情带入（掩码显示）；留空提交即保留原密码。</span>
+          <span class="pwd-hint">当前访问密码不回显；留空提交即保留原密码，填写新值则更新。</span>
         </n-form-item>
         <n-form-item label="排序" path="rank">
           <n-input-number v-model:value="formValue.rank" :min="0" style="width: 200px" />

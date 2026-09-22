@@ -246,7 +246,7 @@ await test('比赛编辑：走管理端详情，PUT 失败保留完整表单且�
   assert.equal(pushes.length, 0, '失败后不应跳转');
 });
 
-await test('训练题目：displayId 为 Integer>=1，管理详情保留 privatePwd/description', async () => {
+await test('训练题目：displayId 为 Integer>=1，详情密码不回显且编辑保留 description/顺序', async () => {
   calls = [];
   responder = (url, init) => {
     if (url === '/api/admin/training/5') {
@@ -255,7 +255,8 @@ await test('训练题目：displayId 为 Integer>=1，管理详情保留 private
         title: '私有题单',
         type: 'Official',
         auth: 'Private',
-        privatePwd: 'pw',
+        // 后端 TrainingAdminServiceImpl.getTrainingDetail 恒以 privatePwd=null 响应
+        privatePwd: null,
         description: '真实描述',
         status: false,
         rank: 3,
@@ -269,12 +270,12 @@ await test('训练题目：displayId 为 Integer>=1，管理详情保留 private
       const problemId = Number(queryOf(url).get('problemId'));
       return json({ exists: true, problemId, problemCode: 'P' + problemId, title: 'T' + problemId });
     }
-    if (init?.method === 'PUT') return json(null);
+    if (init?.method === 'PUT' || init?.method === 'POST') return json(null);
     return json(null);
   };
   const state = useTrainingForm();
   await state.loadData(5);
-  assert.equal(state.formValue.privatePwd, 'pw');
+  assert.equal(state.formValue.privatePwd, '', '详情不回显密码：privatePwd=null 必须回填为空串');
   assert.equal(state.formValue.description, '真实描述');
   assert.equal(state.formValue.status, false);
   assert.deepEqual(
@@ -295,13 +296,34 @@ await test('训练题目：displayId 为 Integer>=1，管理详情保留 private
   assert.ok(put, '应发送 PUT');
   const body = bodyOf(put);
   assert.equal(body.title, '只改标题');
-  assert.equal(body.privatePwd, 'pw', '只改标题必须保留 privatePwd');
-  assert.equal(body.description, '真实描述');
+  assert.equal(body.privatePwd, null, '只改标题必须发送 privatePwd=null 由后端保留原密码');
+  assert.equal(body.description, '真实描述', '只改标题不得丢失 description');
   assert.deepEqual(
     body.problems.map((p) => p.displayId),
     [1, 2, 3],
   );
   assert.ok(body.problems.every((p) => Number.isInteger(p.displayId) && p.displayId >= 1));
+
+  // 填写新密码：必须按新值提交
+  calls = [];
+  state.formValue.privatePwd = 'brand-new-pwd';
+  await state.handleSubmit(true, 5);
+  const putPwd = calls.find((call) => call.init?.method === 'PUT');
+  assert.equal(bodyOf(putPwd).privatePwd, 'brand-new-pwd', '填写新值必须提交新密码');
+
+  // 新建私有题单但没有密码：必须本地阻止，不得发请求
+  calls = [];
+  const addState = useTrainingForm();
+  addState.formValue.title = '新建私有题单';
+  addState.formValue.auth = 'Private';
+  await addState.handleSubmit(false);
+  assert.equal(
+    calls.filter((call) => call.url === '/api/admin/training' && call.init?.method === 'POST').length,
+    0,
+    '新建私有题单无密码不得发送请求',
+  );
+  assert.equal(messages.at(-1)?.type, 'warning');
+  assert.equal(messages.at(-1)?.value, '私有题单必须设置访问密码');
 });
 
 await test('作业：classIds 数字数组、null description 归一为字符串、A/B 字符串展示编号', async () => {

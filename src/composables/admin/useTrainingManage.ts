@@ -361,7 +361,7 @@ export function useTrainingForm() {
       message.warning('请输入题单名称');
       return;
     }
-    // 编辑时详情已带入当前密码（掩码显示）：留空传 null 表示保留原密码，只有新建私有题单必须显式设置
+    // 管理端详情不回显密码（privatePwd 恒为 null）：留空传 null 表示保留原密码，只有新建私有题单必须显式设置
     if (!isEdit && formValue.auth === 'Private' && !formValue.privatePwd.trim()) {
       message.warning('私有题单必须设置访问密码');
       return;

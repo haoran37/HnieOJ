@@ -20,7 +20,7 @@ export interface UserInfo {
   username: string;
   name: string;
   email?: string;
-  role: UserRole;          // 主角色（多角色时取权限最高者，兼容旧组件）
+  role: UserRole;          // 主角色（多角色时取权限最高者）
   roles: Role[];           // 后端返回的真实角色列表
   avatar?: string;
   college?: string;

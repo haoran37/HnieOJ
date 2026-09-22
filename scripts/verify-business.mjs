@@ -1,16 +1,26 @@
 // 业务接线最小回归：真实请求参数/路径 + 纯映射函数。
-// 运行：node scripts/verify-business.mjs（Node 20.19/22.12 无原生 TS 类型剥离时也可直接执行）
+// 运行：node scripts/verify-business.mjs（仓库根目录，Node 22.18+ / 24 原生 TS 类型剥离 + registerHooks）
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { createJiti } from 'jiti'
+import path from 'node:path'
+import { registerHooks } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from 'vue/compiler-sfc'
 
-// Node 20.19/22.12 没有原生 TS stripping，不能静态 import .ts。
-// 用已有依赖 jiti 在脚本内转译这三个 TS 模块，保持直接 node 调用、engines 与依赖不变。
-const jiti = createJiti(import.meta.url, {
-  alias: { '@': fileURLToPath(new URL('../src', import.meta.url)) },
+const root = fileURLToPath(new URL('..', import.meta.url))
+
+// 与其余 verify 脚本一致：原生 TS + node:module registerHooks 解析 '@/' 别名
+registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier.startsWith('@/')) {
+      let target = path.join(root, 'src', specifier.slice(2))
+      if (!path.extname(target)) target += '.ts'
+      return next(pathToFileURL(target).href, context)
+    }
+    return next(specifier, context)
+  },
 })
+
 const {
   getProblemList,
   getProblemDetail,
@@ -42,12 +52,12 @@ const {
   updateAdminAnnouncementStatus,
   getJudgeOutbox,
   retryJudgeOutbox,
-} = await jiti.import(fileURLToPath(new URL('../src/utils/api.ts', import.meta.url)))
-const { toProblemRow, difficultyLabel } = await jiti.import(
-  fileURLToPath(new URL('../src/types/problem.ts', import.meta.url)),
+} = await import(pathToFileURL(path.join(root, 'src/utils/api.ts')).href)
+const { toProblemRow, difficultyLabel } = await import(
+  pathToFileURL(path.join(root, 'src/types/problem.ts')).href
 )
-const { submissionStatusText, isJudgingStatus, SUBMISSION_STATUS } = await jiti.import(
-  fileURLToPath(new URL('../src/types/submission.ts', import.meta.url)),
+const { submissionStatusText, isJudgingStatus, SUBMISSION_STATUS } = await import(
+  pathToFileURL(path.join(root, 'src/types/submission.ts')).href
 )
 
 let passed = 0

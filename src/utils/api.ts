@@ -1087,6 +1087,37 @@ export function batchDeleteUsers(uids: string[]): Promise<null> {
   return del<null>('/api/users/batch', { uids })
 }
 
+/** 导入失败行（用户导入与注册名单导入共用同一后端结构） */
+export interface ImportFailureItem {
+  rowNo: number | null
+  uid: string | null
+  reason: string | null
+}
+
+/** 对应后端 UserImportResultVo.CreatedUserItem（initialPassword 只在本次结果中出现） */
+export interface UserImportCreatedUser {
+  uid: string
+  initialPassword: string | null
+}
+
+/** 对应后端 UserImportResultVo */
+export interface UserImportResultVo {
+  successCount: number
+  failedCount: number
+  createdUsers: UserImportCreatedUser[]
+  failures: ImportFailureItem[]
+}
+
+/**
+ * 上传用户导入 Excel（multipart file，需 USER_MANAGE）。
+ * 表头为 uid/username/email/password/phone/avatar/collegeId/classId/grade，单次最多 1000 行。
+ */
+export function importUsers(file: File): Promise<UserImportResultVo> {
+  const form = new FormData()
+  form.append('file', file)
+  return post<UserImportResultVo>('/api/users/import', form)
+}
+
 // --------------------------------------------------
 // 权限管理（AdminPermissionController）
 // --------------------------------------------------
@@ -1189,6 +1220,25 @@ export function rejectRegistration(uid: string, reason: string): Promise<null> {
 /** 批量通过返回后端汇总文案（成功/失败数量） */
 export function batchApproveRegistrations(uids: string[]): Promise<string> {
   return post<string>('/api/registrations/batch/approve', { uids })
+}
+
+/** 对应后端 RegistrationImportResultVo */
+export interface RegistrationImportResultVo {
+  successCount: number
+  failedCount: number
+  successUids: string[]
+  failures: ImportFailureItem[]
+}
+
+/**
+ * 上传注册名单 Excel（multipart file，ADMIN/ROOT）。
+ * 表头为 uid/username/password/email/collegeId/classId/grade/qq，
+ * 每行先注册再自动通过，不是审批已有 UID；单次最多 1000 行。
+ */
+export function importRegistrations(file: File): Promise<RegistrationImportResultVo> {
+  const form = new FormData()
+  form.append('file', file)
+  return post<RegistrationImportResultVo>('/api/registrations/import', form)
 }
 
 // --------------------------------------------------

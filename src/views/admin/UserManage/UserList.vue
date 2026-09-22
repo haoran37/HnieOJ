@@ -7,7 +7,7 @@
             <template #icon><n-icon><PersonAddOutline /></n-icon></template>
             添加
           </n-button>
-          <n-button type="info" @click="showImportModal = true">
+          <n-button type="info" @click="openImportModal">
             <template #icon><n-icon><CloudUploadOutline /></n-icon></template>
             导入
           </n-button>
@@ -373,35 +373,81 @@
       </template>
     </n-modal>
 
-    <!-- 导入用户模态框（后端无上传接口，仅模板下载可用） -->
+    <!-- 导入用户模态框（真实上传 POST /api/users/import） -->
     <n-modal
       v-model:show="showImportModal"
       preset="card"
       title="导入用户"
       :mask-closable="false"
-      style="width: auto; min-width: 600px; max-width: 90vw"
+      :closable="!submitting"
+      :close-on-esc="!submitting"
+      style="width: auto; min-width: 640px; max-width: 90vw"
+      @after-leave="handleImportModalAfterLeave"
     >
       <n-space vertical :size="16">
-        <n-alert type="warning">
-          {{ importUnavailableMessage }}
+        <n-alert type="info" :show-icon="false">
+          支持 .xls / .xlsx 单文件；表头必须为 uid、username、email、password、phone、avatar、collegeId、classId、grade（列顺序不限），单次最多 1000 行数据。
+          uid、username 必填；password 留空时由后端生成初始密码并在下方结果中显示。
         </n-alert>
 
         <n-space align="center">
-          <n-button text type="primary" @click="handleDownloadTemplate">
+          <n-button text type="primary" :disabled="submitting" @click="handleDownloadTemplate">
             <template #icon><n-icon><DownloadOutline /></n-icon></template>
             下载模板
           </n-button>
-          <span class="tip-text">下载模板后按模板填写，登录后即可下载</span>
+          <span class="tip-text">下载模板后按上述表头填写，列顺序不限</span>
         </n-space>
 
-        <n-upload disabled :max="1" accept=".xlsx,.xls" :default-upload="false">
-          <n-button disabled>选择文件（暂不可用）</n-button>
+        <n-upload
+          :max="1"
+          accept=".xlsx,.xls"
+          :default-upload="false"
+          :disabled="submitting"
+          :file-list="importFileList"
+          @change="handleImportUploadChange"
+        >
+          <n-button :disabled="submitting">选择文件</n-button>
         </n-upload>
+
+        <template v-if="importResult">
+          <n-alert :type="importResultType">
+            成功 {{ importResult.successCount }} 条，失败 {{ importResult.failedCount }} 条。
+            <template v-if="importResult.failedCount > 0">
+              请只修正失败行后再上传（成功行不要重复导入）。
+            </template>
+          </n-alert>
+
+          <n-space v-if="importResult.createdUsers.length > 0" vertical :size="8">
+            <n-text strong>已创建用户（初始密码仅在本窗口显示，关闭后清除）</n-text>
+            <n-list bordered>
+              <n-list-item v-for="created in importResult.createdUsers" :key="created.uid">
+                <n-space align="center" :size="12">
+                  <n-text>{{ created.uid }}</n-text>
+                  <n-text code>{{ created.initialPassword || '（该行已填写密码）' }}</n-text>
+                </n-space>
+              </n-list-item>
+            </n-list>
+          </n-space>
+
+          <n-space v-if="importResult.failures.length > 0" vertical :size="8">
+            <n-text strong>失败行（UID 与原因）</n-text>
+            <n-list bordered>
+              <n-list-item
+                v-for="(failure, index) in importResult.failures"
+                :key="`${failure.rowNo}-${failure.uid}-${index}`"
+              >
+                第 {{ failure.rowNo ?? '-' }} 行 · UID {{ failure.uid || '（空）' }}：{{
+                  failure.reason || '导入失败'
+                }}
+              </n-list-item>
+            </n-list>
+          </n-space>
+        </template>
       </n-space>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showImportModal = false">关闭</n-button>
-          <n-button type="primary" disabled @click="handleImport">导入（暂不可用）</n-button>
+          <n-button :disabled="submitting" @click="closeImportModal">关闭</n-button>
+          <n-button type="primary" :loading="submitting" @click="handleImport">导入</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -409,8 +455,17 @@
 </template>
 
 <script setup lang="ts">
-import { h, onMounted } from 'vue';
-import { NButton, NSpace, NTag, NIcon, useMessage, type DataTableColumns } from 'naive-ui';
+import { computed, h, onMounted } from 'vue';
+import {
+  NButton,
+  NSpace,
+  NTag,
+  NIcon,
+  useMessage,
+  type DataTableColumns,
+  type UploadFileInfo,
+  type UploadOnChange,
+} from 'naive-ui';
 import {
   PersonAddOutline,
   CloudUploadOutline,
@@ -446,7 +501,8 @@ const {
   passwordForm,
   achievementForm,
   addUserForm,
-  importUnavailableMessage,
+  importFile,
+  importResult,
   collegeOptions,
   filterGradeOptions,
   filterClassOptions,
@@ -485,10 +541,31 @@ const {
   handleBatchDelete,
   openAddUserModal,
   handleAddUser,
+  openImportModal,
+  closeImportModal,
+  handleImportModalAfterLeave,
+  handleImportFileChange,
   handleImport,
   handleDownloadTemplate,
   formatFullTime,
 } = useUserManage();
+
+// 上传组件展示的受控列表始终来自 composable 中唯一一份待导入文件：
+// 校验被拒、导入完成、关闭弹窗后都不会残留旧文件误导重复导入
+const importFileList = computed<UploadFileInfo[]>(() => {
+  const file = importFile.value;
+  if (!file) return [];
+  return [{ id: 'user-import-file', name: file.name, status: 'pending', file }];
+});
+
+const handleImportUploadChange: UploadOnChange = ({ fileList }) => {
+  handleImportFileChange(fileList[fileList.length - 1]?.file ?? null);
+};
+
+const importResultType = computed(() => {
+  if (!importResult.value || importResult.value.failedCount === 0) return 'success';
+  return importResult.value.successCount > 0 ? 'warning' : 'error';
+});
 
 const statusOptions = [
   { label: '正常', value: USER_STATUS.NORMAL },

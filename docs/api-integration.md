@@ -201,4 +201,3 @@
 - 题单 `type` 仅 `Official`/`User`（`TrainingTypeConstant`），`auth` 仅 `Public`/`Private`（`TrainingAuthConstant`）；新建 `auth=Private` 时必须提交 `privatePwd`；管理端详情不回显密码（`privatePwd` 恒为 null），编辑留空提交即保留原密码，填写新值才更新。
 - 作业 `classIds` 为数字数组（后端 `@Min(1)`）；作业表单的学院→年级→班级选项来自 `GET /api/colleges`、`/api/colleges/{id}/grades`、`/api/colleges/{id}/grades/{grade}/classes`，没有“专业”维度。
 - 比赛限定账号请求为 `accountList: string[]`（uid），详情返回 `accountList[{uid,username}]`；账号查验使用 `GET /api/user/check?query=`。
-

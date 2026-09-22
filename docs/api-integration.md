@@ -33,7 +33,7 @@
 | 21 | POST `/api/registrations/{uid}/approve` | useRegistration.ts handleApprove() | RegistrationReviewController | 已接线 |  |
 | 22 | POST `/api/registrations/{uid}/reject` | useRegistration.ts handleRejectSubmit() | RegistrationReviewController | 已接线 | {reason} 真实原因 |
 | 23 | POST `/api/registrations/batch/approve` | useRegistration.ts handleBatchApprove() | RegistrationReviewController | 已接线 | {uids}，返回成功/失败汇总 |
-| 24 | GET `/api/users/import/template` | `src/composables/admin/useUserManage.ts handleDownloadTemplate()`（鉴权 Blob 下载） | UserManageController | 已接线 | 后端源码已有该路由（xlsx，需 USER_MANAGE） |
+| 24 | GET `/api/users/import/template` | `src/composables/admin/useUserManage.ts handleDownloadTemplate()`（鉴权 Blob 下载） | UserManageController | 已接线 | 后端源码已有该路由（xlsx，需 USER_MANAGE）；配套上传见 B 节 POST `/api/users/import` |
 | 25 | GET `/api/users/{uid}/achievements` | src/utils/api.ts getUserAchievements()（UserSideBar.vue） | UserAchievementController | 已接线 | 成就列表分页 |
 | 26 | POST `/api/achievements/apply` | src/utils/api.ts submitAchievementApply()（UserSetting.vue） | AchievementApplyController | 已接线 | multipart title/description/file，真实报错 |
 | 27 | POST `/api/admin/users/{uid}/achievements` | useUserManage.ts handleAddAchievement()（UserList 成就弹窗）、ContestManage/Achievement.vue | AdminUserAchievementController | 已接线 | {title?,content,proofUrl?,achieveTime?} |
@@ -138,6 +138,8 @@
 | GET `/api/admin/announcements/{id}` | `useAnnouncement.ts openEditModal()`（Announcement.vue 编辑） | `Result<AnnouncementDetailVo>`（id/title/content/uid/status/gmtCreate/gmtModified），仅 ADMIN/ROOT，上线/下线都可读 |
 | POST `/api/admin/judge/nodes/tokens/{tokenId}/drain`、`/enable`、`/disable`、`/policy`、`/revoke` | `useJudgeNodes.ts drainNode()/enableNode()/revokeToken()`（Service.vue 行内操作） | 节点生命周期（ADMIN/ROOT）：`drain` 停止新调度、`enable` 恢复 active、`disable` 禁用并提升 accessVersion、`policy` 调整并发/权重/模式/授权截止、`revoke` 吊销；响应 `JudgeNodeTokenVo`。前端以 `status === draining` 展示排空，以 `maxConcurrency`/`expireTime` 展示并发与到期，已吊销/硬到期不提供恢复入口 |
 | GET `/api/admin/achievements/{id}/file` | `useAchievementManage.ts handleDownloadFile()`（成就申请详情/列表按钮） | 本地附件受保护下载（Bearer Blob，带鉴权）；外部 http(s) fileUrl 仍以链接展示，不做服务端代理 |
+| POST `/api/users/import` | `api.ts importUsers()`（`useUserManage.handleImport()`，UserList.vue 导入弹窗） | multipart `file`（.xls/.xlsx），需 USER_MANAGE；表头 uid/username/email/password/phone/avatar/collegeId/classId/grade，单次最多 1000 数据行；返回 `UserImportResultVo{successCount,failedCount,createdUsers[{uid,initialPassword}],failures[{rowNo,uid,reason}]}`。password 留空由后端生成初始密码，前端只在当前弹窗内存展示、关闭即清除，不写存储/日志；成功数>0 后重读真实用户列表 |
+| POST `/api/registrations/import` | `api.ts importRegistrations()`（`useRegistration.handleImport()`，Registration.vue「上传名单自动通过」） | multipart `file`（.xls/.xlsx），ADMIN/ROOT；表头 uid/username/password/email/collegeId/classId/grade/qq，单次最多 1000 数据行；每行先注册再自动通过，不是审批已有 UID；返回 `RegistrationImportResultVo{successCount,failedCount,successUids,failures[{rowNo,uid,reason}]}`。没有注册模板下载接口，也不复用用户 9 列模板；导入与原审批共享同一提交锁 |
 | GET `/api/admin/training/{id}` | `useTrainingManage.ts` useTrainingForm().loadData()（TrainingEdit.vue） | 返回 `Result<AdminTrainingDetailVo{id,title,type,auth,privatePwd,description,status(boolean),rank,problems[{problemId,displayId(Integer)}]}>`，仅 ADMIN/ROOT，停用/私有题单不受启用过滤且返回全部有序题目；`privatePwd` 恒为 null（密码不回显），留空提交即保留原密码 |
 | GET `/api/admin/judge/servers` | 前端节点管理使用 `/api/admin/judge/nodes` | 兼容投影：`AdminJudgeServerController.listServers` 直接投影 `judgeNodeSecurityService.listTokens(null)`，与已接线 `nodes` 同源，不是独立旧服务器数据源；前端不为重复字段新增页面 |
 | GET `/api/problems/{id}/testdata/download`、`/{caseNo}/download` | `StatusInfo.vue`、`ProblemEdit.vue` 测试数据卡片 | 角色 TEACHER/ADMIN/ROOT；ProblemEdit 也提供真实管理入口（上传 POST `/api/admin/problem/{id}/testdata`、下载全部/单个测试点） |
@@ -187,6 +189,7 @@
 - 分页统一 `{list,total}`（后端 `PageVo`）。
 - 用户 `status` 为 0 正常 / 1 禁用（`UserStatusConstant`）；注册申请 `status` 为 0 待处理 / 1 通过 / 2 驳回（`RegisterStatus`）；成就申请 `status` 为 pending/approved/rejected。
 - `/api/user/users` 仅支持 keyword/collegeId/grade/classId 服务端筛选；UserList.vue 已移除后端不支持的邮箱/角色/状态/注册时间筛选，不再用当页数据冒充全局筛选。
+- Excel 导入表头固定、列顺序不限：用户导入为 `uid/username/email/password/phone/avatar/collegeId/classId/grade`（`password` 留空由后端生成初始密码），注册名单导入为 `uid/username/password/email/collegeId/classId/grade/qq`（每行注册后自动通过，不是审批已有 UID）；两者都只接受 .xls/.xlsx 单文件、单次最多 1000 数据行，失败行按 `rowNo`（Excel 行号，数据从 2 开始）/`uid`/`reason` 返回；注册名单没有模板下载接口，不得复用用户 9 列模板。
 - `registerMode` 必须原样提交后端 `SystemConfigConstant.REGISTER_MODE_SET`（OPEN/EMAIL_SUFFIX/INVITE_CODE），否则 `PUT /api/admin/config` 返回 400；`smtpPassword` 后端不回显，留空即省略以保留旧值。
 - 题目 `judgeMode` 取值 `default`/`spj`/`interactive`；`type` 为 0 ACM / 1 OI；`difficulty` 为 0 简单 / 1 中等 / 2 困难（`ProblemDifficultyConstant`）。
 - 题目 `auth` 为 1 公开 / 2 私有 / 3 仅比赛（`ProblemAuthConstant`）；`PUT /api/admin/problem/auth` 后端仅接受 1/2，auth=3 通过新增/编辑接口设置。

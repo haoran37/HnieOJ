@@ -1,6 +1,19 @@
 <template>
   <div class="achievement-manage-page">
     <n-card :bordered="false" title="成就认证审核">
+      <template #header-extra>
+        <n-space :size="12" align="center">
+          <n-text depth="3">已选 {{ selectedRowKeys.length }} 条待处理申请</n-text>
+          <n-button
+            type="success"
+            :disabled="selectedRowKeys.length === 0 || loading || mutating"
+            :loading="mutating"
+            @click="openBatchApprove"
+          >
+            批量通过
+          </n-button>
+        </n-space>
+      </template>
       <!-- 筛选区 -->
       <n-space vertical :size="16" style="margin-bottom: 16px">
         <n-space :size="12" align="center">
@@ -39,8 +52,41 @@
         :loading="loading"
         :pagination="pagination"
         :row-key="(row: AchievementApplication) => String(row.id)"
+        :checked-row-keys="selectedRowKeys"
         :scroll-x="1500"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
       />
+
+      <!-- 批量通过结果：持久显示成功数、失败数及每条失败申请 ID 与原因 -->
+      <n-alert
+        v-if="batchResult"
+        :type="batchResult.failedCount > 0 ? 'warning' : 'success'"
+        :bordered="false"
+        :title="`批量通过结果：成功 ${batchResult.successCount} 条，失败 ${batchResult.failedCount} 条`"
+        style="margin-top: 12px"
+      >
+        <n-space vertical :size="4">
+          <n-text v-if="batchResult.failures.length === 0" depth="3">全部申请均已通过</n-text>
+          <n-text v-for="failure in batchResult.failures" :key="failure.id" depth="3">
+            申请 #{{ failure.id }}：{{ failure.reason }}
+          </n-text>
+        </n-space>
+        <template #action>
+          <n-button size="small" @click="fetchList">重新读取列表</n-button>
+        </template>
+      </n-alert>
+      <n-alert
+        v-if="batchError"
+        type="error"
+        :bordered="false"
+        title="批量通过失败"
+        style="margin-top: 12px"
+      >
+        {{ batchError }}
+        <template #action>
+          <n-button size="small" @click="fetchList">重新读取列表</n-button>
+        </template>
+      </n-alert>
     </n-card>
 
     <!-- 申请详情（展示说明 + 附件）模态框 -->
@@ -82,13 +128,15 @@
       </n-space>
     </n-modal>
 
-    <!-- 打回原因模态框 -->
+    <!-- 打回原因模态框：关闭受控，审批在途不得关闭 -->
     <n-modal
-      v-model:show="showRejectModal"
+      :show="showRejectModal"
       preset="card"
       title="打回申请"
       style="width: 500px"
       :mask-closable="false"
+      :close-on-esc="!mutating"
+      @update:show="handleRejectShowChange"
     >
       <n-form label-placement="left" :label-width="80">
         <n-form-item label="打回原因" required>
@@ -102,8 +150,13 @@
       </n-form>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showRejectModal = false">取消</n-button>
-          <n-button type="error" :loading="submitting" @click="handleRejectSubmit">
+          <n-button :disabled="mutating" @click="closeRejectModal">取消</n-button>
+          <n-button
+            type="error"
+            :loading="mutating"
+            :disabled="mutating"
+            @click="handleRejectSubmit"
+          >
             确认打回
           </n-button>
         </n-space>
@@ -126,6 +179,7 @@ import {
 const {
   loading,
   submitting,
+  mutating,
   list,
   filters,
   pagination,
@@ -135,6 +189,9 @@ const {
   rejectReason,
   showDetailModal,
   detailRow,
+  selectedRowKeys,
+  batchResult,
+  batchError,
   fetchColleges,
   fetchList,
   handleSearch,
@@ -143,7 +200,11 @@ const {
   handleDownloadFile,
   handleApprove,
   openRejectModal,
+  closeRejectModal,
+  handleRejectShowChange,
   handleRejectSubmit,
+  handleCheckedRowKeysChange,
+  openBatchApprove,
 } = useAchievementManage();
 
 const statusText = (status: string) => {
@@ -153,6 +214,11 @@ const statusText = (status: string) => {
 };
 
 const columns: DataTableColumns<AchievementApplication> = [
+  {
+    // 仅当前页待处理行可选；列表加载/审批在途时禁用，旧页行不会借迟到响应混入选择
+    type: 'selection',
+    disabled: (row) => loading.value || mutating.value || row.status !== ACHIEVEMENT_STATUS.PENDING,
+  },
   {
     title: 'UID',
     key: 'uid',
@@ -247,6 +313,7 @@ const columns: DataTableColumns<AchievementApplication> = [
               size: 'tiny',
               type: 'primary',
               secondary: true,
+              disabled: mutating.value || loading.value,
               onClick: () => handleApprove(row),
             },
             { default: () => '通过' },
@@ -257,6 +324,7 @@ const columns: DataTableColumns<AchievementApplication> = [
               size: 'tiny',
               type: 'error',
               secondary: true,
+              disabled: mutating.value || loading.value,
               onClick: () => openRejectModal(row),
             },
             { default: () => '打回' },

@@ -1233,6 +1233,17 @@ export function rejectAchievement(id: number, reason: string): Promise<null> {
   return post<null>(`/api/admin/achievements/${id}/reject`, { reason })
 }
 
+/**
+ * 批量审核通过（按申请 id）。
+ * 后端逐个返回结果：HTTP 200 也可能部分/全部失败，调用方必须以
+ * successCount/failedCount/failures 为准，不能因为 200 就显示全部成功。
+ */
+export function batchApproveAchievements(
+  ids: number[],
+): Promise<{ successCount: number; failedCount: number; failures: { id: number; reason: string }[] }> {
+  return post('/api/admin/achievements/batch/approve', { ids })
+}
+
 /** 本地附件需 Bearer 鉴权下载（blob） */
 export function downloadAchievementApplyFile(id: number): Promise<DownloadedBlob> {
   return downloadFile(`/api/admin/achievements/${id}/file`)

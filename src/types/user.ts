@@ -25,7 +25,8 @@ export interface RegisterPayload {
   qq: string
 }
 
-// GET /api/user/profile 返回 data；字段名与后端 UserProfileVo 一致（collegeId/classId 与 cfUsername 等均为 camelCase）
+// GET /api/user/profile 返回 data；字段名与后端 UserProfileVo 的 Jackson 序列化一致
+// （collegeId/classId 等为 camelCase，CF 用户名为 cf_username）
 export interface UserProfile {
   uid: string
   username: string
@@ -39,8 +40,8 @@ export interface UserProfile {
   grade?: string | null
   qq?: string | null
   phone?: string | null
-  // 后端 UserProfileVo 的 CF 用户名
-  cfUsername?: string | null
+  // 后端 UserProfileVo 的 CF 用户名（响应字段为 cf_username）
+  cf_username?: string | null
   github?: string | null
   blog?: string | null
   roles?: string[] | null

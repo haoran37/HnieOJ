@@ -675,6 +675,8 @@ const profileData = {
   class: '软件2401',
   classId: 10,
   grade: '2024',
+  // 后端 UserProfileVo 的 Jackson 序列化为 snake_case
+  cf_username: 'existing-cf',
 };
 
 await test('资料：真实加载并回填，uid/email 只读', async () => {
@@ -689,6 +691,7 @@ await test('资料：真实加载并回填，uid/email 只读', async () => {
   assert.equal(state.profile.username, 'alice');
   assert.equal(state.profile.collegeId, 1);
   assert.equal(state.profile.classId, 10);
+  assert.equal(state.profile.cfUsername, 'existing-cf', '响应 cf_username 必须回填到 profile.cfUsername');
   assert.equal(state.profileLoaded.value, true);
   assert.equal(state.identity.collegeId, 1, '身份申请以当前资料为默认起点');
 });
@@ -922,6 +925,43 @@ await test('身份申请：真实 POST 四项身份字段 + reason，成功后�
   assert.equal(post.url, '/api/user/profile-change-requests');
   assert.deepEqual(bodyOf(post), { realname: '张三', collegeId: 1, grade: '2024', classId: 11, reason: '班级调整' });
   assert.ok(calls.some((c) => c.url.startsWith('/api/user/profile-change-requests?')), '提交成功后刷新本人申请列表');
+});
+
+await test('身份申请：CF 用户名同值不提交，新值按 cfUsername 真实提交', async () => {
+  responder = (url, init) => {
+    if (init?.method === 'POST') return json(null);
+    if (url === '/api/user/profile') return json(profileData);
+    if (url.includes('profile-change-requests')) return json({ list: [], total: 0 });
+    return json(null);
+  };
+  const state = useUserSettings();
+  await state.loadProfile();
+  assert.equal(state.profile.cfUsername, 'existing-cf');
+
+  // 与当前资料同值：不构成 changedProfileFields，不发 POST
+  state.identity.cfUsername = 'existing-cf';
+  state.identity.reason = '确认 CF 用户名';
+  calls = [];
+  assert.equal(await state.submitIdentity(), false);
+  assert.equal(
+    calls.filter((c) => c.init?.method === 'POST').length,
+    0,
+    '同值 CF 用户名不得提交资料变更申请',
+  );
+
+  // 新值：请求体使用后端 ProfileChangeCreateRequest 的 cfUsername
+  state.identity.cfUsername = 'new-cf';
+  calls = [];
+  assert.equal(await state.submitIdentity(), true);
+  const post = calls.find((c) => c.init?.method === 'POST');
+  assert.equal(post.url, '/api/user/profile-change-requests');
+  const body = bodyOf(post);
+  assert.equal(body.cfUsername, 'new-cf', '申请体必须使用 camelCase cfUsername');
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(body, 'cf_username'),
+    false,
+    '申请体不得出现响应侧 snake_case',
+  );
 });
 
 await test('身份申请：reset 后在途成功不刷新新账号申请列表', async () => {

@@ -871,7 +871,7 @@ export interface AnnouncementListVo {
   title: string
   uid: string | null
   status: number | null
-  /** 后端 20260920 增量新增；历史记录为 ANNOUNCEMENT。可选以兼容旧后端响应 */
+  /** 公告分类：ANNOUNCEMENT / NEWS */
   category?: string | null
   gmtCreate: string | null
   gmtModified: string | null
@@ -914,8 +914,8 @@ export interface UserDetailVo {
   grade: string | null
   classId: number | null
   majorClass: string | null
-  /** 与后端 UserInfo 返回的 camelCase 字段名一致 */
-  cfUsername: string | null
+  /** 与后端 UserDetailVo 的 Jackson 序列化一致：CF 用户名为 cf_username */
+  cf_username: string | null
   github: string | null
   blog: string | null
   roles: string[] | null
@@ -1600,7 +1600,7 @@ export interface AdminAnnouncementListVo {
   title: string
   uid: string | null
   status: number | null
-  /** ANNOUNCEMENT / NEWS；可选以兼容旧后端响应 */
+  /** ANNOUNCEMENT / NEWS；后端按记录实际存储的分类返回 */
   category?: string | null
   gmtCreate: string | null
   gmtModified: string | null
@@ -2061,13 +2061,13 @@ export function updateAdminHomeworkStatus(id: number | string, status: boolean):
 }
 
 // --------------------------------------------------
-// B2 批次：管理通知 / 本人站内消息 / 自助资料 / 资料变更申请（user 服务）
-// 契约见 backend-api-b2.md。字段以后端 DTO/VO 为准。
+// 管理通知 / 本人站内消息 / 自助资料 / 资料变更申请（user 服务）
+// 字段以后端 DTO/VO 为准。
 // --------------------------------------------------
 
-/** B2-1 targetType：USERS 目标为 uid，CLASSES 目标为班级 id 字符串 */
+/** targetType：USERS 目标为 uid，CLASSES 目标为班级 id 字符串 */
 export type NoticeTargetType = 'USERS' | 'CLASSES'
-/** B2-1 status：DRAFT 草稿可编辑；PUBLISHED 已发布不可再编辑正文/目标 */
+/** status：DRAFT 草稿可编辑；PUBLISHED 已发布不可再编辑正文/目标 */
 export type NoticeStatus = 'DRAFT' | 'PUBLISHED'
 
 /** 对应后端 UserNoticeListVo */
@@ -2143,7 +2143,7 @@ export interface UserMessageVo {
   createdAt: string | null
 }
 
-/** B2-2 本人收件箱分页；unread=true 仅返回未读 */
+/** 本人收件箱分页；unread=true 仅返回未读 */
 export function getUserMessages(
   page: number,
   pageSize: number,
@@ -2196,7 +2196,7 @@ export function changeUserPassword(payload: {
   return put<null>('/api/user/password', payload)
 }
 
-/** B2-5 资料变更申请状态 */
+/** 资料变更申请状态 */
 export type ProfileChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
 /**

@@ -1,0 +1,32 @@
+# 依赖更新策略：npm 依赖每周检查，补丁/次要版本合并为一个 PR，避免告警量大时刷屏；
+# Actions 依赖与后端仓库保持一致，每周检查一次。
+# 安全更新（有已知漏洞的依赖）由 Dependabot 自动开 PR，不占这里的 open-pull-requests-limit 分组。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch

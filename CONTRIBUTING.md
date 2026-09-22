@@ -15,13 +15,21 @@ pnpm install
 pnpm dev
 ```
 
+## 分支策略
+
+分支模型为 `main`（发布）+ `develop`（集成）：请一律基于 `develop` 分支提交 PR，经 CI 门禁与维护者审核后合入 `develop`；积累稳定后由维护者合并 `develop` → `main`，并打版本 tag 触发发布。
+
+- 发布由 `v*` tag 触发 `Deploy to GitHub Pages` 工作流；`main` 的日常推送不会发布。
+- CI 门禁（全部通过才可合并）：UTF-8 编码检查、ESLint、`vue-tsc` 类型检查、Vite 生产构建、gitleaks 密钥扫描；PR 另有依赖成分审查。
+
 ## 提交前检查
 
-请至少执行以下命令并确保通过：
+请先执行以下命令并确保通过：
 
 ```bash
+pnpm lint:all      # ESLint + UTF-8 编码检查
 pnpm type-check
-pnpm lint
+pnpm build-only
 ```
 
 ## 代码规范
@@ -49,7 +57,7 @@ pnpm lint
 1. 变更说明（做了什么、为什么做）。
 2. 关联 Issue（如有）。
 3. UI 改动截图或录屏（如有界面变化）。
-4. 已执行的本地检查结果（`type-check` / `lint`）。
+4. 已执行的本地检查结果（`lint:all` / `type-check` / `build-only`）。
 
 ## 行为准则
 

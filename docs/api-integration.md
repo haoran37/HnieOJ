@@ -138,6 +138,7 @@
 | GET `/api/admin/announcements/{id}` | `useAnnouncement.ts openEditModal()`（Announcement.vue 编辑） | `Result<AnnouncementDetailVo>`（id/title/content/uid/status/gmtCreate/gmtModified），仅 ADMIN/ROOT，上线/下线都可读 |
 | POST `/api/admin/judge/nodes/tokens/{tokenId}/drain`、`/enable`、`/disable`、`/policy`、`/revoke` | `useJudgeNodes.ts drainNode()/enableNode()/revokeToken()`（Service.vue 行内操作） | 节点生命周期（ADMIN/ROOT）：`drain` 停止新调度、`enable` 恢复 active、`disable` 禁用并提升 accessVersion、`policy` 调整并发/权重/模式/授权截止、`revoke` 吊销；响应 `JudgeNodeTokenVo`。前端以 `status === draining` 展示排空，以 `maxConcurrency`/`expireTime` 展示并发与到期，已吊销/硬到期不提供恢复入口 |
 | GET `/api/admin/achievements/{id}/file` | `useAchievementManage.ts handleDownloadFile()`（成就申请详情/列表按钮） | 本地附件受保护下载（Bearer Blob，带鉴权）；外部 http(s) fileUrl 仍以链接展示，不做服务端代理 |
+| POST `/api/admin/achievements/batch/approve` | `useAchievementManage.ts openBatchApprove()`（UserManage/Achievement.vue） | ADMIN/ROOT；{ids} 仅含当前页选中的 pending 申请；确认后显示成功/失败数及逐条原因，批量与单条通过/驳回共享写锁，搜索/翻页/刷新清除旧选择 |
 | GET `/api/admin/training/{id}` | `useTrainingManage.ts` useTrainingForm().loadData()（TrainingEdit.vue） | 返回 `Result<AdminTrainingDetailVo{id,title,type,auth,privatePwd,description,status(boolean),rank,problems[{problemId,displayId(Integer)}]}>`，仅 ADMIN/ROOT，停用/私有题单不受启用过滤且返回全部有序题目；`privatePwd` 恒为 null（密码不回显），留空提交即保留原密码 |
 | GET `/api/admin/judge/servers` | 前端节点管理使用 `/api/admin/judge/nodes` | 兼容投影：`AdminJudgeServerController.listServers` 直接投影 `judgeNodeSecurityService.listTokens(null)`，与已接线 `nodes` 同源，不是独立旧服务器数据源；前端不为重复字段新增页面 |
 | GET `/api/problems/{id}/testdata/download`、`/{caseNo}/download` | `StatusInfo.vue`、`ProblemEdit.vue` 测试数据卡片 | 角色 TEACHER/ADMIN/ROOT；ProblemEdit 也提供真实管理入口（上传 POST `/api/admin/problem/{id}/testdata`、下载全部/单个测试点） |
@@ -154,7 +155,7 @@
 | PUT `/api/user/password` | `useUserSettings.ts`（UserSetting.vue 密码表单） | `UpdatePasswordRequest{oldPassword,newPassword}`，新密码 6–32 位且不 trim；旧密码错误返回 `PASSWORD_ERROR`；成功后后端失效全部旧会话，前端清理本地 token 并跳转登录 |
 | PUT `/api/user/profile/password` | 前端不使用 | 并存的另一个人工改密入口，请求体是 `ChangeCurrentPasswordRequest{oldPassword,password}`，且旧密码错误返回 `UNAUTHORIZED`。**与 `PUT /api/user/password` 字段名和错误码都不同，不是等价路径**，新代码不要替换为它 |
 | POST/GET `/api/user/profile-change-requests` | `useUserSettings.ts`（UserSetting.vue 资料变更申请） | 项目内唯一的资料变更申请流程（`ProfileChangeService`），按申请 id 审批，可申请 12 个字段（身份字段 realname/collegeId/grade/classId + 联系/社交字段 username/email/phone/avatar/qq/cfUsername/github/blog），只提交需要变更的字段，含逐字段原值一致性校验 |
-| GET `/api/admin/profile-change-requests`、POST `/{id}/approve`、POST `/{id}/reject`、POST `/batch-approve` | `useUserChange.ts`（UserManage/Change.vue） | ADMIN/ROOT；按申请 id 审批，仅 PENDING 可操作，通过/驳回均要求原因（≤1000），审批时逐字段校验申请原值与用户当前资料一致；批量审批按 id 列表逐条独立事务，单条失败不影响其它条目 |
+| GET `/api/admin/profile-change-requests`、POST `/{id}/approve`、POST `/{id}/reject`、POST `/batch-approve` | `useUserChange.ts`（UserManage/Change.vue） | ADMIN/ROOT；按申请 id 审批，仅 PENDING 可操作；单条通过/驳回要求原因（≤1000），批量通过仅提交 {ids}；审批时逐字段校验原值，批量逐条独立事务。页面仅选择当前页待审核申请，显示成功/失败数及逐条失败原因，完成后重新读取真实列表 |
 
 ## C. 无文档且后端无 API 的缺失能力（保留页面并禁用/空状态）
 
@@ -169,7 +170,7 @@
 | 用户消息 | **已接线**：`useUserMessages.ts` + `UserMessage.vue` 支持分页、全部/未读过滤、未读数、单条/全部已读、删除确认；仅本人可见（route uid 与本人 uid 比较，非本人不可访问），失败不伪 0 |
 | 收藏/评分/历史统计 | 后端无自助接口；UserHome/UserSideBar 统计区标注「暂未开放」，UserHome「已通过/尝试过的题目」不再显示 0 题或「暂无本地记录」 |
 | 自助资料/密码/身份变更申请 | **已接线**：`useUserSettings.ts` + `UserSetting.vue` 真实加载 `GET /api/user/profile`，只提交白名单字段；密码走 `PUT /api/user/password`，成功后清理本地会话并跳转登录；身份与联系/社交字段走同一个变更申请并展示本人申请分页。收藏/评分仍暂未开放 |
-| 用户信息变更审核（「变动申请」页） | **已接线**：`useUserChange.ts` + `Change.vue` 走真实分页/状态/关键字，行 key 为申请 id，仅 PENDING 可审核、原因必填，冲突保留错误并刷新真实状态；已移除 disabled 占位批量按钮 |
+| 用户信息变更审核（「变动申请」页） | **已接线**：`useUserChange.ts` + `Change.vue` 走真实分页/状态/关键字，行 key 为申请 id，仅 PENDING 可审核；单条审核原因必填，批量通过已接真实接口并展示逐条结果，单条/批量共享写锁，冲突保留错误并刷新真实状态 |
 | 成就附件本地/外部区分 | 本地存储：`fileUrl` 为受保护路径 `/api/admin/achievements/{id}/file`，前端 Bearer 下载为 Blob；外部仅 http(s) 以链接打开，不把 local key 当链接、也不走服务端代理 |
 | 注册开关/注册模式执行缺口 | `registerMode` 已按后端合法枚举（OPEN/EMAIL_SUFFIX/INVITE_CODE）保存与回读，但 user 模块未读取 allowRegister/registerMode，RegisterRequest 无 inviteCode；Config.vue 明确提示该设置当前不影响实际注册，不虚构邀请码注册已生效 |
 | 共享主 Judge Token 重置 | 已退休，改用 Bootstrap 一次性注册凭据（Service.vue `POST /api/admin/judge/nodes/bootstrap-tokens`）+ Ed25519 注册 |

@@ -5,8 +5,10 @@ import {
   approveRegistration,
   batchApproveRegistrations,
   getRegistrations,
+  importRegistrations,
   rejectRegistration,
   type RegistrationApplyVo,
+  type RegistrationImportResultVo,
 } from '@/utils/api';
 
 // 对应后端 RegisterStatus
@@ -59,6 +61,11 @@ export function useRegistration() {
     email: '',
     reason: '',
   });
+
+  // 导入注册名单：文件与结果只保留在当前弹窗会话内，关闭即清理
+  const showImportModal = ref(false);
+  const importFile = ref<File | null>(null);
+  const importResult = ref<RegistrationImportResultVo | null>(null);
 
   const selectedIds = ref<string[]>([]);
   const keyword = ref('');
@@ -206,6 +213,91 @@ export function useRegistration() {
     });
   };
 
+  // ---- 导入注册名单（真实上传 POST /api/registrations/import） ----
+  const IMPORT_FILE_EXTENSIONS = ['.xls', '.xlsx'];
+
+  const resetImportState = () => {
+    importFile.value = null;
+    importResult.value = null;
+  };
+
+  const openImportModal = () => {
+    // 新一次打开不沿用上一次的文件与结果
+    resetImportState();
+    showImportModal.value = true;
+  };
+
+  /** n-modal 关闭动画结束后兜底清理：覆盖右上角关闭/Esc 等非按钮关闭路径 */
+  const handleImportModalAfterLeave = () => {
+    resetImportState();
+  };
+
+  /**
+   * 校验并暂存待导入名单文件。
+   * 空选择/空文件/错误后缀一律拒绝并返回 false，调用方不得发起请求。
+   */
+  const handleImportFileChange = (file: File | null): boolean => {
+    // 导入在途不得更换文件
+    if (submitting.value) return false;
+    // 待导入文件始终只有一份：被拒/移除后不留旧选择（结果保留到下次导入或关闭弹窗）
+    importFile.value = null;
+    if (!file) return false;
+    const name = file.name.toLowerCase();
+    if (!IMPORT_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      message.warning('仅支持 .xls / .xlsx 格式的 Excel 文件');
+      return false;
+    }
+    if (file.size === 0) {
+      message.warning('文件内容为空，请重新选择');
+      return false;
+    }
+    importFile.value = file;
+    return true;
+  };
+
+  /** 关闭导入弹窗；导入在途禁止关闭 */
+  const closeImportModal = (): boolean => {
+    if (submitting.value) return false;
+    showImportModal.value = false;
+    resetImportState();
+    return true;
+  };
+
+  const handleImport = async () => {
+    // 与通过/打回/批量通过共享同一把提交锁：在途时重复点击不再发请求
+    if (submitting.value) return;
+    const file = importFile.value;
+    if (!file) {
+      message.warning('请先选择要导入的 Excel 名单文件');
+      return;
+    }
+    submitting.value = true;
+    importResult.value = null;
+    try {
+      const result = await importRegistrations(file);
+      importResult.value = result;
+      const success = result?.successCount ?? 0;
+      const failed = result?.failedCount ?? 0;
+      if (failed > 0 && success > 0) {
+        message.warning(`部分成功：成功 ${success} 条，失败 ${failed} 条，请只修正失败行后再上传`);
+      } else if (failed > 0) {
+        message.error(`导入失败：成功 0 条，失败 ${failed} 条，请修正失败行后再上传`);
+      } else {
+        message.success(`导入成功 ${success} 条`);
+      }
+      // 后端已返回结果：清空原文件，避免整份原文件被再次提交导致成功行重复导入
+      importFile.value = null;
+      if (success > 0) {
+        await fetchRegistrations();
+      }
+    } catch (err) {
+      // HTTP/网络失败：保留已选文件与真实错误以便重试，且不显示任何成功结果
+      message.error(err instanceof Error ? err.message : '导入注册名单失败');
+    } finally {
+      submitting.value = false;
+    }
+  };
+
   return {
     loading,
     submitting,
@@ -217,12 +309,20 @@ export function useRegistration() {
     pagination,
     showRejectModal,
     rejectForm,
+    showImportModal,
+    importFile,
+    importResult,
     fetchRegistrations,
     resetFilters,
     handleApprove,
     openRejectModal,
     handleRejectSubmit,
     handleBatchApprove,
+    openImportModal,
+    closeImportModal,
+    handleImportModalAfterLeave,
+    handleImportFileChange,
+    handleImport,
     formatFullTime,
   };
 }

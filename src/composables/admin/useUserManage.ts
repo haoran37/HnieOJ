@@ -20,10 +20,12 @@ import {
   getUserAchievements,
   getUserDetail,
   getUsers,
+  importUsers,
   updateUser,
   updateUserPassword,
   type ClassStaffVo,
   type UserDetailVo,
+  type UserImportResultVo,
   type UserListVo,
 } from '@/utils/api';
 import { saveBlob } from '@/utils/download';
@@ -194,9 +196,9 @@ export function useUserManage() {
     newDate: null as number | null,
   });
 
-  // 导入：后端无上传接口，仅支持模板下载
-  const importUnavailableMessage =
-    '后端未提供用户批量导入上传接口，本页仅支持下载模板，导入操作暂不可用。';
+  // 导入：文件与结果只保留在当前弹窗会话内，关闭即清理（初始密码不落任何持久化）
+  const importFile = ref<File | null>(null);
+  const importResult = ref<UserImportResultVo | null>(null);
 
   const fetchColleges = async () => {
     collegeOptions.value = ((await getColleges()) ?? []).map((item) => ({
@@ -768,8 +770,89 @@ export function useUserManage() {
     }
   };
 
-  const handleImport = () => {
-    message.warning(importUnavailableMessage);
+  // ---- 导入用户（真实上传 POST /api/users/import） ----
+  const IMPORT_FILE_EXTENSIONS = ['.xls', '.xlsx'];
+
+  const resetImportState = () => {
+    importFile.value = null;
+    importResult.value = null;
+  };
+
+  const openImportModal = () => {
+    // 新一次打开不沿用上一次的文件与结果（含初始密码）
+    resetImportState();
+    showImportModal.value = true;
+  };
+
+  /** n-modal 关闭动画结束后兜底清理：覆盖右上角关闭/Esc 等非按钮关闭路径 */
+  const handleImportModalAfterLeave = () => {
+    resetImportState();
+  };
+
+  /**
+   * 校验并暂存待导入文件。
+   * 空选择/空文件/错误后缀一律拒绝并返回 false，调用方不得发起请求。
+   */
+  const handleImportFileChange = (file: File | null): boolean => {
+    // 导入在途不得更换文件
+    if (submitting.value) return false;
+    // 待导入文件始终只有一份：被拒/移除后不留旧选择（结果保留到下次导入或关闭弹窗）
+    importFile.value = null;
+    if (!file) return false;
+    const name = file.name.toLowerCase();
+    if (!IMPORT_FILE_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      message.warning('仅支持 .xls / .xlsx 格式的 Excel 文件');
+      return false;
+    }
+    if (file.size === 0) {
+      message.warning('文件内容为空，请重新选择');
+      return false;
+    }
+    importFile.value = file;
+    return true;
+  };
+
+  /** 关闭导入弹窗；导入在途禁止关闭（结果未落定且初始密码仍需人工记录） */
+  const closeImportModal = (): boolean => {
+    if (submitting.value) return false;
+    showImportModal.value = false;
+    resetImportState();
+    return true;
+  };
+
+  const handleImport = async () => {
+    // 沿用现有提交锁：在途时重复点击不再发请求
+    if (submitting.value) return;
+    const file = importFile.value;
+    if (!file) {
+      message.warning('请先选择要导入的 Excel 文件');
+      return;
+    }
+    submitting.value = true;
+    importResult.value = null;
+    try {
+      const result = await importUsers(file);
+      importResult.value = result;
+      const success = result?.successCount ?? 0;
+      const failed = result?.failedCount ?? 0;
+      if (failed > 0 && success > 0) {
+        message.warning(`部分成功：成功 ${success} 条，失败 ${failed} 条，请只修正失败行后再上传`);
+      } else if (failed > 0) {
+        message.error(`导入失败：成功 0 条，失败 ${failed} 条，请修正失败行后再上传`);
+      } else {
+        message.success(`导入成功 ${success} 条`);
+      }
+      // 后端已返回结果：清空原文件，避免整份原文件被再次提交导致成功行重复导入
+      importFile.value = null;
+      if (success > 0) {
+        await fetchUsers();
+      }
+    } catch (err) {
+      // HTTP/网络失败：保留已选文件与真实错误以便重试，且不显示任何成功结果
+      message.error(err instanceof Error ? err.message : '导入用户失败');
+    } finally {
+      submitting.value = false;
+    }
   };
 
   // ---- 用户成就 ----
@@ -870,7 +953,8 @@ export function useUserManage() {
     passwordForm,
     achievementForm,
     addUserForm,
-    importUnavailableMessage,
+    importFile,
+    importResult,
     collegeOptions,
     filterGradeOptions,
     filterClassOptions,
@@ -909,6 +993,10 @@ export function useUserManage() {
     handleBatchDelete,
     openAddUserModal,
     handleAddUser,
+    openImportModal,
+    closeImportModal,
+    handleImportModalAfterLeave,
+    handleImportFileChange,
     handleImport,
     handleDownloadTemplate,
     formatFullTime,

@@ -659,13 +659,27 @@ check('本批无 mock / Math.random / 模拟 delay', () => {
   }
 });
 
-check('禁用项明确：导入上传/注册名单仍禁用，变更页/比赛成就已接真实 API', () => {
+check('接线明确：用户导入/注册名单已接真实 API，变更页/比赛成就已接真实 API', () => {
   const userList = read('src/views/admin/UserManage/UserList.vue');
-  assert.ok(userList.includes('n-upload disabled'), '用户导入上传必须显式禁用');
-  assert.ok(userList.includes('暂不可用'), '导入需清楚说明暂不可用');
+  assert.ok(userList.includes('@click="handleImport"'), '用户导入必须接真实 handleImport 提交入口');
+  assert.ok(userList.includes('handleDownloadTemplate'), '用户导入模板下载必须保留');
+  assert.ok(!userList.includes('n-upload disabled'), '用户导入上传不得再整体禁用');
+  assert.ok(
+    !userList.includes('后端无上传接口') && !userList.includes('暂不可用'),
+    '用户导入不得再声称后端缺接口/暂不可用',
+  );
 
   const registration = read('src/views/admin/UserManage/Registration.vue');
-  assert.ok(registration.includes('上传名单自动通过') && registration.includes('disabled'), '注册名单上传必须禁用');
+  assert.ok(
+    registration.includes('上传名单自动通过') && registration.includes('@click="handleImport"'),
+    '注册名单必须保留真实导入入口并接 handleImport 提交',
+  );
+  assert.ok(!registration.includes('n-upload disabled'), '注册名单上传不得再整体禁用');
+  assert.ok(
+    !registration.includes('后端未提供注册名单') && !registration.includes('暂不可用'),
+    '注册名单不得再声称后端缺接口/暂不可用',
+  );
+  assert.ok(!registration.includes('下载模板'), '注册名单没有模板接口，不得提供假模板');
 
   const change = read('src/views/admin/UserManage/Change.vue');
   assert.ok(!change.includes('暂未开放'), '变更页不得再保留旧占位文案');

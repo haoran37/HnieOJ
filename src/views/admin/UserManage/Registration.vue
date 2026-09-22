@@ -3,17 +3,12 @@
     <n-card :bordered="false" title="注册审核">
       <template #header-extra>
         <n-space>
-          <n-tooltip trigger="hover">
-            <template #trigger>
-              <n-button type="primary" disabled>
-                <template #icon>
-                  <n-icon :size="18"><CloudUploadOutline /></n-icon>
-                </template>
-                上传名单自动通过
-              </n-button>
+          <n-button type="primary" :disabled="submitting" @click="openImportModal">
+            <template #icon>
+              <n-icon :size="18"><CloudUploadOutline /></n-icon>
             </template>
-            后端未提供注册名单批量导入上传接口，暂不可用
-          </n-tooltip>
+            上传名单自动通过
+          </n-button>
           <n-button
             type="success"
             :disabled="selectedIds.length === 0"
@@ -27,10 +22,6 @@
           </n-button>
         </n-space>
       </template>
-
-      <n-alert type="warning" :bordered="false" style="margin-bottom: 12px">
-        「上传 Excel 名单自动审核」暂未开放，请逐条或批量审核注册申请。
-      </n-alert>
 
       <n-space :size="12" align="center" style="margin-bottom: 12px">
         <n-input
@@ -105,12 +96,86 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- 导入注册名单模态框（真实上传 POST /api/registrations/import，每行注册后自动通过） -->
+    <n-modal
+      v-model:show="showImportModal"
+      preset="card"
+      title="上传名单自动通过"
+      :mask-closable="false"
+      :closable="!submitting"
+      :close-on-esc="!submitting"
+      style="width: auto; min-width: 640px; max-width: 90vw"
+      @after-leave="handleImportModalAfterLeave"
+    >
+      <n-space vertical :size="16">
+        <n-alert type="info" :show-icon="false">
+          支持 .xls / .xlsx 单文件；表头必须为 uid、username、password、email、collegeId、classId、grade、qq（列顺序不限），单次最多 1000 行数据。
+          名单中每一行都会注册新账号并自动通过审核（不是审批已有 UID），请勿重复上传同一份名单。
+        </n-alert>
+
+        <n-upload
+          :max="1"
+          accept=".xlsx,.xls"
+          :default-upload="false"
+          :disabled="submitting"
+          :file-list="importFileList"
+          @change="handleImportUploadChange"
+        >
+          <n-button :disabled="submitting">选择文件</n-button>
+        </n-upload>
+
+        <template v-if="importResult">
+          <n-alert :type="importResultType">
+            成功 {{ importResult.successCount }} 条，失败 {{ importResult.failedCount }} 条。
+            <template v-if="importResult.failedCount > 0">
+              请只修正失败行后再上传（成功行不要重复导入）。
+            </template>
+          </n-alert>
+
+          <n-space v-if="importResult.successUids.length > 0" vertical :size="8">
+            <n-text strong>已通过 UID</n-text>
+            <n-list bordered>
+              <n-list-item v-for="uid in importResult.successUids" :key="uid">{{ uid }}</n-list-item>
+            </n-list>
+          </n-space>
+
+          <n-space v-if="importResult.failures.length > 0" vertical :size="8">
+            <n-text strong>失败行（UID 与原因）</n-text>
+            <n-list bordered>
+              <n-list-item
+                v-for="(failure, index) in importResult.failures"
+                :key="`${failure.rowNo}-${failure.uid}-${index}`"
+              >
+                第 {{ failure.rowNo ?? '-' }} 行 · UID {{ failure.uid || '（空）' }}：{{
+                  failure.reason || '导入失败'
+                }}
+              </n-list-item>
+            </n-list>
+          </n-space>
+        </template>
+      </n-space>
+      <template #footer>
+        <n-space justify="end">
+          <n-button :disabled="submitting" @click="closeImportModal">关闭</n-button>
+          <n-button type="primary" :loading="submitting" @click="handleImport">导入</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { h, onMounted } from 'vue';
-import { NButton, NSpace, NTag, NIcon, type DataTableColumns } from 'naive-ui';
+import { computed, h, onMounted } from 'vue';
+import {
+  NButton,
+  NSpace,
+  NTag,
+  NIcon,
+  type DataTableColumns,
+  type UploadFileInfo,
+  type UploadOnChange,
+} from 'naive-ui';
 import { CloudUploadOutline, CheckmarkDoneOutline } from '@vicons/ionicons5';
 import {
   useRegistration,
@@ -128,14 +193,39 @@ const {
   pagination,
   showRejectModal,
   rejectForm,
+  showImportModal,
+  importFile,
+  importResult,
   fetchRegistrations,
   resetFilters,
   handleApprove,
   openRejectModal,
   handleRejectSubmit,
   handleBatchApprove,
+  openImportModal,
+  closeImportModal,
+  handleImportModalAfterLeave,
+  handleImportFileChange,
+  handleImport,
   formatFullTime,
 } = useRegistration();
+
+// 上传组件展示的受控列表始终来自 composable 中唯一一份待导入文件：
+// 校验被拒、导入完成、关闭弹窗后都不会残留旧文件误导重复导入
+const importFileList = computed<UploadFileInfo[]>(() => {
+  const file = importFile.value;
+  if (!file) return [];
+  return [{ id: 'registration-import-file', name: file.name, status: 'pending', file }];
+});
+
+const handleImportUploadChange: UploadOnChange = ({ fileList }) => {
+  handleImportFileChange(fileList[fileList.length - 1]?.file ?? null);
+};
+
+const importResultType = computed(() => {
+  if (!importResult.value || importResult.value.failedCount === 0) return 'success';
+  return importResult.value.successCount > 0 ? 'warning' : 'error';
+});
 
 const statusOptions = [
   { label: '待处理', value: REGISTER_STATUS.PENDING },

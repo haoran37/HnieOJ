@@ -7,7 +7,7 @@
             <span class="filter-label">筛选条件</span>
             <n-dropdown
               :options="difficultyOptions"
-              @select="(_: string | number, option: DropdownOption) => localSearch.difficulty = option.key === null ? null : Number(option.key)"
+              @select="(_: string | number, option: DropdownOption) => localSearch.difficulty = option.key === 'all' ? null : Number(option.key)"
             >
               <n-button size="small" quaternary>
                 {{ difficultyLabel(localSearch.difficulty) === '未评级' ? '题目难度' : difficultyLabel(localSearch.difficulty) }}
@@ -139,6 +139,7 @@ const localSearch = reactive<ProblemSearchParams>({
 })
 
 const difficultyOptions = [
+  { label: '全部难度', key: 'all' },
   { label: '简单', key: '0' },
   { label: '中等', key: '1' },
   { label: '困难', key: '2' },

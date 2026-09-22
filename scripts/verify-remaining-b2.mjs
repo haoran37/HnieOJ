@@ -1087,10 +1087,11 @@ await test('通知页：列含标题/目标类型/状态/时间，无 v-html，�
   assert.ok(noticeSource.includes('userPickerOptions') && noticeSource.includes('classPickerOptions'), '收件目标必须来自真实查询');
 });
 
-await test('变更页：行 key 为申请 id，仅 PENDING 操作，无占位批量按钮', () => {
+await test('变更页：行 key 为申请 id，仅 PENDING 操作，批量通过接真实入口', () => {
   assert.ok(changeSource.includes('row.id'), '行数据必须以申请 id 为 key');
   assert.ok(changeSource.includes('PENDING'), '必须识别待处理状态');
-  assert.ok(!changeSource.includes('批量通过'), '不得保留 disabled 占位批量按钮');
+  assert.ok(changeSource.includes('openBatchApprove'), '批量通过必须接真实 openBatchApprove 入口');
+  assert.ok(changeSource.includes("type: 'selection'"), '批量通过必须有选择列');
   assert.ok(changeSource.includes('openApprove') && changeSource.includes('openReject'));
 });
 

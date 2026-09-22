@@ -1,6 +1,19 @@
 <template>
   <div class="change-page">
     <n-card :bordered="false" title="变动申请">
+      <template #header-extra>
+        <n-space :size="12" align="center">
+          <n-text depth="3">已选 {{ selectedIds.length }} 条待处理申请</n-text>
+          <n-button
+            type="success"
+            :disabled="selectedIds.length === 0 || listLoading || saving"
+            :loading="saving"
+            @click="openBatchApprove"
+          >
+            批量通过
+          </n-button>
+        </n-space>
+      </template>
       <n-form inline label-placement="left" :show-feedback="false" class="search-bar">
         <n-form-item label="关键字">
           <n-input
@@ -40,9 +53,42 @@
         :data="changes"
         :loading="listLoading"
         :row-key="(row: ProfileChangeVo) => row.id"
+        :checked-row-keys="selectedIds"
         :pagination="false"
         :scroll-x="1300"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
       />
+
+      <!-- 批量通过结果：持久显示成功数、失败数及每条失败申请 ID 与原因 -->
+      <n-alert
+        v-if="batchResult"
+        :type="batchResult.failedCount > 0 ? 'warning' : 'success'"
+        :bordered="false"
+        :title="`批量通过结果：成功 ${batchResult.successCount} 条，失败 ${batchResult.failedCount} 条`"
+        style="margin-top: 12px"
+      >
+        <n-space vertical :size="4">
+          <n-text v-if="batchResult.failures.length === 0" depth="3">全部申请均已通过</n-text>
+          <n-text v-for="failure in batchResult.failures" :key="failure.id" depth="3">
+            申请 #{{ failure.id }}：{{ failure.reason }}
+          </n-text>
+        </n-space>
+        <template #action>
+          <n-button size="small" @click="fetchChanges">重新读取列表</n-button>
+        </template>
+      </n-alert>
+      <n-alert
+        v-if="batchError"
+        type="error"
+        :bordered="false"
+        title="批量通过失败"
+        style="margin-top: 12px"
+      >
+        {{ batchError }}
+        <template #action>
+          <n-button size="small" @click="fetchChanges">重新读取列表</n-button>
+        </template>
+      </n-alert>
 
       <div class="pagination-wrapper">
         <n-pagination
@@ -62,6 +108,7 @@
       preset="card"
       :title="reviewMode === 'approve' ? '通过资料变更申请' : '驳回资料变更申请'"
       :mask-closable="false"
+      :close-on-esc="!saving"
       :style="{ width: 'auto', minWidth: '520px', maxWidth: '90vw' }"
       @update:show="handleReviewShowChange"
     >
@@ -118,6 +165,9 @@ const {
   showReviewModal,
   reviewMode,
   reviewForm,
+  selectedIds,
+  batchResult,
+  batchError,
   fetchChanges,
   handleSearch,
   handleReset,
@@ -128,6 +178,8 @@ const {
   closeReview,
   handleReviewShowChange,
   submitReview,
+  handleCheckedRowKeysChange,
+  openBatchApprove,
   changedFields,
 } = useUserChange();
 
@@ -165,6 +217,11 @@ const renderDiff = (row: ProfileChangeVo) => {
 };
 
 const columns: DataTableColumns<ProfileChangeVo> = [
+  {
+    // 行 key 为数字申请 id：仅当前页待处理行可选，列表加载/写操作在途时禁用
+    type: 'selection',
+    disabled: (row) => listLoading.value || saving.value || row.status !== 'PENDING',
+  },
   { title: '申请ID', key: 'id', width: 90 },
   { title: 'UID', key: 'uid', width: 130 },
   { title: '原因', key: 'reason', width: 160, className: 'cell-wrap' },
@@ -214,7 +271,7 @@ const columns: DataTableColumns<ProfileChangeVo> = [
               size: 'tiny',
               type: 'success',
               secondary: true,
-              disabled: saving.value,
+              disabled: saving.value || listLoading.value,
               onClick: () => openApprove(row),
             },
             { default: () => '通过' },
@@ -225,7 +282,7 @@ const columns: DataTableColumns<ProfileChangeVo> = [
               size: 'tiny',
               type: 'error',
               secondary: true,
-              disabled: saving.value,
+              disabled: saving.value || listLoading.value,
               onClick: () => openReject(row),
             },
             { default: () => '驳回' },

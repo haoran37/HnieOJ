@@ -90,11 +90,20 @@ function lastQuery() {
 
 // ---- 桩换 naive-ui，供组合式模块在 Node 下导入 ----
 globalThis.__msg = { success() {}, error() {}, warning() {}, info() {} };
+// 记录最后一次对话框参数，供审批互斥用例真实调用 onPositiveClick
 globalThis.__dialog = {
-  info() {},
-  warning() {},
-  error() {},
-  success() {},
+  info: (opts) => {
+    globalThis.__lastDialog = opts;
+  },
+  warning: (opts) => {
+    globalThis.__lastDialog = opts;
+  },
+  error: (opts) => {
+    globalThis.__lastDialog = opts;
+  },
+  success: (opts) => {
+    globalThis.__lastDialog = opts;
+  },
 };
 const naiveStub =
   'data:text/javascript,' +
@@ -124,7 +133,7 @@ const { useUserManage, toUserItem } = await import(
 const { pickManageableRole, usePermissionManage } = await import(
   pathToFileURL(path.join(root, 'src/composables/admin/usePermissionManage.ts'))
 );
-const { toRegistrationItem, REGISTER_STATUS } = await import(
+const { toRegistrationItem, REGISTER_STATUS, useRegistration } = await import(
   pathToFileURL(path.join(root, 'src/composables/admin/useRegistration.ts'))
 );
 const { toAchievementApplication, isExternalFile } = await import(
@@ -247,6 +256,74 @@ await checkAsync('注册审核：列表/approve/reject(reason)/batch-approve 真
   assert.equal(lastCall().url, '/api/registrations/batch/approve');
   assert.deepEqual(lastBody(), { uids: ['u1'] });
   assert.equal(summary, '成功: 1, 失败: 0');
+});
+
+await checkAsync('注册审批：三个确认入口共享 submitting 互斥，在途返回 false 且不重复请求', async () => {
+  const postUrls = [];
+  let releaseApprove;
+  responder = (url, init) => {
+    if (init?.method === 'POST') {
+      postUrls.push(String(url));
+      if (String(url).endsWith('/approve') && !releaseApprove) {
+        return new Promise((resolve) => {
+          releaseApprove = resolve;
+        });
+      }
+      return json({ code: 200, msg: 'ok', data: null });
+    }
+    return json({ code: 200, msg: 'ok', data: { list: [], total: 0 } });
+  };
+
+  const state = useRegistration();
+  const item = {
+    uid: 'u1',
+    username: 'n1',
+    email: 'n1@example.com',
+    status: REGISTER_STATUS.PENDING,
+  };
+
+  // 通过确认在途：同步持有互斥锁，且只发出一次真实请求
+  state.handleApprove(item);
+  const approveOpts = globalThis.__lastDialog;
+  assert.equal(typeof approveOpts?.onPositiveClick, 'function', '通过确认应提供真实 onPositiveClick');
+  const approving = approveOpts.onPositiveClick();
+  assert.equal(state.submitting.value, true, '审批在途必须持有互斥锁');
+  assert.deepEqual(postUrls, ['/api/registrations/u1/approve']);
+
+  // 同一确认重复点击：返回 false（对话框保持打开）且不新增请求
+  assert.equal(await approveOpts.onPositiveClick(), false, '重复点击必须返回 false');
+  // 其它行的通过确认：同样返回 false
+  state.handleApprove({ ...item, uid: 'u2' });
+  assert.equal(
+    await globalThis.__lastDialog.onPositiveClick(),
+    false,
+    '在途时其它通过确认必须返回 false',
+  );
+  // 批量通过确认：共享同一把锁
+  state.selectedIds.value = ['u1', 'u2'];
+  state.handleBatchApprove();
+  assert.equal(
+    await globalThis.__lastDialog.onPositiveClick(),
+    false,
+    '在途时批量通过必须返回 false',
+  );
+  // 打回提交：共享同一把锁
+  state.openRejectModal(item);
+  state.rejectForm.reason = '资料不全';
+  assert.equal(await state.handleRejectSubmit(), false, '在途时打回必须返回 false');
+  assert.deepEqual(postUrls, ['/api/registrations/u1/approve'], '互斥期间不得新增任何 POST');
+
+  // 释放后互斥解除：打回可真实提交
+  releaseApprove(json({ code: 200, msg: 'ok', data: null }));
+  await approving;
+  assert.equal(state.submitting.value, false, '完成后必须释放互斥锁');
+  await state.handleRejectSubmit();
+  assert.deepEqual(
+    postUrls,
+    ['/api/registrations/u1/approve', '/api/registrations/u1/reject'],
+    '互斥释放后打回应真实提交',
+  );
+  assert.equal(state.submitting.value, false, '打回完成后同样释放互斥锁');
 });
 
 await checkAsync('成就：列表/approve/reject/本地附件下载/用户成就增删', async () => {

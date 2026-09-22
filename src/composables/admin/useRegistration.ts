@@ -133,8 +133,8 @@ export function useRegistration() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起审批请求
-        if (submitting.value) return;
+        // 双击确认按钮不得重复发起审批请求；返回 false 让对话框保持打开
+        if (submitting.value) return false;
         submitting.value = true;
         try {
           await approveRegistration(item.uid);
@@ -163,7 +163,7 @@ export function useRegistration() {
       return;
     }
 
-    if (submitting.value) return;
+    if (submitting.value) return false;
     submitting.value = true;
     try {
       await rejectRegistration(rejectForm.uid, rejectForm.reason.trim());
@@ -189,8 +189,8 @@ export function useRegistration() {
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: async () => {
-        // 双击确认按钮不得重复发起批量审批请求
-        if (submitting.value) return;
+        // 双击确认按钮不得重复发起批量审批请求；返回 false 让对话框保持打开
+        if (submitting.value) return false;
         submitting.value = true;
         try {
           const summary = await batchApproveRegistrations([...selectedIds.value]);

@@ -1,5 +1,5 @@
-import { ref, onMounted, onUnmounted } from 'vue';
-import { getSystemTime } from '@/utils/api';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { getSystemTime, getFeaturedContest, type FeaturedContestVo } from '@/utils/api';
 import { formatFullTime } from '@/composables/useTime';
 
 /**
@@ -26,9 +26,7 @@ function parseServerTimeMs(value: unknown): number | null {
 }
 
 /**
- * 比赛模式（独立大屏）：
- * 后端没有 /api/special/contest-mode 等独立开关/赛事信息接口，本页不得伪造赛事名称、
- * 倒计时或节点时延。仅展示真实的服务端时间，其余能力明确“暂未开放”。
+ * 比赛模式（独立大屏）：展示公开进行中或最近即将开始的比赛。
  *
  * 时钟策略：按后端毫秒 epoch 校准本机偏移（offset = serverMs - localMs），本地每秒 tick
  * 刷新显示、每 60 秒重新同步一次；同步在途不叠请求；非法/失败响应保留上次有效校准，
@@ -36,9 +34,20 @@ function parseServerTimeMs(value: unknown): number | null {
  */
 export function useContestMode() {
   const loading = ref(false);
-  const available = false;
-  const unavailableMessage = '比赛模式暂未开放';
   const systemTime = ref('--');
+  const featured = ref<FeaturedContestVo | null>(null);
+  const featuredError = ref(false);
+  const online = ref(false);
+  const latencyMs = ref<number | null>(null);
+  const currentMs = ref(Date.now());
+  const countdown = computed(() => {
+    if (!featured.value) return '--:--:--';
+    const target = Date.parse(featured.value.status === 'running' ? featured.value.endTime : featured.value.startTime);
+    const seconds = Math.max(0, Math.ceil((target - currentMs.value) / 1000));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  });
 
   // serverMs - localMs；null 表示尚无有效校准
   let offsetMs: number | null = null;
@@ -49,6 +58,7 @@ export function useContestMode() {
 
   const renderSystemTime = () => {
     if (disposed) return;
+    currentMs.value = Date.now() + (offsetMs ?? 0);
     if (offsetMs === null) {
       systemTime.value = '--';
       return;
@@ -60,6 +70,7 @@ export function useContestMode() {
   const syncSystemTime = async () => {
     if (disposed || syncing) return;
     syncing = true;
+    const started = performance.now();
     try {
       const time = await getSystemTime();
       if (disposed) return;
@@ -67,8 +78,12 @@ export function useContestMode() {
         ? time.unixTimestamp
         : parseServerTimeMs(time?.serverTime);
       if (serverMs !== null) offsetMs = serverMs - Date.now();
+      online.value = serverMs !== null;
+      latencyMs.value = Math.round(performance.now() - started);
       renderSystemTime();
     } catch {
+      online.value = false;
+      latencyMs.value = null;
       // 网络暂时失败：保留已有校准，本地计时继续
       renderSystemTime();
     } finally {
@@ -76,15 +91,25 @@ export function useContestMode() {
     }
   };
 
+  const syncFeatured = async () => {
+    try {
+      const value = await getFeaturedContest();
+      if (!disposed) { featured.value = value; featuredError.value = false; }
+    } catch {
+      if (!disposed) featuredError.value = true;
+    }
+  };
+
   onMounted(() => {
     loading.value = true;
-    void syncSystemTime().finally(() => {
+    void Promise.all([syncSystemTime(), syncFeatured()]).finally(() => {
       if (!disposed) loading.value = false;
     });
     // 每秒只做本地渲染；每 60 秒才向服务端校验一次时间
     tickTimer = setInterval(renderSystemTime, 1000);
     syncTimer = setInterval(() => {
       void syncSystemTime();
+      void syncFeatured();
     }, 60_000);
   });
 
@@ -98,8 +123,11 @@ export function useContestMode() {
 
   return {
     loading,
-    available,
-    unavailableMessage,
+    featured,
+    featuredError,
+    online,
+    latencyMs,
+    countdown,
     systemTime,
   };
 }

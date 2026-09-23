@@ -23,6 +23,7 @@ export interface RegisterPayload {
   classId: number
   grade: string
   qq: string
+  inviteCode?: string
 }
 
 // GET /api/user/profile 返回 data；字段名与后端 UserProfileVo 的 Jackson 序列化一致

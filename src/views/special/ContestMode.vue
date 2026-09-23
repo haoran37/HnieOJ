@@ -20,11 +20,11 @@
       <div class="status-group">
         <div class="status-item">
           <span class="status-dot"></span>
-          <span>Server_Online: 暂未开放</span>
+          <span>Server_Online: {{ online ? 'YES' : 'NO' }}</span>
         </div>
         
         <div class="latency-item">
-          LATENCY: <span class="latency-value">--</span>
+          LATENCY: <span class="latency-value">{{ latencyMs === null ? '--' : `${latencyMs}ms` }}</span>
         </div>
         
         <div class="status-divider"></div>
@@ -40,25 +40,29 @@
     <main class="main-content">
       <n-spin :show="loading">
         <div class="title-section">
-          <h1 class="main-title">{{ unavailableMessage }}</h1>
-          <p class="subtitle">比赛模式相关信息暂未开放</p>
+          <h1 class="main-title">{{ featured?.title || (featuredError ? '比赛信息暂时不可用' : '暂无公开比赛') }}</h1>
+          <p class="subtitle">{{ featured ? `${featured.type} · ${featured.status === 'running' ? '正在进行' : '即将开始'}` : featuredError ? '请稍后重试' : '请关注即将发布的赛事' }}</p>
         </div>
 
         <div class="timer-section">
-          <n-empty description="比赛模式暂未开放" />
+          <div v-if="featured" class="countdown-display">
+            <span>{{ featured.status === 'running' ? '距离结束' : '距离开始' }}</span>
+            <strong>{{ countdown }}</strong>
+          </div>
+          <n-empty v-else :description="featuredError ? '比赛信息加载失败' : '当前没有进行中或即将开始的公开比赛'" />
         </div>
 
         <div class="action-section">
-          <router-link to="/login" class="login-btn">
+          <router-link :to="entryPath" class="login-btn">
             <span class="btn-bg"></span>
             <span class="btn-content">
-              <span class="btn-text">登录比赛系统</span>
+              <span class="btn-text">{{ userStore.isLogin ? '进入比赛' : '登录比赛系统' }}</span>
               <n-icon size="16">
                 <ArrowForward />
               </n-icon>
             </span>
           </router-link>
-          <p class="login-hint">请使用统一分配的账号与密码登录</p>
+          <p class="login-hint">{{ featured ? '公开比赛需先报名后参赛' : '登录后可查看全部比赛' }}</p>
         </div>
       </n-spin>
     </main>
@@ -93,8 +97,14 @@
 import { useContestMode } from '@/composables/admin/useContestMode';
 import { ArrowForward } from '@vicons/ionicons5';
 import { NSpin, NIcon, NEmpty } from 'naive-ui';
+import { computed } from 'vue';
+import { useUserStore } from '@/stores/userStore';
 
-const { loading, unavailableMessage, systemTime } = useContestMode();
+const { loading, featured, featuredError, online, latencyMs, countdown, systemTime } = useContestMode();
+const userStore = useUserStore();
+const entryPath = computed(() => userStore.isLogin
+  ? featured.value ? `/contest/${featured.value.id}` : '/contests'
+  : '/login');
 </script>
 
 <style lang="less" scoped>
@@ -317,6 +327,15 @@ const { loading, unavailableMessage, systemTime } = useContestMode();
 .timer-section {
   text-align: center;
   margin-bottom: 4rem;
+
+  .countdown-display {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--primary-blue);
+    font-family: 'JetBrains Mono', monospace;
+    strong { font-size: clamp(3rem, 8vw, 6rem); letter-spacing: 0.05em; }
+  }
 
   .timer-display {
     display: flex;

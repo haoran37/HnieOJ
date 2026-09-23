@@ -33,7 +33,7 @@
 
               <n-divider title-placement="left">注册控制</n-divider>
               <n-alert type="warning" :bordered="false" class="mb-3">
-                注册开关与注册模式会被保存，但当前注册流程尚未使用这两项设置，保存后暂不影响实际注册。
+                开放、邮箱后缀与邀请码注册均由服务端在提交时校验。邀请码一次性使用，有效期为 7 天。
               </n-alert>
               <n-form-item label="允许注册" path="allowRegister">
                 <n-space vertical align="start">
@@ -43,7 +43,7 @@
                       :options="registerModeOptions" style="width: 220px" size="small" />
                   </n-space>
                   <div v-if="config.allowRegister" class="tip-text">
-                    可选注册模式：OPEN / EMAIL_SUFFIX / INVITE_CODE。邀请码注册入口尚未开放，当前仅保存该项设置。
+                    可选注册模式：OPEN / EMAIL_SUFFIX / INVITE_CODE。
                   </div>
                   <n-dynamic-tags v-if="config.allowRegister && config.registerMode === 'EMAIL_SUFFIX'"
                     v-model:value="config.allowedEmailSuffixes" />
@@ -52,6 +52,19 @@
                   </div>
                 </n-space>
               </n-form-item>
+              <template v-if="config.allowRegister && config.registerMode === 'INVITE_CODE'">
+                <n-divider title-placement="left">注册邀请码</n-divider>
+                <n-space align="center" style="margin-bottom: 12px">
+                  <n-button type="primary" :loading="invitesLoading" @click="handleCreateInvite">生成一次性邀请码</n-button>
+                  <n-button :disabled="invitesLoading" @click="loadInvites">刷新列表</n-button>
+                </n-space>
+                <n-alert v-if="newInviteCode" type="success" style="margin-bottom: 12px">
+                  新邀请码只显示这一次，请现在复制：{{ newInviteCode }}
+                </n-alert>
+                <n-alert v-if="invitesError" type="error" style="margin-bottom: 12px">{{ invitesError }}</n-alert>
+                <n-data-table :columns="inviteColumns" :data="invites" :loading="invitesLoading"
+                  :row-key="(row: InviteCodeVo) => row.id" size="small" />
+              </template>
             </n-form>
           </div>
         </n-tab-pane>
@@ -200,10 +213,11 @@
 </template>
 
 <script setup lang="ts">
-import { h } from 'vue';
-import { NButton, NPopconfirm, NSpace, NTag, type DataTableColumns } from 'naive-ui';
+import { h, onMounted, ref } from 'vue';
+import { NButton, NPopconfirm, NSpace, NTag, useMessage, type DataTableColumns } from 'naive-ui';
 import { AddOutline, SaveOutline } from '@vicons/ionicons5';
 import { useSystemConfig, type RemoteJudgeAccount } from '@/composables/admin/useSystemConfig';
+import { createInviteCode, getInviteCodes, revokeInviteCode, type InviteCodeVo } from '@/utils/api';
 
 const {
   config,
@@ -233,6 +247,64 @@ const {
   ACCOUNT_CONCURRENCY_MIN,
   ACCOUNT_CONCURRENCY_MAX,
 } = useSystemConfig();
+
+const message = useMessage();
+const invites = ref<InviteCodeVo[]>([]);
+const invitesLoading = ref(false);
+const invitesError = ref<string | null>(null);
+const newInviteCode = ref<string | null>(null);
+
+async function loadInvites() {
+  invitesLoading.value = true;
+  invitesError.value = null;
+  try {
+    invites.value = await getInviteCodes();
+  } catch (error) {
+    invitesError.value = error instanceof Error ? error.message : '邀请码加载失败';
+  } finally {
+    invitesLoading.value = false;
+  }
+}
+
+async function handleCreateInvite() {
+  invitesLoading.value = true;
+  newInviteCode.value = null;
+  try {
+    newInviteCode.value = await createInviteCode(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    message.success('邀请码已生成');
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '邀请码生成失败');
+  } finally {
+    invitesLoading.value = false;
+  }
+  await loadInvites();
+}
+
+async function handleRevokeInvite(id: number) {
+  try {
+    await revokeInviteCode(id);
+    message.success('邀请码已撤销');
+    await loadInvites();
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '邀请码撤销失败');
+  }
+}
+
+const inviteColumns: DataTableColumns<InviteCodeVo> = [
+  { title: '编号', key: 'id', width: 80 },
+  { title: '签发人', key: 'createdBy' },
+  { title: '到期时间', key: 'expiresAt', render: (row) => formatFullTime(row.expiresAt) },
+  { title: '使用者', key: 'usedUid', render: (row) => row.usedUid || '未使用' },
+  { title: '状态', key: 'status', render: (row) => row.usedUid ? '已使用'
+    : row.status === 0 ? '已撤销' : new Date(row.expiresAt).getTime() <= Date.now() ? '已过期' : '可用' },
+  { title: '操作', key: 'actions', render: (row) => row.status === 1 && !row.usedUid
+    ? h(NPopconfirm, { onPositiveClick: () => handleRevokeInvite(row.id) }, {
+      trigger: () => h(NButton, { size: 'tiny', type: 'error', secondary: true }, { default: () => '撤销' }),
+      default: () => '确定撤销该邀请码？',
+    }) : null },
+];
+
+onMounted(() => { void loadInvites(); });
 
 const accountStatusText = (status: number) => {
   if (status === 0) return '禁用';

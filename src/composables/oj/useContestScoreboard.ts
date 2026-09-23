@@ -1,23 +1,33 @@
 import { ref } from 'vue';
-
-// 后端当前没有比赛排行榜/名次接口（backend-routes.json 未收录），
-// 这里明确标记为暂未开放，绝不用随机数据冒充。
-export const SCOREBOARD_UNAVAILABLE = '排行榜暂未开放：后端暂未提供比赛排行榜接口';
+import { getContestScoreboard, type ContestRankVo } from '@/utils/api';
 
 export function useContestScoreboard() {
   const loading = ref(false);
-  const available = ref(false);
-  const unavailableReason = ref(SCOREBOARD_UNAVAILABLE);
+  const rows = ref<ContestRankVo[]>([]);
+  const error = ref('');
+  let seq = 0;
 
-  const fetchScoreboard = async (_cid: string) => {
-    loading.value = false;
-    available.value = false;
+  const fetchScoreboard = async (cid: string) => {
+    const current = ++seq;
+    loading.value = true;
+    error.value = '';
+    try {
+      const result = await getContestScoreboard(cid);
+      if (current === seq) rows.value = result;
+    } catch (cause) {
+      if (current === seq) {
+        rows.value = [];
+        error.value = cause instanceof Error ? cause.message : '获取排行榜失败';
+      }
+    } finally {
+      if (current === seq) loading.value = false;
+    }
   };
 
   return {
     loading,
-    available,
-    unavailableReason,
+    rows,
+    error,
     fetchScoreboard,
   };
 }

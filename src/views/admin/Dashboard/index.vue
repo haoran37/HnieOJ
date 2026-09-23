@@ -26,12 +26,14 @@
     <n-grid cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12" class="mt-4">
       <n-grid-item>
         <n-card title="增长趋势（近 7 天）" :bordered="false" size="small">
-          <n-empty description="增长趋势暂未开放" />
+          <VChart v-if="submissionStats" :option="trendOption" style="height: 260px" autoresize />
+          <n-empty v-else description="趋势数据加载失败" />
         </n-card>
       </n-grid-item>
       <n-grid-item>
         <n-card title="提交结果分布" :bordered="false" size="small">
-          <n-empty description="判题结果统计暂未开放" />
+          <VChart v-if="submissionStats" :option="statusOption" style="height: 260px" autoresize />
+          <n-empty v-else description="判题数据加载失败" />
         </n-card>
       </n-grid-item>
     </n-grid>
@@ -39,17 +41,29 @@
     <n-grid cols="1 m:2 l:3" responsive="screen" :x-gap="12" :y-gap="12" class="mt-4">
       <n-grid-item>
         <n-card title="热门题目" :bordered="false" size="small">
-          <n-empty description="热门题目暂未开放" />
+          <n-empty v-if="!submissionStats?.hotProblems.length" description="暂无提交" />
+          <div v-for="item in submissionStats?.hotProblems" :key="item.problemCode" class="list-row">
+            <router-link :to="`/problem/${item.problemCode}`">{{ item.problemCode }}</router-link>
+            <span>{{ item.submissions }} 次提交</span>
+          </div>
         </n-card>
       </n-grid-item>
       <n-grid-item>
-        <n-card title="活跃题单" :bordered="false" size="small">
-          <n-empty description="活跃题单暂未开放" />
+        <n-card title="收藏最多的题单" :bordered="false" size="small">
+          <n-empty v-if="!favoriteTrainings.length" description="暂无题单收藏" />
+          <div v-for="item in favoriteTrainings" :key="item.trainingId" class="list-row">
+            <router-link :to="`/training/${item.trainingId}`">题单 #{{ item.trainingId }}</router-link>
+            <span>{{ item.favorites }} 人收藏</span>
+          </div>
         </n-card>
       </n-grid-item>
       <n-grid-item>
-        <n-card title="冷门题目" :bordered="false" size="small">
-          <n-empty description="冷门题目暂未开放" />
+        <n-card title="低提交题目" :bordered="false" size="small">
+          <n-empty v-if="!submissionStats?.lowActivityProblems.length" description="暂无提交" />
+          <div v-for="item in submissionStats?.lowActivityProblems" :key="item.problemCode" class="list-row">
+            <router-link :to="`/problem/${item.problemCode}`">{{ item.problemCode }}</router-link>
+            <span>{{ item.submissions }} 次提交</span>
+          </div>
         </n-card>
       </n-grid-item>
     </n-grid>
@@ -67,6 +81,8 @@ import {
   BookOutline,
 } from '@vicons/ionicons5'
 import { NCard, NStatistic, NIcon, NNumberAnimation, NGrid, NGridItem, NEmpty, NAlert, NButton } from 'naive-ui'
+import VChart from '@/utils/echarts'
+import { SUBMISSION_STATUS_TEXT } from '@/types/submission'
 import {
   useDashboard,
   dashboardMetricState,
@@ -76,7 +92,28 @@ import {
 
 defineOptions({ name: 'AdminDashboardPage' })
 
-const { error, totals, failed, loading, fetchData } = useDashboard()
+const { error, totals, failed, loading, submissionStats, favoriteTrainings, fetchData } = useDashboard()
+const trendOption = computed(() => {
+  const counts = new Map(submissionStats.value?.daily.map(item => [item.day, item.submissions]) ?? [])
+  const reportDate = submissionStats.value?.reportDate ?? submissionStats.value?.daily.at(-1)?.day
+  const days = Array.from({ length: 7 }, (_, index) => {
+    if (!reportDate) return ''
+    const date = new Date(`${reportDate}T12:00:00`)
+    date.setDate(date.getDate() - 6 + index)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  })
+  return {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: days },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{ name: '提交数', type: 'line', data: days.map(day => counts.get(day) ?? 0), smooth: true }],
+  }
+})
+const statusOption = computed(() => ({
+  tooltip: { trigger: 'item' },
+  series: [{ type: 'pie', radius: ['40%', '70%'], data: (submissionStats.value?.statuses ?? [])
+    .map(item => ({ name: SUBMISSION_STATUS_TEXT[item.status] ?? `状态 ${item.status}`, value: item.submissions })) }],
+}))
 
 const reload = () => {
   void fetchData()
@@ -150,5 +187,12 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.list-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
 }
 </style>

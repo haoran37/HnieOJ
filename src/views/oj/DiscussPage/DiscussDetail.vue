@@ -11,6 +11,7 @@
       <div class="page-header-card" v-if="post">
         <div class="header-left">
           <h1 class="page-title">{{ post.title }}</h1>
+          <n-button size="small" :loading="favoriteLoading" @click="toggleFavorite">{{ isFavorite ? '取消收藏' : '收藏讨论' }}</n-button>
           <div class="tags-row">
             <n-tag v-for="tag in post.tags" :key="tag" size="small" :bordered="false" type="info" class="tag">
               {{ tag }}
@@ -162,6 +163,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFavorite } from '@/composables/oj/useFavorite';
 import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
@@ -171,6 +173,7 @@ import { getRelatedDiscussions } from '@/utils/api';
 import DiscussAnswerItem from './components/DiscussAnswerItem.vue';
 
 const route = useRoute();
+const { saved: isFavorite, loading: favoriteLoading, toggle: toggleFavorite } = useFavorite('discussion', () => String(route.params.id ?? ''));
 const router = useRouter();
 const message = useMessage();
 

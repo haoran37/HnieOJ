@@ -26,6 +26,9 @@ export interface StatusFilters {
   status: number | null;
 }
 
+const queryValue = (value: string | null | (string | null)[] | undefined): string =>
+  (typeof value === 'string' ? value : Array.isArray(value) ? value.find(item => typeof item === 'string') : undefined) || '';
+
 export function useStatusList() {
   const route = useRoute();
 
@@ -38,14 +41,14 @@ export function useStatusList() {
 
   // 筛选表单
   const filters = ref<StatusFilters>({
-    problem: (route.query.pid as string) || '',
-    user: '',
+    problem: queryValue(route.query.pid),
+    user: queryValue(route.query.uid),
     language: null,
     status: null,
   });
 
   // 获取 URL 中的比赛 ID（前端使用 cid 查询参数）
-  const contestId = ref((route.query.cid as string) || '');
+  const contestId = ref(queryValue(route.query.cid));
 
   // 局部请求序号：分页/筛选/路由 query 连续变化时，旧响应不得覆盖新查询
   let seq = 0;
@@ -106,13 +109,19 @@ export function useStatusList() {
 
   // 监听路由参数变化 (从比赛切回普通列表；题目详情带 pid 进入时按题号过滤)
   watch(() => route.query.cid, (newCid) => {
-    contestId.value = (newCid as string) || '';
+    contestId.value = queryValue(newCid);
     page.value = 1;
     handleRefresh();
   });
 
   watch(() => route.query.pid, (newPid) => {
-    filters.value.problem = (newPid as string) || '';
+    filters.value.problem = queryValue(newPid);
+    page.value = 1;
+    handleRefresh();
+  });
+
+  watch(() => route.query.uid, (newUid) => {
+    filters.value.user = queryValue(newUid);
     page.value = 1;
     handleRefresh();
   });

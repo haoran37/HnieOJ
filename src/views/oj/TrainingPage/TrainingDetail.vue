@@ -10,6 +10,7 @@
               <span class="tid">#{{ detail.id }}</span>
               {{ detail.title }}
             </h1>
+            <n-button size="small" :loading="favoriteLoading" @click="toggleFavorite">{{ isFavorite ? '取消收藏' : '收藏题单' }}</n-button>
           </div>
 
           <div class="stats-section">
@@ -52,8 +53,10 @@
 import { onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTrainingDetail } from '@/composables/oj/useTrainingDetail';
+import { useFavorite } from '@/composables/oj/useFavorite';
 
 const route = useRoute();
+const { saved: isFavorite, loading: favoriteLoading, toggle: toggleFavorite } = useFavorite('training', () => String(route.params.trainingId ?? ''));
 const router = useRouter();
 
 const { loading, error, detail, fetchTrainingDetail } = useTrainingDetail();

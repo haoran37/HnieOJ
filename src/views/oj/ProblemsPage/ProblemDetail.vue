@@ -12,6 +12,7 @@
               <span class="pid">{{ problem.problemCode }}</span>
               {{ problem.title }}
             </h1>
+            <n-button size="small" :loading="favoriteLoading" @click="toggleFavorite">{{ isFavorite ? '取消收藏' : '收藏题目' }}</n-button>
           </div>
           
           <div class="stats-section">
@@ -43,7 +44,7 @@
           <n-card :bordered="false" class="problem-card">
             
             <div v-if="isSubmitMode">
-              <ProblemSubmit :problem-code="problem.problemCode" :contest-id="(route.query.cid as string) || undefined" />
+              <ProblemSubmit :problem-code="problem.problemCode" :contest-id="queryId(route.query.cid)" :homework-id="queryId(route.query.hid)" />
             </div>
 
             <div v-else>
@@ -232,6 +233,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFavorite } from '@/composables/oj/useFavorite';
 import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMessage } from 'naive-ui';
@@ -274,6 +276,9 @@ interface Problem {
 }
 
 const route = useRoute();
+const queryId = (value: string | null | (string | null)[] | undefined): string | undefined =>
+  (typeof value === 'string' ? value : Array.isArray(value) ? value.find(item => typeof item === 'string') : undefined) || undefined;
+const { saved: isFavorite, loading: favoriteLoading, toggle: toggleFavorite } = useFavorite('problem', () => String(route.params.id ?? ''));
 const router = useRouter();
 const message = useMessage();
 const userStore = useUserStore();
@@ -369,7 +374,7 @@ const fetchProblemDetail = async (problemCode: string) => {
   loading.value = true;
   error.value = null;
   try {
-    const detail = await getProblemDetail(problemCode);
+    const detail = await getProblemDetail(problemCode, queryId(route.query.cid));
     if (seq !== detailSeq) return;
     problem.value = {
       problemCode: detail.problemCode,

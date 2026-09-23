@@ -216,6 +216,18 @@ export const ojRouters: RouteRecordRaw = {
           component: () => import('@/views/oj/UserPage/views/UserTraining.vue')
         },
         {
+          path: 'favorites',
+          name: 'UserFavorites',
+          meta: { title: '收藏' },
+          component: () => import('@/views/oj/UserPage/views/UserFavorites.vue')
+        },
+        {
+          path: 'teams',
+          name: 'UserTeams',
+          meta: { title: '团队' },
+          component: () => import('@/views/oj/UserPage/views/UserTeams.vue')
+        },
+        {
           path: 'discuss',
           name: 'UserDiscuss',
           meta: { title: '讨论' },

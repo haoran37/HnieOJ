@@ -35,7 +35,9 @@ const json = (data, status = 200) =>
     { status, headers: { 'Content-Type': 'application/json' } },
   );
 
-let responder = async () => json({ list: [], total: 0 });
+let responder = async (url) => json(url.includes('/api/admin/submissions/dashboard')
+  ? { totalSubmissions: 0, daily: [], statuses: [], hotProblems: [], lowActivityProblems: [] }
+  : { list: [], total: 0 });
 const calls = [];
 globalThis.fetch = async (url, init) => {
   calls.push({ url: String(url), init });
@@ -96,7 +98,9 @@ await test('dashboard 状态映射区分加载/真实值/失败/暂未开放', (
 });
 
 await test('dashboard 首次加载真实 total=0 显示 0 而非暂未开放', async () => {
-  responder = async () => json({ list: [], total: 0 });
+  responder = async (url) => json(url.includes('/api/admin/submissions/dashboard')
+    ? { totalSubmissions: 0, daily: [], statuses: [], hotProblems: [], lowActivityProblems: [] }
+    : { list: [], total: 0 });
   const state = useDashboard();
   await state.fetchData();
   assert.equal(state.error.value, null);

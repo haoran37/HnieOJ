@@ -1,18 +1,22 @@
 <template>
   <div class="user-home">
     <n-card title="历史统计" :bordered="false" size="small" class="chart-card">
-      <n-empty description="历史统计暂未开放" style="padding: 60px 0" />
+      <n-spin :show="loading">
+        <n-alert v-if="error" type="error">{{ error }}</n-alert>
+        <n-empty v-else-if="!summary?.daily.length" description="暂无提交记录" style="padding: 60px 0" />
+        <VChart v-else :option="chartOption" style="height: 240px" autoresize />
+      </n-spin>
     </n-card>
 
     <n-card title="已通过的题目" :bordered="false" size="small" class="chart-card">
       <template #header-extra>
         <span class="count-label">
-          {{ userStore.acceptedProblems.size > 0 ? `${userStore.acceptedProblems.size} 题` : '暂未开放' }}
+          {{ accepted.length }} 题
         </span>
       </template>
-      <div v-if="userStore.acceptedProblems.size > 0" class="problem-tags">
+      <div v-if="accepted.length > 0" class="problem-tags">
         <n-tag
-          v-for="pid in userStore.acceptedProblems"
+          v-for="pid in accepted"
           :key="pid"
           type="success"
           size="small"
@@ -22,18 +26,18 @@
           {{ pid }}
         </n-tag>
       </div>
-      <n-empty v-else description="做题记录暂未开放" size="small" />
+      <n-empty v-else description="暂无已通过题目" size="small" />
     </n-card>
 
     <n-card title="尝试过的题目" :bordered="false" size="small" class="chart-card">
       <template #header-extra>
         <span class="count-label">
-          {{ userStore.wrongProblems.size > 0 ? `${userStore.wrongProblems.size} 题` : '暂未开放' }}
+          {{ attempted.length }} 题
         </span>
       </template>
-      <div v-if="userStore.wrongProblems.size > 0" class="problem-tags">
+      <div v-if="attempted.length > 0" class="problem-tags">
         <n-tag
-          v-for="pid in userStore.wrongProblems"
+          v-for="pid in attempted"
           :key="pid"
           type="warning"
           size="small"
@@ -43,15 +47,45 @@
           {{ pid }}
         </n-tag>
       </div>
-      <n-empty v-else description="做题记录暂未开放" size="small" />
+      <n-empty v-else description="暂无尝试题目" size="small" />
     </n-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '@/stores/userStore';
+import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import VChart from '@/utils/echarts';
+import { getUserSubmissionSummary, type UserSubmissionSummaryVo } from '@/utils/api';
 
-const userStore = useUserStore();
+const route = useRoute();
+const loading = ref(false);
+const error = ref('');
+const summary = ref<UserSubmissionSummaryVo | null>(null);
+const accepted = computed(() => summary.value?.problems.filter(p => p.accepted).map(p => p.problemCode) ?? []);
+const attempted = computed(() => summary.value?.problems.filter(p => !p.accepted).map(p => p.problemCode) ?? []);
+const chartOption = computed(() => ({
+  tooltip: { trigger: 'axis' },
+  legend: { data: ['提交', '通过'] },
+  xAxis: { type: 'category', data: summary.value?.daily.map(d => d.day) ?? [] },
+  yAxis: { type: 'value', minInterval: 1 },
+  series: [
+    { name: '提交', type: 'line', smooth: true, data: summary.value?.daily.map(d => d.submissions) ?? [] },
+    { name: '通过', type: 'line', smooth: true, data: summary.value?.daily.map(d => d.accepted) ?? [] },
+  ],
+}));
+let seq = 0;
+watch(() => route.params.uid, async uid => {
+  const current = ++seq;
+  loading.value = true;
+  error.value = '';
+  try {
+    const data = await getUserSubmissionSummary(String(uid));
+    if (current === seq) summary.value = data;
+  } catch (cause) {
+    if (current === seq) { summary.value = null; error.value = cause instanceof Error ? cause.message : '获取做题记录失败'; }
+  } finally { if (current === seq) loading.value = false; }
+}, { immediate: true });
 </script>
 
 <style scoped lang="less">

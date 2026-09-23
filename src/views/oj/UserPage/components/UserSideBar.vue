@@ -75,7 +75,11 @@
     </n-card>
 
     <n-card title="提交统计" :bordered="false" size="small" class="side-card">
-      <n-empty description="提交统计暂未开放：后端暂无用户历史统计接口" size="small" />
+      <n-spin :show="summaryLoading">
+        <n-alert v-if="summaryError" type="error" size="small">{{ summaryError }}</n-alert>
+        <div v-else-if="summary">提交 {{ summary.totalSubmissions }} 次 · 解决 {{ summary.acceptedProblems }} 题</div>
+        <n-empty v-else description="暂无提交统计" size="small" />
+      </n-spin>
     </n-card>
   </div>
 </template>
@@ -83,7 +87,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getUserAchievements, getUserDetail, getUserMessageUnreadCount, type UserDetailVo, type UserAchievementVo } from '@/utils/api';
+import { getUserAchievements, getUserDetail, getUserMessageUnreadCount, getUserSubmissionSummary, type UserDetailVo, type UserAchievementVo, type UserSubmissionSummaryVo } from '@/utils/api';
 import { onUserMessagesChanged } from '@/composables/oj/useUserMessages';
 import { formatFullTime } from '@/composables/useTime';
 import { useUserStore } from '@/stores/userStore';
@@ -97,6 +101,9 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const profile = ref<UserDetailVo | null>(null);
 const achievements = ref<UserAchievementVo[]>([]);
+const summary = ref<UserSubmissionSummaryVo | null>(null);
+const summaryLoading = ref(false);
+const summaryError = ref('');
 
 // 消息入口仅本人可见；未读数读取失败不伪 0
 const unreadCount = ref<number | null>(null);
@@ -138,6 +145,21 @@ onBeforeUnmount(() => {
 });
 
 let seq = 0;
+let summarySeq = 0;
+const loadSummary = async (uid: string) => {
+  const current = ++summarySeq;
+  summaryLoading.value = true;
+  summaryError.value = '';
+  try {
+    const data = await getUserSubmissionSummary(uid);
+    if (current === summarySeq) summary.value = data;
+  } catch (cause) {
+    if (current === summarySeq) {
+      summary.value = null;
+      summaryError.value = cause instanceof Error ? cause.message : '获取提交统计失败';
+    }
+  } finally { if (current === summarySeq) summaryLoading.value = false; }
+};
 const load = async (uid: string) => {
   if (!uid) return;
   const current = ++seq;
@@ -191,7 +213,7 @@ watch(
   () => {
     void loadUnread();
     const uid = String(route.params.uid ?? '');
-    if (uid) void load(uid);
+    if (uid) { void load(uid); void loadSummary(uid); }
   },
   { immediate: true },
 );

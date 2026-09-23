@@ -83,6 +83,7 @@ import { python } from '@codemirror/lang-python';
 const props = defineProps<{
   problemCode: string;
   contestId?: string;
+  homeworkId?: string;
 }>();
 
 const router = useRouter();
@@ -143,18 +144,21 @@ const handleSubmit = async () => {
   submitting.value = true;
   try {
     const contestId = props.contestId?.trim() || undefined;
+    const homeworkId = props.homeworkId?.trim() || undefined;
     const result = isFileEmpty
       ? await submitCode({
           problemCode: props.problemCode,
           language: language.value,
           code: code.value,
           contestId,
+          homeworkId,
         })
       : await (async () => {
           const form = new FormData();
           form.append('problemCode', props.problemCode);
           form.append('language', language.value);
           if (contestId) form.append('contestId', contestId);
+          if (homeworkId) form.append('homeworkId', homeworkId);
           form.append('file', uploadedFile.value as File);
           return submitCodeFile(form);
         })();

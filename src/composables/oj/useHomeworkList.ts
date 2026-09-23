@@ -23,12 +23,17 @@ export function useHomeworkList() {
 
   let seq = 0;
 
-  const fetchHomeworks = async (params: { keyword?: string } = {}) => {
+  const fetchHomeworks = async (params: { keyword?: string; classIds?: number[] } = {}) => {
     const current = ++seq;
     loading.value = true;
     error.value = null;
     try {
-      const result = await getHomeworks(page.value, pageSize.value, params.keyword);
+      if (params.classIds && params.classIds.length === 0) {
+        listData.value = [];
+        total.value = 0;
+        return;
+      }
+      const result = await getHomeworks(page.value, pageSize.value, params.keyword, undefined, params.classIds);
       if (current !== seq) return;
       listData.value = (result?.list ?? []).map((vo) => ({
         id: String(vo.id),

@@ -377,8 +377,9 @@ export function getProblemList(
   })
 }
 
-export function getProblemDetail(problemCode: string): Promise<ProblemDetailVo> {
-  return get<ProblemDetailVo>(`/api/problems/${encodeURIComponent(problemCode)}`)
+export function getProblemDetail(problemCode: string, contestId?: string): Promise<ProblemDetailVo> {
+  return get<ProblemDetailVo>(`/api/problems/${encodeURIComponent(problemCode)}`,
+    contestId ? { cid: contestId } : undefined)
 }
 
 // --------------------------------------------------
@@ -479,6 +480,129 @@ export function getSubmissionCases(submissionId: string): Promise<SubmissionCase
   return get<SubmissionCaseVo[]>(`/api/submissions/${encodeURIComponent(submissionId)}/cases`)
 }
 
+export interface ContestRankVo {
+  rank: number
+  uid: string
+  username: string
+  solved: number
+  totalScore: number
+  penaltyMinutes: number
+  problemScores: Record<string, number>
+}
+
+export function getContestScoreboard(contestId: string): Promise<ContestRankVo[]> {
+  return get<ContestRankVo[]>(`/api/contests/${encodeURIComponent(contestId)}/scoreboard`)
+}
+
+export interface ContestRatingVo {
+  rank: number
+  uid: string
+  username: string
+  rating: number
+  contests: number
+}
+
+export function getContestRatings(): Promise<ContestRatingVo[]> {
+  return get<ContestRatingVo[]>('/api/contests/ratings')
+}
+
+export function getContestRating(uid: string): Promise<ContestRatingVo | null> {
+  return get<ContestRatingVo | null>(`/api/contests/ratings/${encodeURIComponent(uid)}`)
+}
+
+export interface ContributionRankVo {
+  rank: number
+  uid: string
+  username: string
+  contribution: number
+  posts: number
+  answers: number
+}
+
+export function getContributionRankings(): Promise<ContributionRankVo[]> {
+  return get<ContributionRankVo[]>('/api/discussions/contributions')
+}
+
+export function getUserContribution(uid: string): Promise<ContributionRankVo | null> {
+  return get<ContributionRankVo | null>(`/api/discussions/contributions/${encodeURIComponent(uid)}`)
+}
+
+export interface HomeworkRankVo {
+  rank: number
+  uid: string
+  username: string
+  solved: number
+  totalScore: number
+}
+
+export function getHomeworkRankings(homeworkId: string): Promise<HomeworkRankVo[]> {
+  return get<HomeworkRankVo[]>(`/api/homeworks/${encodeURIComponent(homeworkId)}/rankings`)
+}
+
+export interface UserSolveRankVo {
+  rank: number
+  uid: string
+  username: string
+  solved: number
+  monthlySolved: number
+  submissions: number
+}
+
+export function getSolveRankings(period: 'all' | 'month' = 'all'): Promise<UserSolveRankVo[]> {
+  return get<UserSolveRankVo[]>('/api/submissions/rankings', { period })
+}
+
+export interface UserSubmissionSummaryVo {
+  totalSubmissions: number
+  acceptedProblems: number
+  problems: Array<{ problemCode: string; accepted: boolean; attempts: number }>
+  daily: Array<{ day: string; submissions: number; accepted: number }>
+}
+
+export function getUserSubmissionSummary(uid: string): Promise<UserSubmissionSummaryVo> {
+  return get<UserSubmissionSummaryVo>(`/api/submissions/users/${encodeURIComponent(uid)}/summary`)
+}
+
+export interface AdminSubmissionDashboardVo {
+  totalSubmissions: number
+  reportDate?: string
+  daily: Array<{ day: string; submissions: number }>
+  statuses: Array<{ status: number; submissions: number }>
+  hotProblems: Array<{ problemCode: string; submissions: number }>
+  lowActivityProblems: Array<{ problemCode: string; submissions: number }>
+}
+
+export function getAdminSubmissionDashboard(): Promise<AdminSubmissionDashboardVo> {
+  return get<AdminSubmissionDashboardVo>('/api/admin/submissions/dashboard')
+}
+
+export interface FavoriteTrainingStatVo { trainingId: string; favorites: number }
+export function getTopFavoriteTrainings(): Promise<FavoriteTrainingStatVo[]> {
+  return get<FavoriteTrainingStatVo[]>('/api/admin/favorites/top-trainings')
+}
+
+export type FavoriteType = 'problem' | 'training' | 'contest' | 'discussion'
+export interface UserFavoriteVo {
+  id: number
+  uid: string
+  targetType: FavoriteType
+  targetId: string
+  gmtCreate: string
+}
+
+export function getFavorites(type?: FavoriteType): Promise<UserFavoriteVo[]> {
+  return get<UserFavoriteVo[]>('/api/user/favorites', { type })
+}
+export function checkFavorite(type: FavoriteType, targetId: string): Promise<boolean> {
+  return get<boolean>('/api/user/favorites/check', { type, targetId })
+}
+export function addFavorite(type: FavoriteType, targetId: string): Promise<void> {
+  return post<void>('/api/user/favorites', { type, targetId })
+}
+export function removeFavorite(type: FavoriteType, targetId: string): Promise<void> {
+  return del<void>(`/api/user/favorites/${type}/${encodeURIComponent(targetId)}`)
+}
+
 export function rejudgeSubmission(submissionId: string): Promise<SubmitCodeVo> {
   return post<SubmitCodeVo>(`/api/admin/submissions/${encodeURIComponent(submissionId)}/rejudge`)
 }
@@ -560,6 +684,7 @@ export interface ContestListOptions {
   startTo?: number
   /** 排序口径；不传则后端按开始时间倒序 */
   window?: ContestListWindow
+  participantUid?: string
 }
 
 export function getContests(
@@ -577,11 +702,45 @@ export function getContests(
     startFrom: options.startFrom,
     startTo: options.startTo,
     window: options.window,
+    participantUid: options.participantUid,
   })
 }
 
 export function getContestDetail(contestId: number | string): Promise<ContestDetailVo> {
   return get<ContestDetailVo>(`/api/contests/${encodeURIComponent(String(contestId))}`)
+}
+
+export interface FeaturedContestVo {
+  id: number
+  title: string
+  type: string
+  startTime: string
+  endTime: string
+  status: 'running' | 'upcoming'
+}
+
+export function getFeaturedContest(): Promise<FeaturedContestVo | null> {
+  return get<FeaturedContestVo | null>('/api/contests/featured')
+}
+
+export function getContestRegistration(contestId: string): Promise<boolean> {
+  return get<boolean>(`/api/contests/${encodeURIComponent(contestId)}/registration`)
+}
+
+export interface MyContestTeamVo {
+  teamId: number
+  teamName: string
+  contestId: number
+  contestTitle: string
+  captainUid: string
+}
+
+export function getMyContestTeams(): Promise<MyContestTeamVo[]> {
+  return get<MyContestTeamVo[]>('/api/contests/teams/mine')
+}
+
+export function registerContest(contestId: string): Promise<void> {
+  return post<void>(`/api/contests/${encodeURIComponent(contestId)}/registration`)
 }
 
 export function checkContest(contestId: number | string): Promise<ContestCheckVo> {
@@ -694,11 +853,15 @@ export function getHomeworks(
   page: number,
   pageSize: number,
   keyword?: string,
+  classId?: number,
+  classIds?: number[],
 ): Promise<PageVo<HomeworkListVo>> {
   return get<PageVo<HomeworkListVo>>('/api/homeworks', {
     page,
     pageSize,
     keyword: keyword?.trim() || undefined,
+    classId,
+    classIds: classIds?.join(','),
   })
 }
 
@@ -800,7 +963,7 @@ export interface DiscussionVoteVo {
 export function getDiscussions(
   page: number,
   pageSize: number,
-  options: { category?: string; keyword?: string; sort?: string } = {},
+  options: { category?: string; keyword?: string; sort?: string; uid?: string } = {},
 ): Promise<PageVo<DiscussionListVo>> {
   return get<PageVo<DiscussionListVo>>('/api/discussions', {
     page,
@@ -808,6 +971,7 @@ export function getDiscussions(
     category: options.category || undefined,
     keyword: options.keyword?.trim() || undefined,
     sort: options.sort || undefined,
+    uid: options.uid || undefined,
   })
 }
 
@@ -1442,6 +1606,28 @@ export function getPublicConfig(): Promise<SystemPublicConfigVo> {
 
 export function getSystemTime(): Promise<SystemTimeVo> {
   return get<SystemTimeVo>('/api/system/time')
+}
+
+export interface InviteCodeVo {
+  id: number
+  status: number
+  createdBy: string
+  usedUid: string | null
+  usedAt: string | null
+  expiresAt: string
+  gmtCreate: string
+}
+
+export function getInviteCodes(): Promise<InviteCodeVo[]> {
+  return get<InviteCodeVo[]>('/api/admin/invite-codes')
+}
+
+export function createInviteCode(expiresAt: number): Promise<string> {
+  return post<string>('/api/admin/invite-codes', { expiresAt })
+}
+
+export function revokeInviteCode(id: number): Promise<null> {
+  return post<null>(`/api/admin/invite-codes/${id}/revoke`)
 }
 
 // --------------------------------------------------

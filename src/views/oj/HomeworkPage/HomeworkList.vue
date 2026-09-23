@@ -9,18 +9,15 @@
         <span class="title">作业查询 / Homework Query</span>
       </div>
 
-      <n-alert type="info" :bordered="false" style="margin-bottom: 16px">
-        作业列表接口当前仅支持关键词检索；学院 / 年级 / 班级 / 教师筛选暂未开放。
-      </n-alert>
-
       <n-grid :x-gap="24" :y-gap="24" cols="1 s:2 m:3 l:5" responsive="screen">
         <n-grid-item>
           <div class="filter-item">
             <span class="label">所属学院 (College)</span>
             <n-select
-              disabled
-              placeholder="暂未开放"
-              :options="[]"
+              v-model:value="collegeId"
+              placeholder="全部学院"
+              :options="collegeOptions"
+              clearable
             />
           </div>
         </n-grid-item>
@@ -29,9 +26,11 @@
           <div class="filter-item">
             <span class="label">年级 (Grade)</span>
             <n-select
-              disabled
-              placeholder="暂未开放"
-              :options="[]"
+              v-model:value="grade"
+              placeholder="全部年级"
+              :options="gradeOptions"
+              :disabled="!collegeId"
+              clearable
             />
           </div>
         </n-grid-item>
@@ -40,9 +39,11 @@
           <div class="filter-item">
             <span class="label">行政班级 (Class)</span>
             <n-select
-              disabled
-              placeholder="暂未开放"
-              :options="[]"
+              v-model:value="classId"
+              placeholder="全部班级"
+              :options="classOptions"
+              :disabled="!collegeId"
+              clearable
             />
           </div>
         </n-grid-item>
@@ -51,9 +52,13 @@
           <div class="filter-item">
             <span class="label">任课教师 (Teacher)</span>
             <n-select
-              disabled
-              placeholder="暂未开放"
-              :options="[]"
+              v-model:value="teacherUid"
+              placeholder="全部教师"
+              :options="teacherOptions"
+              :disabled="!collegeId"
+              :loading="teachersLoading"
+              @focus="loadTeachers"
+              clearable
             />
           </div>
         </n-grid-item>
@@ -118,14 +123,77 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search as SearchIcon } from '@vicons/ionicons5';
 import ContestItem from '@/components/ContestItem.vue';
 import { useHomeworkList } from '@/composables/oj/useHomeworkList';
+import { getColleges, getGrades, getClasses, getClassTeachers } from '@/utils/api';
 
 const router = useRouter();
 const searchKeyword = ref('');
+const collegeId = ref<number | null>(null);
+const grade = ref<string | null>(null);
+const classId = ref<number | null>(null);
+const teacherUid = ref<string | null>(null);
+const collegeOptions = ref<Array<{ label: string; value: number }>>([]);
+const gradeOptions = ref<Array<{ label: string; value: string }>>([]);
+const allClasses = ref<Array<{ id: number; name: string; grade: string }>>([]);
+const teacherClasses = ref<Record<string, number[]>>({});
+const teacherNames = ref<Record<string, string>>({});
+const teachersLoading = ref(false);
+const classOptions = computed(() => allClasses.value.filter(item => !grade.value || item.grade === grade.value)
+  .map(item => ({ label: `${item.name} (${item.grade})`, value: item.id })));
+const teacherOptions = computed(() => Object.entries(teacherNames.value)
+  .filter(([uid]) => (teacherClasses.value[uid] ?? []).some(id => classOptions.value.some(item => item.value === id)))
+  .map(([uid, name]) => ({ label: name, value: uid })));
+let filterSeq = 0;
+watch(collegeId, async id => {
+  const current = ++filterSeq;
+  grade.value = null;
+  classId.value = null;
+  teacherUid.value = null;
+  gradeOptions.value = [];
+  allClasses.value = [];
+  teacherClasses.value = {};
+  teacherNames.value = {};
+  if (!id) return;
+  try {
+    const grades = await getGrades(id);
+    if (current !== filterSeq) return;
+    gradeOptions.value = grades.map(item => ({ label: item.grade, value: item.grade }));
+    const groups = await Promise.all(grades.map(async item => ({
+      grade: item.grade, classes: await getClasses(id, item.grade),
+    })));
+    if (current === filterSeq) allClasses.value = groups.flatMap(group =>
+      group.classes.map(item => ({ ...item, grade: group.grade })));
+  } catch (cause) {
+    if (current === filterSeq) listError.value = cause instanceof Error ? cause.message : '班级选项加载失败';
+  }
+});
+watch(grade, () => { classId.value = null; teacherUid.value = null; teacherClasses.value = {}; teacherNames.value = {}; });
+watch(classId, () => { teacherUid.value = null; });
+const loadTeachers = async () => {
+  if (!collegeId.value || teachersLoading.value || Object.keys(teacherClasses.value).length) return;
+  const current = filterSeq;
+  teachersLoading.value = true;
+  try {
+    const groups = await Promise.all(classOptions.value.map(async item => ({
+      classId: item.value, teachers: await getClassTeachers(item.value),
+    })));
+    const classes: Record<string, number[]> = {};
+    const names: Record<string, string> = {};
+    for (const group of groups) for (const teacher of group.teachers) {
+      (classes[teacher.uid] ??= []).push(group.classId);
+      names[teacher.uid] = teacher.name;
+    }
+    if (current !== filterSeq) return;
+    teacherClasses.value = classes;
+    teacherNames.value = names;
+  } catch (cause) {
+    if (current === filterSeq) listError.value = cause instanceof Error ? cause.message : '教师选项加载失败';
+  } finally { teachersLoading.value = false; }
+};
 
 // 列表逻辑
 const { 
@@ -138,16 +206,20 @@ const {
   fetchHomeworks 
 } = useHomeworkList();
 
-// 处理查询：后端作业列表接口只支持 keyword 过滤，
-// 学院/年级/班级/教师筛选当前接口不支持，界面已禁用并明确提示，不发送空参数。
+const selectedClassIds = () => {
+  if (!collegeId.value) return undefined;
+  let ids = classId.value ? [classId.value] : classOptions.value.map(item => item.value);
+  if (teacherUid.value) ids = ids.filter(id => (teacherClasses.value[teacherUid.value!] ?? []).includes(id));
+  return ids;
+};
 const handleSearch = () => {
   page.value = 1;
-  void fetchHomeworks({ keyword: searchKeyword.value });
+  void fetchHomeworks({ keyword: searchKeyword.value, classIds: selectedClassIds() });
 };
 
 const handlePageChange = (p: number) => {
   page.value = p;
-  void fetchHomeworks({ keyword: searchKeyword.value });
+  void fetchHomeworks({ keyword: searchKeyword.value, classIds: selectedClassIds() });
 };
 
 const handleItemClick = (id: string) => {
@@ -156,10 +228,13 @@ const handleItemClick = (id: string) => {
 
 const resetFilters = () => {
   searchKeyword.value = '';
+  collegeId.value = null;
   handleSearch();
 };
 
 onMounted(() => {
+  void getColleges().then(items => { collegeOptions.value = items.map(item => ({ label: item.name, value: item.id })); })
+    .catch(cause => { listError.value = cause instanceof Error ? cause.message : '学院选项加载失败'; });
   handleSearch();
 });
 </script>

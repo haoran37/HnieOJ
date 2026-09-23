@@ -96,7 +96,7 @@
 | 84 | PUT `/api/admin/training/{id}` | useTrainingForm() handleSubmit()（TrainingEdit.vue） | AdminTrainingController | 已接线 | 编辑使用受保护 GET /api/admin/training/{id} 完整详情回填 description 与有序题目；后端不回显 privatePwd（恒为 null），留空提交即保留原密码，填写新值才更新；displayId Integer，不能发送 A/B |
 | 85 | DELETE `/api/admin/training` | useTrainingManage.ts handleDelete() | AdminTrainingController | 已接线 | query 参数 id= |
 | 86 | PUT `/api/admin/training/status` | useTrainingManage.ts handleToggleStatus() | AdminTrainingController | 已接线 | body{id,status:boolean}；成功后重读列表 |
-| 87 | GET `/api/homeworks` | src/composables/oj/useHomeworkList.ts（HomeworkList.vue） | HomeworkController | 已接线 | 仅 keyword + 分页；学院/年级/班级/教师筛选接口不支持，界面禁用并显示「暂未开放」，不发送无效参数 |
+| 87 | GET `/api/homeworks` | src/composables/oj/useHomeworkList.ts（HomeworkList.vue） | HomeworkController | 已接线 | keyword、分页和班级筛选已接入；学生的班级范围由服务端根据登录身份确定 |
 | 88 | GET `/api/homeworks/{id}` | src/composables/oj/useHomeworkDetail.ts（HomeworkDetail.vue/HomeworkProblems.vue） | HomeworkController | 已接线 | 详情含 problems（内部 problemId + String displayId） |
 | 89 | GET `/api/admin/homework/list` | src/composables/admin/useHomeworkManage.ts fetchHomeworks()（HomeworkList/index.vue，remote 分页 + keyword） | AdminHomeworkController | 已接线 | status 为布尔 |
 | 90 | POST `/api/admin/homework` | useHomeworkForm() handleSubmit()（HomeworkAdd.vue） | AdminHomeworkController | 已接线 | classIds 为数字数组；displayId 为 String(A/B)；startTime/endTime 毫秒 |
@@ -159,25 +159,25 @@
 | POST/GET `/api/user/profile-change-requests` | `useUserSettings.ts`（UserSetting.vue 资料变更申请） | 项目内唯一的资料变更申请流程（`ProfileChangeService`），按申请 id 审批，可申请 12 个字段（身份字段 realname/collegeId/grade/classId + 联系/社交字段 username/email/phone/avatar/qq/cfUsername/github/blog），只提交需要变更的字段，含逐字段原值一致性校验 |
 | GET `/api/admin/profile-change-requests`、POST `/{id}/approve`、POST `/{id}/reject`、POST `/batch-approve` | `useUserChange.ts`（UserManage/Change.vue） | ADMIN/ROOT；按申请 id 审批，仅 PENDING 可操作；单条通过/驳回要求原因（≤1000），批量通过仅提交 {ids}；审批时逐字段校验原值，批量逐条独立事务。页面仅选择当前页待审核申请，显示成功/失败数及逐条失败原因，完成后重新读取真实列表 |
 
-## C. 无文档且后端无 API 的缺失能力（保留页面并禁用/空状态）
+## C. 业务能力接入状态
 
 | 能力 | 现状处理 |
 |------|---------|
 | 通知管理独立分类/定向推送 | **已接线**：`ContentManage/Notice.vue` + `useNotice.ts` 完成真实分页/筛选、草稿 CRUD、显式收件目标（用户查询 / 学院-年级-班级）与发布确认；已发布只读，删除只删管理记录。公告/新闻分类见 Announcement.vue / News.vue |
-| 比赛排行榜/名次、报名 | 后端无路由；`useContestScoreboard.ts` 与 ContestScoreboard.vue 标注「暂未开放」，不展示 mock |
-| 作业成绩单/排名 | 后端无路由；`useHomeworkRankings.ts` 与 HomeworkRankings.vue 标注「暂未开放」 |
-| 全站排行榜、比赛内排名 | 后端无路由；`RankPage.vue` 页面直接标注「暂未开放」 |
-| 首页 Top 评分/Top 贡献/月度排名 | 后端无路由；对应卡片标注「暂未开放」，不展示随机数据 |
-| 用户个人题单/比赛/作业/讨论 | 后端列表接口不支持 uid 过滤；UserTraining/UserContest/UserHomework/UserDiscuss 标注「暂未开放」，不用全站数据冒充 |
+| 比赛排行榜/名次、报名 | **已接线**：比赛榜单与报名接口；邀请制比赛榜单仅参赛者和管理员可见 |
+| 作业成绩单/排名 | **已接线**：`useHomeworkRankings.ts` 读取真实成绩单，后端按班级限制访问 |
+| 全站排行榜、比赛内排名 | **已接线**：`RankPage.vue` 与比赛详情读取真实榜单 |
+| 首页 Top 评分/Top 贡献/月度排名 | **已接线**：登录后请求真实榜单，游客展示登录提示 |
+| 用户个人题单/比赛/作业/讨论 | **已接线**：个人列表与题单收藏读取真实接口 |
 | 用户消息 | **已接线**：`useUserMessages.ts` + `UserMessage.vue` 支持分页、全部/未读过滤、未读数、单条/全部已读、删除确认；仅本人可见（route uid 与本人 uid 比较，非本人不可访问），失败不伪 0 |
-| 收藏/评分/历史统计 | 后端无自助接口；UserHome/UserSideBar 统计区标注「暂未开放」，UserHome「已通过/尝试过的题目」不再显示 0 题或「暂无本地记录」 |
-| 自助资料/密码/身份变更申请 | **已接线**：`useUserSettings.ts` + `UserSetting.vue` 真实加载 `GET /api/user/profile`，只提交白名单字段；密码走 `PUT /api/user/password`，成功后清理本地会话并跳转登录；身份与联系/社交字段走同一个变更申请并展示本人申请分页。收藏/评分仍暂未开放 |
+| 收藏/评分/历史统计 | **已接线**：收藏管理、比赛评分、贡献值与个人提交汇总读取真实接口；无评分或贡献记录时显示未知 |
+| 自助资料/密码/身份变更申请 | **已接线**：`useUserSettings.ts` + `UserSetting.vue` 真实加载 `GET /api/user/profile`，只提交白名单字段；密码走 `PUT /api/user/password`，成功后清理本地会话并跳转登录；身份与联系/社交字段走同一个变更申请并展示本人申请分页 |
 | 用户信息变更审核（「变动申请」页） | **已接线**：`useUserChange.ts` + `Change.vue` 走真实分页/状态/关键字，行 key 为申请 id，仅 PENDING 可审核；单条审核原因必填，批量通过已接真实接口并展示逐条结果，单条/批量共享写锁，冲突保留错误并刷新真实状态 |
 | 成就附件本地/外部区分 | 本地存储：`fileUrl` 为受保护路径 `/api/admin/achievements/{id}/file`，前端 Bearer 下载为 Blob；外部仅 http(s) 以链接打开，不把 local key 当链接、也不走服务端代理 |
-| 注册开关/注册模式执行缺口 | `registerMode` 已按后端合法枚举（OPEN/EMAIL_SUFFIX/INVITE_CODE）保存与回读，但 user 模块未读取 allowRegister/registerMode，RegisterRequest 无 inviteCode；Config.vue 明确提示该设置当前不影响实际注册，不虚构邀请码注册已生效 |
+| 注册开关/注册模式 | **已接线**：OPEN、EMAIL_SUFFIX、INVITE_CODE 由服务端策略执行；注册页按公开配置展示邀请码字段 |
 | 共享主 Judge Token 重置 | 已退休，改用 Bootstrap 一次性注册凭据（Service.vue `POST /api/admin/judge/nodes/bootstrap-tokens`）+ Ed25519 注册 |
-| 后台仪表盘历史趋势/判题分布/热点统计 | 后端无相应接口；`useDashboard.ts` 取用户/题目/题单/比赛/作业/提交列表的真实 `total`（真实 0 显示 0），任一接口读取失败显示「加载失败」并提供重新加载，不沿用旧成功值、也不伪装「暂未开放」；增长趋势、提交结果分布、热门/冷门题目、活跃题单仍显示「暂未开放」，不用随机统计 |
-| 比赛模式独立大屏 | 后端无 `/api/special/contest-mode` 等赛事信息/独立开关接口；`useContestMode.ts` 不伪造赛事名称、倒计时或节点时延，页面仅展示真实服务端时间并明确「比赛模式暂未开放」 |
+| 后台仪表盘历史趋势/判题分布/热点统计 | **已接线**：`useDashboard.ts` 读取真实总量、提交趋势/状态分布、热门与冷门题目、题单收藏统计；趋势日期以服务端 `reportDate` 为准 |
+| 比赛模式独立大屏 | **已接线**：`useContestMode.ts` 读取服务端时间与公开推荐比赛；请求失败显示错误状态，保留上次成功的比赛信息 |
 
 ## D. 关键字段与单位约定
 

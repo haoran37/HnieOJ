@@ -6,6 +6,7 @@ export interface SubmitCodeRequest {
   language: string
   code?: string
   contestId?: string
+  homeworkId?: string
 }
 
 export interface SubmitCodeVo {

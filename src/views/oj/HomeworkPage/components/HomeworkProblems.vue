@@ -37,7 +37,7 @@ const rows = ref<HomeworkProblemRow[]>([]);
 let seq = 0;
 
 const handleClick = (code: string) => {
-  if (code) router.push(`/problem/${code}`);
+  if (code) router.push({ path: `/problem/${code}`, query: { hid: String(props.detail.id) } });
 };
 
 // 作业题目只提供内部 problemId，必须经 checkProblem 换展示编号

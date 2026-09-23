@@ -17,6 +17,8 @@
               <n-tab name="homework">作业</n-tab>
               <n-tab name="contest">比赛</n-tab>
               <n-tab name="training">题单</n-tab>
+              <n-tab name="favorites">收藏</n-tab>
+              <n-tab name="teams">团队</n-tab>
               <n-tab name="discuss">讨论</n-tab>
               <n-tab name="message">消息</n-tab>
               <n-tab name="setting">设置</n-tab>

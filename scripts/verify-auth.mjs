@@ -31,6 +31,7 @@ globalThis.__registerApiStub = {
   getColleges: async () => [],
   getGrades: async () => [],
   getClasses: async () => [],
+  getPublicConfig: async () => ({ allowRegister: true, registerMode: 'OPEN' }),
   register: async () => null,
 }
 globalThis.__registerMessage = { error() {}, success() {}, warning() {} }
@@ -42,6 +43,7 @@ const componentStubSources = {
     'export const getColleges = (...a) => globalThis.__registerApiStub.getColleges(...a)',
     'export const getGrades = (...a) => globalThis.__registerApiStub.getGrades(...a)',
     'export const getClasses = (...a) => globalThis.__registerApiStub.getClasses(...a)',
+    'export const getPublicConfig = (...a) => globalThis.__registerApiStub.getPublicConfig(...a)',
     'export const register = (...a) => globalThis.__registerApiStub.register(...a)',
   ].join('\n'),
 }

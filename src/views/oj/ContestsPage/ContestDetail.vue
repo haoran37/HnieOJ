@@ -10,6 +10,7 @@
               {{ detail.type }} 赛制
             </n-tag>
             <h1 class="contest-title">{{ detail.title }}</h1>
+            <n-button size="small" :loading="favoriteLoading" @click="toggleFavorite">{{ isFavorite ? '取消收藏' : '收藏比赛' }}</n-button>
             <div class="meta-info">
               <span><n-icon><PersonIcon/></n-icon>主办方: {{ detail.creator }}</span>
               <span><n-icon><TimeIcon/></n-icon>时长: {{ durationText }}</span>
@@ -89,8 +90,10 @@ import {
 } from '@vicons/ionicons5';
 import { useContestDetail } from '@/composables/oj/useContestDetail';
 import { formatDuration } from '@/composables/useTime';
+import { useFavorite } from '@/composables/oj/useFavorite';
 
 const route = useRoute();
+const { saved: isFavorite, loading: favoriteLoading, toggle: toggleFavorite } = useFavorite('contest', () => String(route.params.contestId ?? ''));
 const router = useRouter();
 const message = useMessage();
 

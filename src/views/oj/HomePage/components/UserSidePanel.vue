@@ -9,12 +9,12 @@
         <div class="stat-line">
           <n-icon size="26" class="stat-icon blue-icon"><BarChartIcon /></n-icon>
           <span class="stat-label">评分:</span>
-          <span class="stat-value">暂未开放</span>
+          <span class="stat-value">{{ rating === null ? '—' : rating }}</span>
         </div>
         <div class="stat-line">
           <n-icon size="26" class="stat-icon red-icon"><RibbonIcon /></n-icon>
           <span class="stat-label">贡献:</span>
-          <span class="stat-value">暂未开放</span>
+          <span class="stat-value">{{ contribution === null ? '—' : contribution }}</span>
         </div>
 
         <ul class="nav-list">
@@ -57,16 +57,31 @@ import {
   BarChartOutline as BarChartIcon,
   RibbonOutline as RibbonIcon
 } from '@vicons/ionicons5';
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import BoardCard from '@/components/BoardCard.vue';
 import { useUserStore } from '@/stores/userStore';
-import { getUserMessageUnreadCount } from '@/utils/api';
+import { getUserMessageUnreadCount, getContestRating, getUserContribution } from '@/utils/api';
 import { onUserMessagesChanged } from '@/composables/oj/useUserMessages';
 
 const userStore = useUserStore();
 
 // 真实未读数：读取失败保持 null，不伪装成 0
 const unreadCount = ref<number | null>(null);
+const rating = ref<number | null>(null);
+const contribution = ref<number | null>(null);
+let scoreSeq = 0;
+watch(() => userStore.userInfo?.id, async uid => {
+  const current = ++scoreSeq;
+  rating.value = null;
+  contribution.value = null;
+  if (!uid) return;
+  const [ratingResult, contributionResult] = await Promise.allSettled([
+    getContestRating(uid), getUserContribution(uid),
+  ]);
+  if (current !== scoreSeq) return;
+  rating.value = ratingResult.status === 'fulfilled' ? (ratingResult.value?.rating ?? null) : null;
+  contribution.value = contributionResult.status === 'fulfilled' ? (contributionResult.value?.contribution ?? null) : null;
+}, { immediate: true });
 
 // 请求序号：账号切换后作废旧未读数响应，避免串号
 let unreadSeq = 0;
@@ -92,6 +107,7 @@ const offMessagesChanged = onUserMessagesChanged(() => {
 });
 onBeforeUnmount(() => {
   ++unreadSeq;
+  ++scoreSeq;
   offMessagesChanged();
 });
 onMounted(loadUnread);

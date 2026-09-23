@@ -4,7 +4,10 @@ import {
   getAdminHomeworks,
   getAdminProblemList,
   getAdminTrainings,
-  getSubmissions,
+  getAdminSubmissionDashboard,
+  getTopFavoriteTrainings,
+  type AdminSubmissionDashboardVo,
+  type FavoriteTrainingStatVo,
   getUsers,
 } from '@/utils/api'
 
@@ -63,13 +66,10 @@ export const useDashboard = () => {
   const error = ref<string | null>(null)
   const totals = ref<DashboardTotals>(emptyTotals())
   const failed = ref<Record<DashboardMetric, boolean>>(emptyFailed())
+  const submissionStats = ref<AdminSubmissionDashboardVo | null>(null)
+  const favoriteTrainings = ref<FavoriteTrainingStatVo[]>([])
 
-  // 后端没有历史趋势/判题分布/热点统计等接口，页面必须明确“暂未开放”，不得用随机统计
-  const trendAvailable = false
-  const healthAvailable = false
-  const contentAvailable = false
-
-  // 已接入的 6 个真实 total 接口，任一失败都不能伪造成“暂未开放”
+  // 已接入的真实总量接口，任一失败都不能伪造成“暂未开放”
   const metricLoaders: Array<{
     key: DashboardMetric
     label: string
@@ -80,7 +80,6 @@ export const useDashboard = () => {
     { key: 'totalTrainings', label: '题单', load: () => getAdminTrainings({ page: 1, pageSize: 1 }) },
     { key: 'totalContests', label: '比赛', load: () => getAdminContests({ page: 1, pageSize: 1 }) },
     { key: 'totalHomeworks', label: '作业', load: () => getAdminHomeworks({ page: 1, pageSize: 1 }) },
-    { key: 'totalSubmissions', label: '提交', load: () => getSubmissions({ page: 1, pageSize: 1 }) },
   ]
 
   // 请求序号：重复触发（如快速重试）时，先发起的响应不得覆盖后发起的结果
@@ -90,8 +89,17 @@ export const useDashboard = () => {
     const current = ++fetchSeq
     loading.value = true
     error.value = null
+    favoriteTrainings.value = []
+    void getTopFavoriteTrainings().then(value => {
+      if (current === fetchSeq) favoriteTrainings.value = value
+    }).catch(() => {
+      if (current === fetchSeq) error.value = [error.value, '题单收藏统计加载失败'].filter(Boolean).join('；')
+    })
     try {
-      const results = await Promise.allSettled(metricLoaders.map((metric) => metric.load()))
+      const [results, statsResult] = await Promise.all([
+        Promise.allSettled(metricLoaders.map(metric => metric.load())),
+        Promise.allSettled([getAdminSubmissionDashboard()]).then(results => results[0]!),
+      ])
       if (current !== fetchSeq) return
       const nextTotals = emptyTotals()
       const nextFailed = emptyFailed()
@@ -107,12 +115,13 @@ export const useDashboard = () => {
           failedLabels.push(metric.label)
         }
       })
+      if (statsResult.status === 'fulfilled') nextTotals.totalSubmissions = statsResult.value.totalSubmissions
+      else { nextFailed.totalSubmissions = true; failedLabels.push('提交') }
       // 整体覆盖：失败项保持 null，绝不沿用旧成功值冒充新状态
       totals.value = nextTotals
       failed.value = nextFailed
-      if (failedLabels.length > 0) {
-        error.value = `${failedLabels.join('、')}数据加载失败，请重试`
-      }
+      if (failedLabels.length > 0) error.value = [error.value, `${failedLabels.join('、')}数据加载失败，请重试`].filter(Boolean).join('；')
+      submissionStats.value = statsResult.status === 'fulfilled' ? statsResult.value : null
     } finally {
       if (current === fetchSeq) loading.value = false
     }
@@ -123,9 +132,8 @@ export const useDashboard = () => {
     error,
     totals,
     failed,
-    trendAvailable,
-    healthAvailable,
-    contentAvailable,
+    submissionStats,
+    favoriteTrainings,
     fetchData,
   }
 }

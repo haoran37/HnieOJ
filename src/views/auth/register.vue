@@ -1,6 +1,13 @@
 <template>
   <div class="auth-page">
     <n-card class="auth-card" title="注册 HNIEOJ">
+      <n-alert v-if="policyError" type="error" style="margin-bottom: 16px">{{ policyError }}</n-alert>
+      <n-alert v-else-if="registrationPolicy && !registrationAllowed" type="warning" style="margin-bottom: 16px">
+        系统暂未开放注册
+      </n-alert>
+      <n-alert v-else-if="registrationPolicy?.registerMode === 'EMAIL_SUFFIX'" type="info" style="margin-bottom: 16px">
+        仅允许使用以下邮箱后缀注册：{{ registrationPolicy.allowedEmailSuffixes?.join('、') || '未配置' }}
+      </n-alert>
       <n-form
         ref="formRef"
         :model="form"
@@ -28,6 +35,10 @@
 
         <n-form-item label="邮箱" path="email">
           <n-input v-model:value="form.email" placeholder="请输入邮箱" :disabled="submitting" />
+        </n-form-item>
+
+        <n-form-item v-if="registrationPolicy?.registerMode === 'INVITE_CODE'" label="邀请码" path="inviteCode">
+          <n-input v-model:value="form.inviteCode" placeholder="请输入管理员提供的一次性邀请码" :disabled="submitting" />
         </n-form-item>
 
         <n-form-item label="QQ" path="qq">
@@ -66,7 +77,7 @@
           />
         </n-form-item>
 
-        <n-button type="primary" block attr-type="submit" :loading="submitting" :disabled="submitting">
+        <n-button type="primary" block attr-type="submit" :loading="submitting" :disabled="submitting || !registrationAllowed">
           提交注册申请
         </n-button>
       </n-form>
@@ -89,7 +100,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage, type FormInst, type FormRules } from 'naive-ui'
-import { getClasses, getColleges, getGrades, register } from '@/utils/api'
+import { getClasses, getColleges, getGrades, getPublicConfig, register, type SystemPublicConfigVo } from '@/utils/api'
 import type { ClassOption, CollegeOption, GradeOption } from '@/types/user'
 
 const router = useRouter()
@@ -97,6 +108,9 @@ const message = useMessage()
 
 const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
+const registrationPolicy = ref<SystemPublicConfigVo | null>(null)
+const policyError = ref<string | null>(null)
+const registrationAllowed = computed(() => registrationPolicy.value?.allowRegister === true)
 
 const colleges = ref<CollegeOption[]>([])
 const grades = ref<GradeOption[]>([])
@@ -114,6 +128,7 @@ const form = reactive({
   username: '',
   password: '',
   email: '',
+  inviteCode: '',
   qq: '',
   collegeId: null as number | null,
   grade: null as string | null,
@@ -132,6 +147,8 @@ const rules: FormRules = {
     { required: true, message: '请输入邮箱', trigger: ['input', 'blur'] },
     { type: 'email', message: '邮箱格式不正确', trigger: ['input', 'blur'] },
   ],
+  inviteCode: [{ validator: (_rule, value) => registrationPolicy.value?.registerMode !== 'INVITE_CODE'
+    || Boolean(String(value ?? '').trim()), message: '请输入邀请码', trigger: ['input', 'blur'] }],
   qq: [
     { required: true, message: '请输入 QQ 号', trigger: ['input', 'blur'] },
     { pattern: /^\d{5,11}$/, message: 'QQ 号格式不正确', trigger: ['input', 'blur'] },
@@ -204,7 +221,7 @@ async function handleGradeChange(value: string | null) {
 }
 
 async function handleSubmit() {
-  if (submitting.value) return
+  if (submitting.value || !registrationAllowed.value) return
 
   try {
     await formRef.value?.validate()
@@ -221,6 +238,7 @@ async function handleSubmit() {
       username: form.username.trim(),
       password: form.password,
       email: form.email.trim(),
+      inviteCode: registrationPolicy.value?.registerMode === 'INVITE_CODE' ? form.inviteCode.trim() : undefined,
       qq: form.qq.trim(),
       collegeId: form.collegeId,
       classId: form.classId,
@@ -235,7 +253,14 @@ async function handleSubmit() {
   }
 }
 
-onMounted(loadColleges)
+onMounted(() => {
+  void loadColleges()
+  void getPublicConfig().then((config) => {
+    registrationPolicy.value = config
+  }).catch((error: unknown) => {
+    policyError.value = error instanceof Error ? error.message : '注册策略加载失败'
+  })
+})
 </script>
 
 <style scoped>

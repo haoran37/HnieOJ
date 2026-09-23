@@ -74,8 +74,10 @@ const answerItemStub = moduleStub('export default {};');
 
 // 只桩掉被测模块直接依赖的 api 函数；未赋值的调用会抛 TypeError，避免“假通过”
 const API_STUB_NAMES = [
+  'addFavorite',
   'changeUserPassword',
   'checkProblem',
+  'checkFavorite',
   'createAdminTraining',
   'createDiscussionAnswer',
   'createDiscussionComment',
@@ -85,12 +87,14 @@ const API_STUB_NAMES = [
   'getClasses',
   'getColleges',
   'getDiscussionDetail',
+  'getFeaturedContest',
   'getGrades',
   'getJudgeOutbox',
   'getMyProfileChangeRequests',
   'getProfile',
   'getRelatedDiscussions',
   'getSystemTime',
+  'removeFavorite',
   'retryJudgeOutbox',
   'submitProfileChangeRequest',
   'updateAdminTraining',

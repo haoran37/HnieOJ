@@ -8,7 +8,7 @@
       </div>
       <div class="layout-right">
         <RecentContests />
-        <UserSidePanel />
+        <UserSidePanel @menu-click="handleUserMenuClick" />
         <TopRatingList />
         <TopContributorList />
         <UserSearchBox />
@@ -28,8 +28,44 @@ import TopRatingList from './components/TopRatingList.vue'
 import UserSearchBox from './components/UserSearchBox.vue'
 import FriendLinks from './components/FriendLinks.vue'
 import TopContributorList from './components/TopContributorList.vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/userStore'
 
 defineOptions({ name: 'OjHomePage' })
+
+const router = useRouter()
+const userStore = useUserStore()
+
+function handleUserMenuClick(key: string) {
+  const uid = userStore.userInfo?.id
+  if (!uid) {
+    void router.push('/login')
+    return
+  }
+  const userPath = `/user/${encodeURIComponent(uid)}`
+  switch (key) {
+    case 'settings':
+      void router.push(`${userPath}/setting`)
+      break
+    case 'messages':
+      void router.push(`${userPath}/message`)
+      break
+    case 'submissions':
+      void router.push({ path: '/status', query: { uid } })
+      break
+    case 'contests':
+      void router.push('/contests')
+      break
+    case 'favorites':
+      void router.push(`${userPath}/favorites`)
+      break
+    case 'teams':
+      void router.push(`${userPath}/teams`)
+      break
+    default:
+      break
+  }
+}
 </script>
 
 <style scoped lang="less">

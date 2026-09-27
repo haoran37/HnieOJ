@@ -51,7 +51,7 @@
     "eslint-plugin-vue": "~10.11.0",
     "jiti": "^2.7.0",
     "less": "^4.9.1",
-    "less-loader": "^12.3.0",
+    "less-loader": "^13.0.0",
     "naive-ui": "^2.45.3",
     "npm-run-all2": "^9.0.3",
     "typescript": "~5.9.3",
